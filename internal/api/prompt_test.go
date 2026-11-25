@@ -203,7 +203,7 @@ func TestBuildPromptEvidenceBaseIsUnified(t *testing.T) {
 		"`evidence` 路径以**本轮 case 目录**为基准",
 		"本 run 写 `raw/x`",
 		"复用别的 case 写 `../in_x/…`",
-		"图里的路径可原样抄进 `facts.jsonl`",
+		"图和接口里显示的是 cases 根相对（带 `in_xxx/` 前缀）",
 		"声明路径必须和文件实际位置一致",
 		"解析结果必须落在项目 cases 目录内的某个 case",
 		"`../../x` 会让整行 JSON 被跳过",
@@ -1105,7 +1105,6 @@ func TestParkedReasonSurvivesTheBriefClip(t *testing.T) {
 		t.Fatalf("brief clipped the park decision:\n%s", p)
 	}
 }
-
 
 // With review off there is no verdict to wait for: an unverified fact keeps its
 // status and its warning, but its text is shown instead of being replaced by an

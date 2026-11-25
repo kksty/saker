@@ -475,7 +475,10 @@ test('node type labels are operator language, not graph enums', () => {
   assert.equal(nodeTypeLabel('step'), '意图')
   assert.equal(nodeTypeLabel('intent'), '意图')
   assert.equal(nodeTypeLabel('ghost'), '意图')
-  assert.equal(nodeTypeLabel('fact', 'host'), '事实 · host')
+  assert.equal(nodeTypeLabel('fact', 'host'), 'host')
+  // The ledger kind stands alone: a 事实 prefix was a second taxonomy on a badge
+  // that already sits inside the fact panel.
+  assert.equal(nodeTypeLabel('fact', 'artifact'), 'artifact')
   assert.equal(nodeTypeLabel('fact'), '事实')
   assert.equal(nodeTypeLabel('goal'), '目标')
   assert.equal(nodeTypeLabel('project'), '项目')

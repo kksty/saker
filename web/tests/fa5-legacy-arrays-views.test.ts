@@ -299,8 +299,80 @@ test('ProjectState roster keeps live (newest updated) before queued (oldest crea
   assert.deepEqual(ids(runs), runBefore, 'the run payload must not be reordered in place')
 })
 
-// ----------------------------------------------------------------- Overview ----
+test('a settled direction says who declared it, in the roster and in the detail', async () => {
+  const settled = intentRow('settled_one', 'done', '2026-11-10T01:00:00Z', '2026-11-10T06:00:00Z', {
+    done_declared_by: 'commander',
+    done_note: '执行者已拿到 shell，run 收口失败但证据齐全',
+    done_fact_ids: ['f_shell'],
+    done_run_ids: ['r_9f2'],
+    done_at: '2026-11-10T06:00:00Z',
+  })
+  const runs = [runRow('r_9f2', 'settled_one', '2026-11-10T05:00:00Z', { status: 'failed' })]
+  api.board = async () => boardFixture()
+  api.intents = async () => [settled]
+  api.runs = async () => runs
+  api.intentReadiness = async () => null
+  api.runContext = async () => null
+  api.events = async () => []
+  api.intent = async () => ({ intent: settled, facts: [], facts_total: 0 })
+  await mount(React.createElement(ConfirmProvider, null, React.createElement(ProjectState, {})))
+  assert.match(pageText(), /指挥官判定/, 'the roster line must not read as a run-produced 完成')
+  const row = renderer!.root.findByProps({ 'data-testid': 'intent-tab-settled_one' })
+  await act(async () => { row.props.onClick?.({}) })
+  await settle()
+  const text = pageText()
+  assert.match(text, /指挥官判定完成/)
+  const badge = renderer!.root.findAll((node: any) =>
+    typeof node.type === 'string' && String(node.props?.title ?? '').includes('说明：执行者已拿到 shell')).at(-1)
+  assert.ok(badge, 'hover text names the settler note and its evidence')
+  assert.match(String(badge.props.title), /证据事实：f_shell/)
+  assert.match(String(badge.props.title), /证据运行：r_9f2/)
+  // A run-produced completion must not grow the extra chip: exactly one badge in
+  // the detail panel carries the settled provenance.
+  const detail = renderer!.root.findByProps({ 'data-testid': 'exec-detail' })
+  assert.equal(
+    detail.findAll((node: any) => typeof node.type === 'string' && String(node.props?.title ?? '').startsWith('说明：执行者')).length,
+    1,
+  )
+})
 
+test('a canceled run says its category once and gives the operator words the full width', async () => {
+  const stopped = intentRow('stopped_one', 'failed', '2026-11-10T01:00:00Z', '2026-11-10T05:00:00Z', {
+    hold: true,
+    held_by: 'commander',
+    hold_reason: '止损',
+  })
+  const runs = [runRow('r_stop', 'stopped_one', '2026-11-10T04:00:00Z', {
+    status: 'canceled',
+    cancel_cause: 'stop_loss',
+    ended_at: '2026-11-10T04:30:00Z',
+    exit_reason:
+      '止损：操作员指令：白盒优先（本来就是想复现）。先停黑盒摸索，等白盒给出各级 file:line 判定',
+  })]
+  api.board = async () => boardFixture()
+  api.intents = async () => [stopped]
+  api.runs = async () => runs
+  api.intentReadiness = async () => null
+  api.runContext = async () => null
+  api.events = async () => []
+  api.intent = async () => ({ intent: stopped, facts: [], facts_total: 0 })
+  await mount(React.createElement(ConfirmProvider, null, React.createElement(ProjectState, {})))
+  const row = renderer!.root.findByProps({ 'data-testid': 'intent-tab-stopped_one' })
+  await act(async () => { row.props.onClick?.({}) })
+  await settle()
+  const text = pageText()
+  assert.match(text, /取消原因/, 'the row keeps its own label')
+  assert.match(text, /操作员指令：白盒优先（本来就是想复现）/, "the operator's words are shown verbatim")
+  assert.doesNotMatch(text, /止损：/, 'the category is not repeated inside the reason')
+  const body = renderer!.root.findAll((node: any) =>
+    typeof node.type === 'string' &&
+    String(node.props?.className ?? '').includes('tw-break') &&
+    String(node.props?.title ?? '').includes('止损')).at(-1)
+  assert.ok(body, 'the cancel reason body is rendered')
+  assert.doesNotMatch(String(body.props.className), /flex-1/, 'the reason must not share its row with the label')
+})
+
+// ----------------------------------------------------------------- Overview ----
 test('Overview distinguishes parked, held, failed, and prerequisite blockers', async () => {
   api.goals = async () => []
   api.runs = async () => []

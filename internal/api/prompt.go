@@ -711,7 +711,7 @@ func writeInputPointers(b *strings.Builder, graph, focus, optional bool) {
 	if optional && focus {
 		b.WriteString("冷层查询 `GET /api/focus?intent=<id>&layer=cold`。索引不等于完整账本。\n")
 	}
-	b.WriteString("`evidence` 路径以**本轮 case 目录**为基准（不是 cwd）：本 run 写 `raw/x`，复用别的 case 写 `../in_x/…`；图里的路径可原样抄进 `facts.jsonl`。\n")
+	b.WriteString("`evidence` 路径以**本轮 case 目录**为基准（不是 cwd，也不是 cases 根）：本 run 写 `raw/x`，复用别的 case 写 `../in_x/…`。图和接口里显示的是 cases 根相对（带 `in_xxx/` 前缀），登记时去掉那个前缀再写。\n")
 	// The shared battlefield is readable with the round's own token: that is how
 	// a run notices a peer's premise, the project goal or an existing proof
 	// instead of re-deriving it. It is a read view, not authorization. The
@@ -841,13 +841,25 @@ func writeHandoff(b *strings.Builder) {
 	b.WriteString("  - `tags`/`observed_at`/`execution_context_ref`：可选检索标签、RFC3339 观察时刻、明确引用的现场/资源标识。\n")
 	b.WriteString("  以上字段只记录身份与出处，不改变事实含义；没有就留空，不能当证据用。\n")
 	b.WriteString("- `playbook` 是可复用打法（进项目打法库，不是事实、不算结论、不送验）：title=名称，summary=什么时候用，doc=命令/判据/坑，tags 可选，outcome=`success`（默认）或 `dead_end`（当时未走通）。本轮经验是否记录和复用由你判断。`from_fact_ids` 只引用可核验事实，不要引用 note（note 永不复核，会让打法永远停在候选）。\n")
-	b.WriteString("- `artifact` 是被分析的对象本身（固件、样本、二进制），`loot` 是拿到的东西。\n")
+	// The kind is the claim, not the outcome that was hoped for and not the
+	// mechanism that stopped it. A list of obstacles ("blocked by ACL / WAF /
+	// auth / read-only store") ages badly and invites a new kind per obstacle;
+	// state the question each kind answers so the same rule covers everything.
+	b.WriteString("- `kind` 写的是这条记录**断言了什么**，不是你希望的结果，也不是挡住你的手段：\n")
+	b.WriteString("  - 断言「我拿到了能力或数据」：`vuln` 是能做到本不该做的事，`cred` 是能用的凭据，`loot` 是拿到的东西。\n")
+	b.WriteString("  - 断言「我试了，没得手」或「我看到了现象，还不足以下结论」：`note`。挡住你的东西不进类型名——没得手就不是能力断言，无论拦在认证、权限、限流、只读、路径不存在还是别处。\n")
+	b.WriteString("  - 断言「原件里就是这个值」用 `host`/`service`（地址、端口、原值）；被分析的对象本身（固件、样本、二进制、响应报文）用 `artifact`。\n")
+	b.WriteString("  - 自检：把这条写进下游意图的 `from_fact_ids`，复核者要重跑什么？写得出一段可重放的利用/登录/取数步骤，才是前三种；只能再看一遍同样的现象，就是 `note`。\n")
 	// Titles are the graph and board labels; they are indexed and searched. A
 	// mixed-language ledger reads badly, but host/service titles are machine
 	// keys (host facts are joined to services by the address), so they stay raw.
 	b.WriteString("- `title` 是索引：`host`/`service` 保持 `地址:端口` 原文，其余类型用简体中文短句（≤24 字）；英文原文、响应逐字内容放进 `summary`/`doc`。\n")
 	b.WriteString("- 静态结论（反汇编、反编译、字符串推断）标 `proof:\"static\"`，并在 `doc` 里写清可重放的命令；否则按动态证明复核。\n")
 	b.WriteString("- `vuln` 的 `doc` 要带最小复现命令、实测的请求报文与响应报文关键片段、以及判据，复核者据此重跑。\n")
+	// A blocked attempt is not an exploit: recording it as `vuln` inflated the
+	// finding list with defenses that held. The taxonomy above already decides
+	// it; this line only pins what the vulnerable write must prove.
+	b.WriteString("- `vuln` 只写已确认可利用或已复现的问题，`doc` 里给出复核者能重跑的那一步。\n")
 	// Severity is a declared label, not a derived one: the executor has to state
 	// either a grade or the reason it could not. The evidence of the run that
 	// exposed this is a real declaration that carried no grade at all while the
@@ -859,6 +871,10 @@ func writeHandoff(b *strings.Builder) {
 	b.WriteString("- harness 原生扫描结果按稳定引用声明：`evidence:[{\"artifact\":\"run_id/result_id\"}]`；只有明确引用的原件算证据，命中本身不是结论。解析结果必须落在项目 cases 目录内的某个 case（本轮或兄弟）；绝对路径、cases 根下或 `../../x` 会让整行 JSON 被跳过。\n")
 	b.WriteString("- 证据可带出处（`file` 必须在）：`{\"file\":\"admin-200.html\",\"url\":\"…\"}` 或 `{\"file\":\"scan.json\",\"artifact\":\"sha256:…\"}`；裸路径等价于 `{\"file\":…}`，出处只是记录。\n")
 	b.WriteString("- 只在线上看到、留不下文件时写 `{\"url\":\"…\"}`：只记录范围与限制，不算证据。能存文件就存文件。\n")
+	b.WriteString("- 结论与证据照原文写，不要脱敏：口令、Cookie、令牌、哈希、序列号、内网地址都保留原始字符与编码。打码会让复核者无法重放，也让复现链断在证据上。\n")
+	b.WriteString("- 控制面的操作员凭据由操作员持有，不是你的身份，读到也不使用。\n")
+	b.WriteString("- 你自己派出的子意图派错了，可以直接取消：`POST /api/intents/<子意图>/cancel`，`{\"reason\":\"…\"}`，理由写清为什么不再需要它。别的意图（同僚、父意图、顶层方向）的生命周期不归你。\n")
+	b.WriteString("- 需要人接手、需要重开一个已停的意图、需要改目标或走审批时，用 handoff 写给指挥官：写明哪条意图、要它做什么、你手上有什么材料；它决定 continue、retry 还是别的。意图停放或结束不阻挡这条路径——材料照样交得出去，只是启动那一下由指挥官按。\n")
 	b.WriteString("- 跑完没结论也要写一条 `note`：试过什么、为什么放弃；`doc` 写清止于何处（试了什么、没试什么）。\"测过\"不等于\"测完\"。没写文件 = 这一轮没有交接。\n")
 }
 

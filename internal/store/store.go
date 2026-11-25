@@ -294,6 +294,9 @@ func (s *Store) ReopenIntent(id string) (model.Intent, error) {
 		in.ParkedAt = nil
 		in.Hold = false
 		in.HeldBy, in.HoldReason = "", ""
+		// Reopening puts the direction back on the queue: a completion that a
+		// previous turn declared is history now, not the current state.
+		in.ClearDoneDeclared()
 		in.UpdatedAt = time.Now()
 		return detachIntent(*in), s.flush("intent")
 	}
@@ -346,6 +349,37 @@ func (s *Store) updateIntentIfCurrent(id, status, runID string, match func(*mode
 			continue
 		}
 		if in.Status != status || in.RunID != runID || (match != nil && !match(in)) {
+			return detachIntent(*in), false, nil
+		}
+		previous := detachIntent(*in)
+		fn(in)
+		if err := s.validateIntentStructureLocked(in, previous); err != nil {
+			return model.Intent{}, false, err
+		}
+		*in = detachIntent(*in)
+		in.UpdatedAt = time.Now()
+		out := detachIntent(*in)
+		err := s.flush("intent")
+		return out, err == nil, err
+	}
+	return model.Intent{}, false, fmt.Errorf("intent %s not found", id)
+}
+
+// UpdateIntentWhen runs fn only when allow accepts the row as it is under the
+// write lock. Guards that depend on the caller's identity or on a state another
+// writer can change between a read and a write (for example "may this caller
+// release this hold?") must be evaluated here: checking a detached snapshot and
+// then calling UpdateIntent would overwrite a stop that landed in between.
+// A refused predicate is a lost race, not an error.
+func (s *Store) UpdateIntentWhen(id string, allow func(model.Intent) bool, fn func(*model.Intent)) (model.Intent, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.db.Intents {
+		in := &s.db.Intents[i]
+		if in.ID != id {
+			continue
+		}
+		if allow != nil && !allow(detachIntent(*in)) {
 			return detachIntent(*in), false, nil
 		}
 		previous := detachIntent(*in)

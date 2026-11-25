@@ -359,7 +359,7 @@ func newToolRoot(root, source string) toolRoot {
 
 // toolRootsNote is operator-facing provenance, not tool usage: it says which
 // resolution rule produced the roots and what the console cannot infer.
-const toolRootsNote = "根目录按 harness 数据目录解析规则推导（scan 工作目录下的 .cyber 优先，其次用户 ~/.cyber）；harness 配置里的显式 misc.data_dir 与 scan 可执行文件旁的 .cyber 无法从运行时读取，如有设置以实际宿主为准。"
+const toolRootsNote = "按 harness 数据目录规则推导：scan 工作目录下的 .cyber 优先，其次 ~/.cyber；配置里显式的 misc.data_dir 与 scan 可执行文件旁的 .cyber 读不到，以宿主实际配置为准。"
 
 // instanceDataDir turns the project directory into the instance root. In
 // production DataDir is <data>/projects/<id>; a bare server (tests, alternate
@@ -381,19 +381,31 @@ func instanceDataDir(projectDir string) string {
 // directory (internal/host/host.go execLaunch), so the first candidate is
 // <instance>/.cyber and the last is the user directory. The scan executable
 // directory is not observable from the AOP runtime, so it is not guessed; the
-// note says so. The legacy instance root (<instance>/arsenal) is kept and
-// labelled, because an operator may still drop tools there by hand.
+// note says so. The legacy instance root (<instance>/arsenal) appears only when
+// tools are installed there, since that is the only case where it is real.
 func defaultToolRoots(projectDir string) []toolRoot {
 	instance := instanceDataDir(projectDir)
-	roots := []toolRoot{newToolRoot(filepath.Join(instance, "arsenal"), "instance")}
+	var roots []toolRoot
+	// The legacy instance root (<instance>/arsenal) is only listed when tools
+	// actually sit there. A candidate that cannot exist is not information: it
+	// reads as a defect next to the root the scan really resolves.
+	if legacy := newToolRoot(filepath.Join(instance, "arsenal"), "instance"); legacy.Exists {
+		roots = append(roots, legacy)
+	}
 
 	harnessData := filepath.Join(instance, ".cyber")
 	harness := newToolRoot(filepath.Join(harnessData, "arsenal"), "harness")
 	if st, err := os.Stat(harnessData); err == nil && st.IsDir() {
 		harness.Resolved = true
 		harness.PathInjected = true
+		// Resolved says where the scan looks; Exists says whether anything is
+		// installed there. Both are true at once, and an operator reading "解析到
+		// 此" next to "目录不存在" takes it as a defect, so say it as one state.
+		if !harness.Exists {
+			harness.Note = "harness 解析到此，还没有装任何工具"
+		}
 	} else {
-		harness.Note = "scan 工作目录下还没有 .cyber；harness 当前回退到用户目录"
+		harness.Note = "scan 工作目录下还没有 .cyber；harness 回退到用户目录"
 	}
 	roots = append(roots, harness)
 
@@ -404,7 +416,7 @@ func defaultToolRoots(projectDir string) []toolRoot {
 		user.Resolved = !harness.Resolved
 		user.PathInjected = user.Resolved
 		if harness.Resolved {
-			user.Note = "harness 已优先使用 scan 工作目录下的 .cyber，不再读取该目录"
+			user.Note = "harness 已改用 scan 工作目录下的 .cyber，这里不进 PATH"
 		}
 		roots = append(roots, user)
 	}

@@ -3,6 +3,7 @@ import { Badge } from '@cyber/ui'
 import { DOCK_DEFAULT_WIDTH } from '@/components/graph/dock-width'
 import { intentStatusDot, intentStopped, INTENT_STOPPED_LABEL } from '@/graph/status'
 import { edgeKindLabel, intentOrigin, originLabel, type GraphEdge, type GraphNode } from '@/graph/model'
+import { DoneDeclaredBadge } from '@/components/DoneDeclaredBadge'
 import { fmtInt, fmtTime, kindVariant, severityLabel, statusKind, statusLabel } from '@/lib/format'
 import type { RunPulse } from '@/lib/types'
 
@@ -245,6 +246,7 @@ export function GraphInspector({
             ⚠ {warnings.length}
           </Badge>
         )}
+        <DoneDeclaredBadge intent={intent} />
         {needsReview && (
           <Badge
             size="sm"

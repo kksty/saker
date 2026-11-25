@@ -46,8 +46,14 @@ test('the graph panel renders a held direction cancel reason', () => {
   assert.match(html, /取消原因/)
   assert.match(html, /操作员/, 'who stopped it is part of the reason header')
   assert.match(html, /止损取消/, 'the sentence starts with the same status label as the run page')
+  // The tooltip keeps the mechanism text; the visible line must not say it twice.
+  const visible = html.replace(/title="[^"]*"/g, '')
+  assert.doesNotMatch(visible, /止损：/, 'the category is not said twice in one line')
   assert.match(html, /d-05 flag 已 submit/, 'the recorded reason, not a re-worded summary')
   assert.match(html, /f_rkvxog5/, 'the evidence id stays readable')
+  // Label and body are stacked: side by side, a long reason is squeezed into a
+  // column of six or seven characters inside the 360px panel.
+  assert.doesNotMatch(html, /tw-break[^"]*flex-1/, 'the reason owns the full width')
 })
 
 test('an executor stop names the initiator role, not its raw participant id', () => {

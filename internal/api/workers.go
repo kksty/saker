@@ -685,26 +685,37 @@ func (s *Server) killWorker(w http.ResponseWriter, r *http.Request, caller worke
 	// Killing is not a way to seize a hold: a worker already stopped by the
 	// operator/commander stays theirs. Otherwise a parent could kill it (which
 	// re-stamps HeldBy to itself) and then restart, silently overriding the
-	// operator's decision.
-	if target.Hold && !s.mayReleaseWorkerHold(target, caller) {
+	// operator's decision. The guard runs inside the store lock together with
+	// the write: checking the snapshot first would let a stop that lands in
+	// between be overwritten by this kill.
+	actor := holdActorOf(caller)
+	cur, applied, err := s.Store.UpdateIntentWhen(target.ID,
+		func(i model.Intent) bool {
+			return !model.Settled(i.Status) && (!i.Hold || s.mayReleaseWorkerHold(i, caller))
+		},
+		func(i *model.Intent) {
+			i.Hold = true
+			i.HeldBy = actor
+			i.HoldReason = "worker kill：" + actor
+			i.Aborted = true
+			i.Wait = nil
+		})
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !applied {
+		if now, ok := s.Store.GetIntent(target.ID); ok {
+			if model.Settled(now.Status) {
+				writeErr(w, http.StatusConflict, "worker 已结束（"+now.Status+"）：不用再 kill")
+				return
+			}
+			target = now
+		}
 		writeJSON(w, http.StatusConflict, map[string]any{
 			"error": s.heldWorkerText(target),
 			"code":  "worker_held",
 		})
-		return
-	}
-	// Stop auto-dispatch first: a canceled run returns the intent to pending,
-	// and without Hold the scheduler would immediately start it again.
-	actor := holdActorOf(caller)
-	cur, err := s.Store.UpdateIntent(target.ID, func(i *model.Intent) {
-		i.Hold = true
-		i.HeldBy = actor
-		i.HoldReason = "worker kill：" + actor
-		i.Aborted = true
-		i.Wait = nil
-	})
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	runID := cur.RunID

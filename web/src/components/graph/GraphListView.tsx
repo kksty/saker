@@ -11,6 +11,7 @@ import type { GraphModel, GraphNode } from '@/graph/model'
 import { graphNodeOrder } from '@/lib/graph-filter'
 import { INTENT_STOPPED_LABEL } from '@/graph/status'
 import { statusLabel } from '@/lib/format'
+import { doneDeclaredByShort } from '@/lib/settle'
 import { focusGraphCanvas } from './focus'
 
 function typeText(node: GraphNode): string {
@@ -18,7 +19,8 @@ function typeText(node: GraphNode): string {
     case 'project':
       return '项目'
     case 'fact':
-      return `事实 · ${node.kind || '未分类'}`
+      // The column header already says 类型, so the kind stands alone here too.
+      return node.kind || '未分类'
     case 'step':
       return '意图'
     case 'goal':
@@ -34,6 +36,10 @@ function stateText(node: GraphNode): string {
   if (node.type === 'project') return '—'
   if (node.type === 'goal') return node.status === 'met' ? '已达成' : '未达成'
   if (node.stopped) return INTENT_STOPPED_LABEL
+  // A declared close is still `done`, but the list must not read it as a run
+  // result: name who settled it inline.
+  const declared = node.meta?.intent?.done_declared_by
+  if (declared && node.status === 'done') return `${statusLabel(node.status)} · ${doneDeclaredByShort(declared)}`
   return statusLabel(node.status)
 }
 

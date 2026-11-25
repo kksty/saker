@@ -270,3 +270,29 @@ func TestHubCredentialSurvivesRestartWithoutSharingOperatorToken(t *testing.T) {
 		t.Fatal("Hub credential ignored instance identity")
 	}
 }
+
+// TestCommanderSessionHasTheWholeIntentLifecycle: the commander decides whether
+// a direction still deserves a run, so every intent state change is on its own
+// credential — including reopen, which was the one action still missing from the
+// list while the refusal told callers to use it.
+func TestCommanderSessionHasTheWholeIntentLifecycle(t *testing.T) {
+	const operatorCred = "lifecycle-operator-token"
+	registry := collab.NewRegistry(time.Hour)
+	commander := sessionCredential(t, registry, "prj-1")
+	auth := newConsoleAuth(operatorCred, registry)
+	if auth == nil {
+		t.Fatal("no console auth was created")
+	}
+	protected := auth.wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	for _, action := range []string{"run", "park", "cancel", "retry", "reopen", "continue", "settle", "steer", "say"} {
+		req := httptest.NewRequest(http.MethodPost, "/p/prj-1/api/intents/in_x/"+action, nil)
+		req.Header.Set("Authorization", "Bearer "+commander.Token)
+		rec := httptest.NewRecorder()
+		protected.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Errorf("commander POST intents/in_x/%s = %d", action, rec.Code)
+		}
+	}
+}

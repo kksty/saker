@@ -104,6 +104,14 @@ type GraphIntent struct {
 	// it is how the node panel knows to offer "前提已就绪，可重开".
 	ParkedPremiseFactIDs []string `json:"parked_premise_fact_ids,omitempty"`
 	LastStop             string   `json:"last_stop,omitempty"`
+	// DoneDeclaredBy marks a completion the commander/operator declared on
+	// recorded evidence instead of one a run produced. The node panel shows it
+	// beside 完成 so a declared close is never read as an executor result.
+	DoneDeclaredBy string   `json:"done_declared_by,omitempty"`
+	DoneNote       string   `json:"done_note,omitempty"`
+	DoneFactIDs    []string `json:"done_fact_ids,omitempty"`
+	DoneRunIDs     []string `json:"done_run_ids,omitempty"`
+	DoneAt         string   `json:"done_at,omitempty"`
 }
 
 // GraphFact is one compact fact: the summary layer plus evidence URIs. The doc
@@ -381,6 +389,13 @@ func graphIntentOf(in model.Intent, runs map[string]model.Run) GraphIntent {
 	}
 	g.ParkedPremiseFactIDs = append([]string(nil), in.ParkedPremiseFactIDs...)
 	g.FromFacts = append([]string(nil), in.FromFactIDs...)
+	g.DoneDeclaredBy = in.DoneDeclaredBy
+	g.DoneNote = graphClip(in.DoneNote, graphReasonRunes)
+	g.DoneFactIDs = append([]string(nil), in.DoneFactIDs...)
+	g.DoneRunIDs = append([]string(nil), in.DoneRunIDs...)
+	if in.DoneAt != nil {
+		g.DoneAt = in.DoneAt.Format(time.RFC3339)
+	}
 	if r, ok := runs[in.RunID]; ok {
 		// The snapshot is read by the executor. Keep the structured state, not
 		// the harness exit log: the log is for the operator and can contain

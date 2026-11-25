@@ -169,9 +169,9 @@ export type EdgeKind =
 
 /**
  * The Chinese name of a node's kind for text surfaces (node panel, list rows).
- * The canvas itself never prints this: it uses shape and colour. Fact kinds stay
- * the ledger's vocabulary and are appended after 事实, never translated into a
- * second taxonomy.
+ * The canvas itself never prints this: it uses shape and colour. A fact shows the
+ * ledger's kind on its own (`vuln`, `artifact`): the badge already sits inside a
+ * fact panel, so a 事实 prefix only shortened the line and said nothing.
  */
 export function nodeTypeLabel(type: NodeType, factKind?: string): string {
   switch (type) {
@@ -180,7 +180,7 @@ export function nodeTypeLabel(type: NodeType, factKind?: string): string {
     case 'ghost':
       return '意图'
     case 'fact':
-      return factKind ? `事实 · ${factKind}` : '事实'
+      return factKind || '事实'
     case 'goal':
       return '目标'
     case 'project':

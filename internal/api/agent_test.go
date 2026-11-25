@@ -434,3 +434,32 @@ func TestDirectionParticipantCannotMessageTheOperator(t *testing.T) {
 		t.Fatalf("executor -> commander = %d %s, want accepted", rec.Code, rec.Body.String())
 	}
 }
+
+// TestWorkerCanCancelItsOwnChildOnly: a worker that can spawn a child intent
+// must be able to stop a mis-planned one, or the mistake keeps spending the
+// direction's budget. Everything else stays with the commander — a worker
+// cannot reach its parent, a sibling, or a top-level direction.
+func TestWorkerCanCancelItsOwnChildOnly(t *testing.T) {
+	f := newAgentFixture(t)
+	child, err := f.p.Store.CreateIntent(model.Intent{Title: "子意图", Description: "d", ParentID: f.src.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Not mine: the target is a top-level intent.
+	if rec := f.call(t, f.tgtID, http.MethodPost, "/api/intents/"+f.target.ID+"/cancel", map[string]any{"reason": "x"}); rec.Code != http.StatusForbidden {
+		t.Fatalf("cancel a top-level intent = %d %s, want 403", rec.Code, rec.Body.String())
+	} else if !strings.Contains(rec.Body.String(), "handoff") {
+		t.Fatalf("refusal does not name the way out: %s", rec.Body.String())
+	}
+
+	// Its own child: allowed, and the hold names the executor that stopped it.
+	rec := f.call(t, f.srcID, http.MethodPost, "/api/intents/"+child.ID+"/cancel", map[string]any{"reason": "派错了，换一条"})
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("cancel own child = %d %s", rec.Code, rec.Body.String())
+	}
+	got, ok := f.p.Store.GetIntent(child.ID)
+	if !ok || !got.Hold || got.HeldBy != f.srcID.ParticipantID {
+		t.Fatalf("child after cancel = %+v", got)
+	}
+}

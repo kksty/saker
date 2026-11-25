@@ -155,8 +155,7 @@ func findToolRoot(t *testing.T, roots []toolRoot, source string) toolRoot {
 // TestToolRootsFollowHarnessDataDirResolution pins the root fix: the console
 // must name the directory the scan resolves by the harness's own rule
 // (<instance>/.cyber/arsenal when it exists, otherwise ~/.cyber/arsenal), and
-// keep the legacy instance root labelled instead of presenting it as the live
-// one.
+// must not list a legacy instance root that holds nothing.
 func TestToolRootsFollowHarnessDataDirResolution(t *testing.T) {
 	home, err := os.UserHomeDir()
 	if err != nil || strings.TrimSpace(home) == "" {
@@ -179,9 +178,21 @@ func TestToolRootsFollowHarnessDataDirResolution(t *testing.T) {
 	if want := filepath.Join(home, ".cyber", "arsenal"); userRoot.Path != want || !userRoot.Resolved {
 		t.Fatalf("user root = %+v, want resolved %q", userRoot, want)
 	}
-	instanceRoot := findToolRoot(t, before.ToolRoots, "instance")
-	if instanceRoot.Path != filepath.Join(root, "arsenal") || instanceRoot.Resolved {
-		t.Fatalf("legacy instance root = %+v", instanceRoot)
+	// The legacy <instance>/arsenal holds nothing, so it is not a candidate the
+	// page should present as a fallback.
+	for _, r := range before.ToolRoots {
+		if r.Source == "instance" {
+			t.Fatalf("empty legacy instance root is still listed: %+v", r)
+		}
+	}
+	// Once an operator drops tools there it is a real root and must show up.
+	legacyBin := filepath.Join(root, "arsenal", "bin")
+	if err := os.MkdirAll(legacyBin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	withLegacy := getTools(t, s)
+	if got := findToolRoot(t, withLegacy.ToolRoots, "instance"); !got.Exists || filepath.Base(filepath.Dir(got.Bin)) != "arsenal" {
+		t.Fatalf("legacy instance root = %+v, want an existing root", got)
 	}
 
 	// Create the harness data directory the scan uses (tianwu installs its
@@ -223,10 +234,10 @@ func TestToolRootsFollowHarnessDataDirResolution(t *testing.T) {
 	if installed.Version != "1.2.3" {
 		t.Fatalf("manifest version = %q", installed.Version)
 	}
-	// The legacy instance root is still listed (it exists nowhere), but it is
-	// not the resolved copy.
-	if r := findToolRoot(t, after.ToolRoots, "instance"); r.Resolved || r.Exists {
-		t.Fatalf("legacy instance root = %+v", r)
+	// The legacy instance root holds a stray bin directory from this fixture, so
+	// it is listed — but it is never the copy the scan resolves.
+	if r := findToolRoot(t, after.ToolRoots, "instance"); r.Resolved || !r.Exists {
+		t.Fatalf("legacy instance root = %+v, want an existing root that is not resolved", r)
 	}
 	if after.ToolRootsNote == "" {
 		t.Fatal("tool_roots_note must explain how the roots were derived")

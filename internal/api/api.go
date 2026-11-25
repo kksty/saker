@@ -642,6 +642,10 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/intents/{id}/retry", s.retryIntent)
 	mux.HandleFunc("GET /api/intents/{id}/retry-preview", s.retryPreview)
 	mux.HandleFunc("POST /api/intents/{id}/reopen", s.reopenIntent)
+	// Settle is the commander/operator's declared completion: no run closed the
+	// direction, but the recorded evidence is judged enough. It is not on the
+	// agent mux because a worker does not declare itself done.
+	mux.HandleFunc("POST /api/intents/{id}/settle", s.settleIntent)
 	// Continue is the operator/commander's "same worker session, next turn":
 	// it is not on the agent mux because a worker does not continue itself.
 	mux.HandleFunc("POST /api/intents/{id}/continue", s.continueIntent)
@@ -1932,12 +1936,13 @@ func (s *Server) retryIntentRun(id, note string, resume bool) (string, int, erro
 		i.Status = model.StatusPending
 		i.Hold = true // Reserve preparation for this explicit retry, not the pump.
 		i.ClaimedBy = ""
-		// A retry is a fresh judgement; the old park snapshot is no longer a
-		// statement about this attempt.
+		// A retry is a fresh judgement; the old park snapshot and the previous
+		// declared completion are no longer statements about this attempt.
 		i.ParkReason = ""
 		i.ParkedPremiseFactIDs = nil
 		i.ParkedPremiseClaims = nil
 		i.ParkedAt = nil
+		i.ClearDoneDeclared()
 	})
 	if err != nil {
 		return "", 0, err
@@ -4389,6 +4394,9 @@ type boardRunWarnings struct {
 	Run      string   `json:"run"`
 	IntentID string   `json:"intent_id,omitempty"`
 	Warnings []string `json:"warnings"`
+	// At is the run's start: the console mixes warnings with the other pending
+	// inbox rows by time, and a warning has no request of its own to date.
+	At string `json:"at,omitempty"`
 }
 
 // recentHandoffWarnings returns the latest runs that recorded warnings, newest
@@ -4411,7 +4419,7 @@ func recentHandoffWarnings(st *store.Store, limit int, hideSupport bool) []board
 		if len(r.Warnings) == 0 || r.WarningsDismissed {
 			continue
 		}
-		out = append(out, boardRunWarnings{Run: r.ID, IntentID: r.IntentID, Warnings: r.Warnings})
+		out = append(out, boardRunWarnings{Run: r.ID, IntentID: r.IntentID, Warnings: r.Warnings, At: r.StartedAt.Format(time.RFC3339)})
 		if len(out) >= limit {
 			break
 		}

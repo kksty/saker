@@ -34,6 +34,9 @@ export interface BrowserLease {
 }
 export interface OperatorRequest {
   intent_id: string; title: string; status: IntentStatus; run_id?: string; profile?: string
+  /** When the direction registered the wait; the inbox mixes every pending row by
+   *  time. Absent on older servers, and such rows sort after the timed ones. */
+  at?: string
   request: { id: string; request: string; access_ids?: string[]; response?: string; resolution?: 'completed' | 'unavailable'; completed_at?: string }
 }
 
@@ -57,8 +60,8 @@ export interface AuthorizationRequest {
 export interface OperatorInbox {
   authorization: AuthorizationRequest[]
   handoff: OperatorRequest[]
-  acceptance: { goal_id: string; statement: string; receipt_changed?: string[] }[]
-  warnings: { run: string; intent_id?: string; warnings: string[] }[]
+  acceptance: { goal_id: string; statement: string; receipt_changed?: string[]; at?: string }[]
+  warnings: { run: string; intent_id?: string; warnings: string[]; at?: string }[]
   /** Tool-approval projection merged by the server (GET /api/operator-inbox). */
   guardrail?: OperatorInboxGuardrail
   /** Requests that are no longer pending (resolved / dismissed), newest first.
@@ -373,6 +376,17 @@ export interface Intent {
   aborted?: boolean
   /** Business state while a direction yields for delegated children. */
   wait?: IntentWait
+  /** The person or commander that declared this direction done on recorded
+   *  evidence instead of a run closing it (`commander` / `operator`). Empty means
+   *  the completion came from a run, so the two are never read as the same thing. */
+  done_declared_by?: string
+  /** The settler's own words, shown on hover next to the badge. */
+  done_note?: string
+  /** Facts cited as proof of the declared completion. */
+  done_fact_ids?: string[]
+  /** Runs cited as proof of the declared completion. */
+  done_run_ids?: string[]
+  done_at?: string
   created_at: string
   updated_at: string
 }

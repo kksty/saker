@@ -17,6 +17,7 @@ import { Badge, Button, Callout, Chip, EmptyState, ListRow, Meter, SkeletonCard,
 import { cn } from '@cyber/theme'
 import { Page, pageGutter } from '@/components/Page'
 import { WorkspaceSidebar } from '@/components/WorkspaceSidebar'
+import { DoneDeclaredBadge } from '@/components/DoneDeclaredBadge'
 import { RetryIntentDialog } from '@/components/RetryIntentDialog'
 import { StopIntentButton } from '@/components/StopIntentButton'
 import { StopIntentDialog, type StopTarget } from '@/components/StopIntentDialog'
@@ -31,6 +32,7 @@ import {
   hasBrokenPremise,
   kindVariant,
   oneLine,
+  runCancelDetail,
   runCancelReason,
   runStatusLabel,
   shortID,
@@ -39,6 +41,7 @@ import {
 import { useConsoleLocation, usePoll } from '@/lib/hooks'
 import { premiseBlockers, summarizeIntentFacts } from '@/lib/intent-detail'
 import { reviewFailureHint, reviewFailureLabel, type ReviewFailure } from '@/lib/review-failure'
+import { doneDeclaredByShort, doneDeclaredDetail } from '@/lib/settle'
 import { useReviewFailure } from '@/lib/use-review-failure'
 import { useLatestScroll } from '@/lib/latest-scroll'
 import { navigate } from '@/lib/navigation'
@@ -538,6 +541,11 @@ function UnitRow({
           unreadable even at 1280. */}
       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-ink-3">
         <span className="shrink-0 font-mono tw-nums">{shortID(intent.id)}</span>
+        {intent.status === 'done' && intent.done_declared_by && (
+          <span className="shrink-0" title={doneDeclaredDetail(intent)}>
+            {doneDeclaredByShort(intent.done_declared_by)}
+          </span>
+        )}
         {live && pulse ? (
           <span className={cn('min-w-0 flex-1 basis-[12rem] truncate font-mono tw-nums', quiet >= 180 && 'text-warning')}>
             静默 {fmtIdle(quiet)} · {fmtInt(pulse.events)} ev{lastPulse ? ` · ${lastPulse}` : ''}
@@ -795,6 +803,7 @@ function UnitDetail({
                     子意图
                   </Badge>
                 )}
+                <DoneDeclaredBadge intent={intent} />
                 {intent.hold && (
                   <Badge size="sm" variant="warning">
                     已停止（人工）
@@ -1360,11 +1369,13 @@ function RunStatusLine({
 
       <div className="space-y-2.5 px-3 py-2.5">
         {run.status === 'canceled' && (
-          <div className="flex items-start gap-2 rounded-lg border border-warning/25 bg-warning/[0.07] px-2.5 py-1.5 text-[12px]">
-            <span className="shrink-0 font-medium text-warning">取消原因</span>
-            <span className="tw-break min-w-0 flex-1 leading-relaxed text-ink-2" title={cancelCauseText(run.cancel_cause)}>
-              {runCancelReason(run)}
-            </span>
+          // 一行一个宽度：长原因（操作员原话、多句）在窄卡里被双列切成竖条。
+          // 类别 already sits in the badge above, so the body is who + why only.
+          <div className="rounded-lg border border-warning/25 bg-warning/[0.07] px-2.5 py-2">
+            <div className="text-[11px] font-medium text-warning">取消原因</div>
+            <div className="tw-break mt-1 text-[12px] leading-relaxed text-ink-2" title={cancelCauseText(run.cancel_cause)}>
+              {runCancelDetail(run)}
+            </div>
           </div>
         )}
 

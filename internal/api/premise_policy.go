@@ -71,6 +71,14 @@ func (s *Server) checkPremiseRefs(ids []string) error {
 			continue
 		}
 		if f.Unusable() || !model.ReviewableKind(f.Kind) {
+			// A non-reviewable kind (note) is not an unverified assertion: no
+			// verdict can ever make it a premise, in any review mode. Say what to
+			// do instead, so a commander does not conclude that its evidence is
+			// unusable and drop from_fact_ids altogether.
+			if !f.Unusable() && !model.ReviewableKind(f.Kind) {
+				return fmt.Errorf("%w：%s（%s；%s 不是可复核的断言，不能作为必要前提——用 context_fact_ids 引用它，或把结论写进描述）",
+					ErrPremiseUnverified, id, model.PremiseIssue(f, policy), f.Kind)
+			}
 			return fmt.Errorf("%w：%s（%s）", ErrPremiseUnverified, id, model.PremiseIssue(f, policy))
 		}
 		// Persist the intended relation while its proof is pending: a reviewable

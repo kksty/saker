@@ -331,8 +331,7 @@ export function Toolbox() {
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="tw-break font-mono text-ink-2">{root.bin}</span>
                         <Badge size="sm" variant="muted">{root.source}</Badge>
-                        {root.resolved && <Badge size="sm" variant="secondary">实例解析到此</Badge>}
-                        <Badge size="sm" variant="secondary">{root.exists ? '目录存在' : '目录不存在'}</Badge>
+                        <Badge size="sm" variant="secondary">{root.exists ? '已装工具' : '未装工具'}</Badge>
                         {root.path_injected && <Badge size="sm" variant="muted">在 PATH</Badge>}
                       </div>
                       {root.note && <p className="tw-break mt-0.5 text-ink-3">{root.note}</p>}

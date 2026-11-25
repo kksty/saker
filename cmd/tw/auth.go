@@ -398,6 +398,8 @@ var sessionWriteRoutes = map[string]bool{
 	"POST /api/intents/*/park":     true,
 	"POST /api/intents/*/cancel":   true,
 	"POST /api/intents/*/retry":    true,
+	"POST /api/intents/*/reopen":   true, // bring a parked direction back once its blocker is gone
+	"POST /api/intents/*/settle":   true, // declare a stopped/failed direction done, on cited evidence
 	"POST /api/intents/*/continue": true,
 	"POST /api/intents/*/operator": true, // ask the operator for help; /complete stays operator-only
 	"PUT /api/intents/*/context":   true, // adjust a direction's references

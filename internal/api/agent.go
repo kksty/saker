@@ -283,6 +283,49 @@ func (s *Server) registerAgent(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/intents/{id}/wait", s.waitIntent)
 	mux.HandleFunc("POST /api/intents/{id}/handoff", s.handoffIntent)
 	mux.HandleFunc("GET /api/intents/{id}/usage", s.intentUsage)
+	// An executor may stop what it created: it can spawn a child intent, so a
+	// mis-planned one must not keep burning the direction's budget. The scope is
+	// exactly its own children; reopening, retrying and every other direction
+	// stay with the commander.
+	mux.HandleFunc("POST /api/intents/{id}/cancel", s.agentCancelChild)
+}
+
+// agentCancelChild is the one lifecycle action a worker owns. It is deliberately
+// narrower than the operator's cancel: the target must be a child of the caller's
+// own intent, so a worker cannot stop a peer, its parent, or anything it did not
+// create. The hold records the caller's participant id (pt_<intent>) so the
+// console can say which executor stopped it.
+func (s *Server) agentCancelChild(w http.ResponseWriter, r *http.Request) {
+	caller, ok := identityOf(r)
+	if !ok {
+		writeErr(w, http.StatusUnauthorized, "缺少协作身份")
+		return
+	}
+	id := r.PathValue("id")
+	in, ok := s.Store.GetIntent(id)
+	if !ok {
+		writeErr(w, http.StatusNotFound, "意图不存在："+id)
+		return
+	}
+	if in.ParentID == "" || in.ParentID != caller.IntentID {
+		writeErr(w, http.StatusForbidden, "只能取消自己派出的子意图：其他意图的生命周期归指挥官，把请求 handoff 给指挥官")
+		return
+	}
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if !decodeOptionalJSON(w, r.Body, &req) {
+		return
+	}
+	runID, err := s.CancelIntentBy(id, req.Reason, string(caller.ParticipantID))
+	if err != nil {
+		writeErr(w, http.StatusConflict, err.Error())
+		return
+	}
+	s.recordAction("cancel", id, req.Reason)
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"intent_id": id, "run_id": runID, "held": true, "held_by": string(caller.ParticipantID),
+	})
 }
 
 // participantView is one addressable participant. contactable means "a message
@@ -493,7 +536,7 @@ func (s *Server) participantOf(in model.Intent, run model.Run) participantView {
 		v.Note = "复核进行中；复核结束前没有可投递的执行轮次"
 	case model.StatusDone, model.StatusFailed, model.StatusReviewFailed, model.StatusParked:
 		v.Contactable = false
-		v.Note = "意图已结束；要重新联系必须先 retry/reopen，消息不会静默复活它"
+		v.Note = "意图已结束；重开归指挥官或操作员，消息不会静默复活它——要它收到，先 handoff 给指挥官"
 	}
 	return v
 }
@@ -692,7 +735,7 @@ func (s *Server) agentSendMessage(w http.ResponseWriter, r *http.Request) {
 	// never see; reopening is an explicit retry/reopen.
 	switch target.Status {
 	case model.StatusDone, model.StatusFailed, model.StatusReviewFailed, model.StatusParked:
-		writeErr(w, http.StatusConflict, "目标意图已结束（"+target.Status+"）：先显式 retry/reopen，消息不能复活它")
+		writeErr(w, http.StatusConflict, "目标意图已结束（"+target.Status+"）：消息不能复活它。重开归指挥官或操作员——把请求 handoff 给指挥官，由它决定 continue 还是 retry")
 		return
 	}
 

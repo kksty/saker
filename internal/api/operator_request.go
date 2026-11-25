@@ -18,12 +18,19 @@ type operatorInboxHandoff struct {
 	Title    string             `json:"title"`
 	Status   string             `json:"status"`
 	Request  model.OperatorWait `json:"request"`
+	// At is when the direction registered the wait, so the console can mix every
+	// pending row into one newest-first list instead of always stacking
+	// authorization above handoffs.
+	At string `json:"at,omitempty"`
 }
 
 type operatorInboxAcceptance struct {
 	GoalID         string   `json:"goal_id"`
 	Statement      string   `json:"statement"`
 	ReceiptChanged []string `json:"receipt_changed,omitempty"`
+	// At is the goal's last revision: the receipt went stale because the
+	// statement changed then, which is what the operator is being asked about.
+	At string `json:"at,omitempty"`
 }
 
 // operatorInboxGuardrail is the read-only tool-approval projection. The count
@@ -130,14 +137,23 @@ func (s *Server) operatorInbox(w http.ResponseWriter, r *http.Request) {
 		}
 		out.Handoff = append(out.Handoff, operatorInboxHandoff{
 			IntentID: in.ID, Title: in.Title, Status: in.Status, Request: *in.Wait.Operator,
+			At: in.Wait.RegisteredAt.Format(time.RFC3339),
 		})
 	}
 	for _, g := range s.Store.Snapshot().Goals {
 		if !g.ReceiptStale {
 			continue
 		}
+		// The goal row keeps the stamp time, not the statement revision time; the
+		// acceptance row is "the receipt no longer matches", so the stamp is the
+		// time it still had. Rows without a stamp sort to the end.
+		at := ""
+		if g.CompletedAt != nil {
+			at = g.CompletedAt.Format(time.RFC3339)
+		}
 		out.Acceptance = append(out.Acceptance, operatorInboxAcceptance{
 			GoalID: g.ID, Statement: g.Statement, ReceiptChanged: g.ReceiptChanged,
+			At: at,
 		})
 	}
 	out.Warnings = recentHandoffWarnings(s.Store, 5, false)

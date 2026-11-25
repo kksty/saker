@@ -165,8 +165,12 @@ export function GraphLegend({ className }: { className?: string }) {
     // card's height (app.css `.tw-graph-stack`), so an expanded legend scrolls
     // inside the map instead of growing up under the page banner. `min-h-10` is
     // the title row: the control stays reachable even in the smallest box.
+    // `shrink-0` keeps that promise: without it the legend is the only flexible
+    // child in the stack, so an expanded 指挥官 card squeezed it into a thin strip
+    // that scrolled a few pixels instead of the stack scrolling. The stack is the
+    // scroll container; each card keeps its full height inside it.
     <div
-      className={`tw-graph-dock flex min-h-10 w-full flex-col overflow-hidden rounded-xl border border-hairline bg-card/95 text-caption shadow-lifted backdrop-blur ${className ?? ''}`}
+      className={`tw-graph-dock flex min-h-10 w-full shrink-0 flex-col overflow-hidden rounded-xl border border-hairline bg-card/95 text-caption shadow-lifted backdrop-blur ${className ?? ''}`}
       data-testid="graph-legend"
     >
       <button
@@ -183,7 +187,7 @@ export function GraphLegend({ className }: { className?: string }) {
       </button>
 
       {open && (
-        <div className="tw-scroll min-h-0 flex-1 overflow-y-auto border-t border-hairline px-3 py-2.5">
+        <div className="tw-scroll max-h-64 min-h-0 flex-1 overflow-y-auto border-t border-hairline px-3 py-2.5">
           <GroupTitle>事实（节点）</GroupTitle>
           <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
             {FACT_KINDS.map((name) => (

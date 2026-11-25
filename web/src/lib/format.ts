@@ -205,9 +205,43 @@ export function holdActorLabel(actor?: string): string {
 }
 
 /**
- * The visible "取消原因" line for a canceled run. exit_reason is what the
- * canceller actually recorded (e.g. "worker kill：operator", "项目停止：复核被取消");
- * prefer it verbatim, and say so plainly when older rows have none.
+ * exit_reason often opens by naming the same category the label already says
+ * ("止损：操作员指令：…"), so the card read "止损取消 · 止损：…". Drop only that
+ * repeated head; the rest is the canceller's own words and stays verbatim —
+ * a criterion like "连续多轮没有新事实或派发" must survive. The test is the
+ * data itself: the token before the colon and the label are prefixes of each
+ * other ("止损" / "止损取消"), so no second vocabulary is needed.
+ */
+function withoutRepeatedCause(raw: string, label: string): string {
+  if (!label) return raw
+  const sep = raw.search(/[：:]/)
+  if (sep <= 0) return raw
+  const head = raw.slice(0, sep).trim()
+  if (!head) return raw
+  const repeated = head === label || label.startsWith(head) || head.startsWith(label)
+  return repeated ? raw.slice(sep + 1).trim() : raw
+}
+
+/**
+ * A canceled run's own words, without the category: for surfaces that already
+ * show runStatusLabel at the head of the row, so the body is only "who + why".
+ */
+export function runCancelDetail(run?: {
+  status?: string
+  cancel_cause?: string
+  exit_reason?: string
+}): string {
+  if (run?.status !== 'canceled') return ''
+  const raw = (run?.exit_reason ?? '').trim()
+  if (!raw) return '（原因未记录）'
+  return withoutRepeatedCause(raw, runStatusLabel(run))
+}
+
+/**
+ * The visible "取消原因" sentence for a canceled run: the category once, then the
+ * canceller's recorded reason. exit_reason is what the canceller actually wrote
+ * (e.g. "worker kill：operator", "项目停止：复核被取消"); prefer it verbatim, and
+ * say so plainly when older rows have none.
  */
 export function runCancelReason(run?: {
   status?: string
@@ -216,8 +250,8 @@ export function runCancelReason(run?: {
 }): string {
   if (run?.status !== 'canceled') return ''
   const label = runStatusLabel(run)
-  const raw = (run.exit_reason ?? '').trim()
-  return raw && raw !== label ? `${label} · ${raw}` : `${label}（原因未记录）`
+  const detail = runCancelDetail(run)
+  return detail === '（原因未记录）' ? `${label}${detail}` : `${label} · ${detail}`
 }
 
 const kindVariants: Record<string, BadgeVariant> = {

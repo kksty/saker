@@ -125,6 +125,9 @@ func (s *Server) continueIntentRun(id, note string) (string, string, error) {
 		i.Hold = true
 		i.ParkReason = ""
 		i.ClaimedBy = ""
+		// Continuing reopens a finished turn: the previous completion (declared
+		// or produced) is history, not the current state of the row.
+		i.ClearDoneDeclared()
 	})
 	if err != nil {
 		return "", "", err

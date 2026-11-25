@@ -72,12 +72,12 @@ func TestCreateProjectOptionsApplyBeforeAttach(t *testing.T) {
 	// builder with the switch open must not contain it (the marker discriminates).
 	prompt := decider.CommanderRoundPrompt(board.View{}, "笔记", "", decider.ContextStatus{},
 		decider.RoundContext{ReviewsOff: k.srv.ReviewsDisabled()})
-	if !strings.Contains(prompt, "复核已关闭：未核验事实的标题与摘要直接可见") {
+	if !strings.Contains(prompt, "复核已关闭。必要前提的准入结果与阻塞原因见 readiness。") {
 		t.Fatal("first-round prompt kept the reviews-open rules although the project was created with reviews off")
 	}
 	open := decider.CommanderRoundPrompt(board.View{}, "笔记", "", decider.ContextStatus{},
 		decider.RoundContext{ReviewsOff: false})
-	if strings.Contains(open, "复核已关闭：未核验事实的标题与摘要直接可见") {
+	if strings.Contains(open, "复核已关闭。必要前提的准入结果与阻塞原因见 readiness。") {
 		t.Fatal("control: the reviews-off marker appears in the reviews-open prompt, so the assertion above proves nothing")
 	}
 }

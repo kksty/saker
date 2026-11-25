@@ -28,6 +28,7 @@ import {
 } from '@cyber/ui'
 import { cn } from '@cyber/theme'
 import { EvidencePreview } from '@/components/EvidencePreview'
+import { DoneDeclaredBadge } from '@/components/DoneDeclaredBadge'
 import { FactClaimDetail } from '@/components/FactClaimDetail'
 import { IntentContextEditor } from '@/components/IntentContextEditor'
 import { RetryIntentDialog } from '@/components/RetryIntentDialog'
@@ -401,6 +402,7 @@ function NodeWorkspace({
         {node.status && isnStatus(node.status) && (
           <IntentStatusChip status={node.status} hold={node.meta?.intent?.hold} />
         )}
+        <DoneDeclaredBadge intent={intent} />
         <div className="ml-auto flex items-center gap-1">
           {treeActive && onShowAll && (
             <Button size="xs" variant="ghost" title="恢复显示全部节点" onClick={onShowAll}>

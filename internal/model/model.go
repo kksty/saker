@@ -170,6 +170,10 @@ const (
 	// IntentNoteRestart is the audit note a parent writes when it restarts a
 	// worker it owns; it is a restart, not a re-scoped retry.
 	IntentNoteRestart = "restart"
+	// IntentNoteSettle is the audit note for a completion the commander
+	// declared on recorded evidence (POST /api/intents/{id}/settle). It is not
+	// a run result: DoneDeclaredBy keeps that distinction on the row.
+	IntentNoteSettle = "settle"
 )
 
 // HoldActor* values live on Intent.HeldBy: who set the sticky stop. A worker
@@ -317,9 +321,34 @@ type Intent struct {
 	// merely being re-read.
 	ParkedPremiseClaims map[string]uint64 `json:"parked_premise_claims,omitempty"`
 	ParkedAt            *time.Time        `json:"parked_at,omitempty"`
-	RunID               string            `json:"run_id,omitempty"`
-	CreatedAt           time.Time         `json:"created_at"`
-	UpdatedAt           time.Time         `json:"updated_at"`
+	// DoneDeclaredBy is the actor that declared this direction done without a
+	// run closing it (commander/operator settle). Empty means the run produced
+	// the completion, which is the only kind that carries a run's outcome.
+	DoneDeclaredBy string     `json:"done_declared_by,omitempty"`
+	DoneNote       string     `json:"done_note,omitempty"`
+	DoneFactIDs    []string   `json:"done_fact_ids,omitempty"`
+	DoneRunIDs     []string   `json:"done_run_ids,omitempty"`
+	DoneAt         *time.Time `json:"done_at,omitempty"`
+	RunID          string     `json:"run_id,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+// DoneDeclared reports a completion written by a person/commander judgement
+// rather than by a run. Surfaces that answer "did the executor finish this?"
+// must use this to keep the two apart.
+func (in Intent) DoneDeclared() bool { return in.DoneDeclaredBy != "" }
+
+// ClearDoneDeclared drops the declared-completion provenance. It belongs to the
+// completed turn it described: once a retry, continue or reopen puts the
+// direction back on the queue, the row must not keep claiming somebody declared
+// it done (the settle note stays in Notes as history).
+func (in *Intent) ClearDoneDeclared() {
+	in.DoneDeclaredBy = ""
+	in.DoneNote = ""
+	in.DoneFactIDs = nil
+	in.DoneRunIDs = nil
+	in.DoneAt = nil
 }
 
 // Wait is the persisted condition a direction yielded on. Evaluation, the

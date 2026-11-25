@@ -9,6 +9,7 @@ import {
   fmtAgo,
   hasBrokenPremise,
   purposeLabel,
+  runCancelDetail,
   runCancelReason,
   runStatusLabel,
   runMatchesFilter,
@@ -98,6 +99,26 @@ test('runCancelReason surfaces who and why for a canceled run', () => {
     runCancelReason(run({ status: 'canceled', cancel_cause: 'restart', exit_reason: '' })),
     '重启取消（原因未记录）',
   )
+})
+
+test('the category is not said twice, and the reason after it stays verbatim', () => {
+  // The operator's own words, as recorded on the run that was stopped.
+  const operatorInstruction =
+    '止损：操作员指令：白盒优先（本来就是想复现）。先停黑盒摸索，等白盒 in_epsagwl 给出各级 file:line 判定与 PoC 材料后再续跑'
+  assert.equal(
+    runCancelDetail(run({ status: 'canceled', cancel_cause: 'stop_loss', exit_reason: operatorInstruction })),
+    '操作员指令：白盒优先（本来就是想复现）。先停黑盒摸索，等白盒 in_epsagwl 给出各级 file:line 判定与 PoC 材料后再续跑',
+  )
+  assert.equal(
+    runCancelReason(run({ status: 'canceled', cancel_cause: 'stop_loss', exit_reason: operatorInstruction })),
+    '止损取消 · 操作员指令：白盒优先（本来就是想复现）。先停黑盒摸索，等白盒 in_epsagwl 给出各级 file:line 判定与 PoC 材料后再续跑',
+  )
+  // Only the repeated head goes: a criterion behind it is the reason and must stay.
+  assert.equal(
+    runCancelDetail(run({ status: 'canceled', cancel_cause: 'stop_loss', exit_reason: '止损：连续多轮没有新事实或派发' })),
+    '连续多轮没有新事实或派发',
+  )
+  assert.equal(runCancelDetail(run({ status: 'done' })), '')
 })
 
 test('cancelCauseText explains the mechanism behind the short label', () => {

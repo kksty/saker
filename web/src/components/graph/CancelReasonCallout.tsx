@@ -28,11 +28,12 @@ export function CancelReasonCallout({
   const title = run ? cancelCauseText(run.cancel_cause) : holdReason?.trim() || ''
   return (
     <Callout tone="warning" className="leading-relaxed">
-      <div className="flex items-start gap-2">
-        <span className="shrink-0 font-semibold text-warning">取消原因{who ? ` · ${who}` : ''}</span>
-        <span className="tw-break min-w-0 flex-1 text-ink-2" title={title}>
+      {/* 标签单独一行、正文独占整行宽：并排双列会把操作员原话切成每行六七个字。 */}
+      <div className="min-w-0">
+        <div className="text-[11px] font-semibold text-warning">取消原因{who ? ` · ${who}` : ''}</div>
+        <div className="tw-break mt-1 text-[12px] leading-relaxed text-ink-2" title={title}>
           {body}
-        </span>
+        </div>
       </div>
     </Callout>
   )

@@ -108,7 +108,8 @@ GNU 参数（如 `--max-filesize`）。
 | 新执行者接班 | `POST /api/intents/in_x/handoff`，`{"note":"交接说明","expected_version":N}`（先 GET 意图拿 handoff_version） |
 | 续话（取消当前 turn、带轨迹继续） | `POST /api/intents/in_x/steer`，`{"note":"…","ref_fact":"f_x"}` |
 | 插话（同一个 run，不取消） | `POST /api/intents/in_x/say`，`{"text":"…","interrupt":false}` |
-| 停放 / 取消 / 重派 | `POST /api/intents/in_x/park\|cancel\|retry`，`{"reason":"…"}` / `{"reason":"…"}` / `{"note":"…"}` |
+| 停放 / 取消 / 重派 / 重开 | `POST /api/intents/in_x/park\|cancel\|retry\|reopen`，`{"reason":"…"}` / `{"reason":"…"}` / `{"note":"…"}` / 无 body：停放与重开是一对——等的前提到手就 `reopen` 接回原意图（无 body），不要新建意图接盘；执行者没有这些动作，它要重开或改停只能 handoff 给你 |
+| 判定完成（没有 run 收口的方向） | `POST /api/intents/in_x/settle`，`{"note":"为什么这一轮算达成","fact_ids":["f_x"]}`（或 `run_ids`）：只对 failed / review_failed / parked / 已停止的 pending 生效，必须写说明并至少引用一条已记录的事实或运行；完成行带 `done_declared_by`，与 run 自己收口的完成区分开；操作员停的方向不能这样翻案 |
 | 续跑已结束/停放/失败的意图 | `POST /api/intents/in_x/continue`，`{"note":"…"}`：续同一个 harness 会话、不重发任务书；done/failed/parked 可用，没有原会话时改用 retry 重派新会话 |
 | 请求停止项目（全局暂停，等操作员恢复） | `POST /api/project/standby`，`{"reason":"…","stop_reason":"blocked|low_value|goal_achieved"}`，请求头额外带 `-H "X-Tw-Actor: commander"`：项目暂停、在跑意图取消、本轮正常收尾；恢复只能由操作员点「继续项目」。`goal_achieved` 只能用于目标已经完成的情况：必须先用 `POST /api/goals/g_x/complete` 盖章，否则控制面返回 409；目标未达成但继续无价值时用 `blocked` 或 `low_value`。控制面只接受“有进行中的指挥官轮次可归因 + 指挥官身份声明”的停止请求，执行者不能停整个项目。先写清笔记与证据，判断边界见「判断」一节 |
 | 目标完成 | `POST /api/goals/g_x/complete`，`{"from":["f_x"],"note":"说清目标口径怎么被证据满足"}`（`from` 里的**每条**事实都必须有自己的证据；对照目标 statement 与已有观察判断是否达成；目标由操作员定义，你按目标判断完成，变更定义另须操作员明确指令；是否要求独立复核由项目当前前提政策决定，完成同样须通过准入；代码不数条数，也不替你定清单） |
