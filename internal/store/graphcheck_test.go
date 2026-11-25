@@ -136,10 +136,10 @@ func TestRunningIntentParentIsFrozen(t *testing.T) {
 		t.Fatalf("parent moved to %q, want %q", kept.ParentID, parent.ID)
 	}
 }
-// The freeze starts from the first attempt, not from running: a failed
-// direction is expected to resume, and moving its child away changes what that
-// resume waits for. A direction that never ran can still be re-parented.
-func TestReparentFrozenAfterTheFirstAttempt(t *testing.T) {
+// A failed direction is a starting point for a retry: its parent link is setup
+// for that attempt, not a running arrangement, so it may still move. Freezing
+// failed directions broke the continuation admission path for no live run's sake.
+func TestReparentAllowedAfterFailure(t *testing.T) {
 	s := open(t)
 	first, err := s.CreateIntent(model.Intent{Title: "第一个父"})
 	if err != nil {
@@ -159,8 +159,38 @@ func TestReparentFrozenAfterTheFirstAttempt(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := s.UpdateIntent(in.ID, func(i *model.Intent) { i.ParentID = second.ID }); err != nil {
+		t.Fatalf("re-parent after a failed run = %v, want it allowed", err)
+	}
+	kept, _ := s.GetIntent(in.ID)
+	if kept.ParentID != second.ID {
+		t.Fatalf("parent = %q, want %q", kept.ParentID, second.ID)
+	}
+}
+// A waiting direction's children are the wait it was parked on: moving one away
+// would leave a wake that can never fire, so the link is frozen while waiting.
+func TestReparentFrozenWhileWaiting(t *testing.T) {
+	s := open(t)
+	first, err := s.CreateIntent(model.Intent{Title: "第一个父"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := s.CreateIntent(model.Intent{Title: "第二个父"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	in, err := s.CreateIntent(model.Intent{Title: "子", ParentID: first.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.UpdateIntent(in.ID, func(i *model.Intent) {
+		i.Status = model.StatusWaiting
+		i.Wait = &model.Wait{Children: []string{"in_other"}, Mode: model.WaitAll}
+	}); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := s.UpdateIntent(in.ID, func(i *model.Intent) { i.ParentID = second.ID }); !errors.Is(err, ErrIntentParentFrozen) {
-		t.Fatalf("re-parent after a failed run = %v, want ErrIntentParentFrozen", err)
+		t.Fatalf("re-parent of a waiting intent = %v, want ErrIntentParentFrozen", err)
 	}
 	kept, _ := s.GetIntent(in.ID)
 	if kept.ParentID != first.ID {

@@ -143,21 +143,21 @@ func (s *Store) intentGraphCycleLocked() (string, bool) {
 // edit and refuses it if the resulting graph has a cycle, restoring the row it
 // replaced. Caller holds the write lock. It returns the (possibly updated) row
 // to persist.
-// hasRunHistory reports whether the direction already started a run. Reparenting
-// is frozen from the first attempt on, not only while running: after a failure
-// or a park the direction is expected to resume, and moving its child away
-// silently changes what that resume is waiting for. Attempts alone cannot be
-// the test (uncountAttempt can take it back to zero), and RunID survives cancel.
-func hasRunHistory(in model.Intent) bool {
+// parentFrozen reports whether the direction's parent link is part of a live
+// arrangement right now: a run is under that parent (running/claimed), or the
+// direction is waiting on children that the link names (waiting). Failed and
+// done directions are starting points for a later retry/continue, where moving
+// the link is a legitimate setup change; freezing those broke that path.
+func parentFrozen(in model.Intent) bool {
 	switch in.Status {
-	case model.StatusClaimed, model.StatusRunning:
+	case model.StatusRunning, model.StatusClaimed, model.StatusWaiting:
 		return true
 	}
-	return in.RunID != "" || in.Attempts > 0
+	return false
 }
 
 func (s *Store) validateIntentStructureLocked(row *model.Intent, previous model.Intent) error {
-	if row.ParentID != previous.ParentID && hasRunHistory(previous) {
+	if row.ParentID != previous.ParentID && parentFrozen(previous) {
 		*row = previous
 		return ErrIntentParentFrozen
 	}

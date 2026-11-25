@@ -216,3 +216,44 @@ func TestPremiseAllowsOwnEarlierRunFact(t *testing.T) {
 		t.Fatalf("own fact treated as foreign: %s", owner)
 	}
 }
+
+// A parent that waits on this direction cannot correct its own facts while it
+// waits. Treating it as live would deadlock exactly the case it is waiting for:
+// the child could never cite the fact its waiting parent just produced.
+func TestPremiseAllowsFactOfAParentWaitingOnMe(t *testing.T) {
+	s := open(t)
+	parent, err := s.CreateIntent(model.Intent{Title: "父"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	parentRun, err := s.AddRun(model.Run{IntentID: parent.ID, Node: "local", Status: model.RunRunning})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := s.AddFact(model.Fact{Kind: "service", Title: "live", Summary: "s", IntentID: parent.ID, SourceRunID: parentRun.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	child, err := s.CreateIntent(model.Intent{Title: "子", FromFactIDs: []string{f.ID}, ParentID: parent.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.UpdateIntent(parent.ID, func(i *model.Intent) {
+		i.Status = model.StatusWaiting
+		i.Wait = &model.Wait{Children: []string{child.ID}, Mode: model.WaitAll}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// The parent run ended when it started waiting; settle the row so the run
+	// check does not mask the wait check.
+	if _, err := s.UpdateRun(parentRun.ID, func(r *model.Run) { r.Status = model.RunDone }); err != nil {
+		t.Fatal(err)
+	}
+	_, runChild, err := s.StartIntentRun(child.ID, "local", "", model.Run{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.PrepareRunInput(runChild.ID, child, model.PremiseVerifiedOnly, DispatchGate{ReviewsOff: true}); err != nil {
+		t.Fatalf("a child its parent is waiting on was refused: %v", err)
+	}
+}

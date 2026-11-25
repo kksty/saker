@@ -559,19 +559,21 @@ func (s *Service) Start(id, prompt, continuedFrom string, resume, keepPrompt boo
 				group, running.ID)
 		}
 	}
-	// A direction whose live subtree still has work does not start: the failed
-	// run already dropped its wait, so the descendants' results have nowhere to
-	// land, and a restart would put the top on the same ground as its own chain.
-	// Waiting for them is the only reading that keeps the graph honest;
-	// cancelling them first is the operator's call. This is the one enforcement
-	// point: pump, redispatch, auto-resume and an explicit run all arrive here.
-	if kids := s.o.Store.ActiveDescendants(id); len(kids) > 0 {
-		ids := make([]string, 0, len(kids))
-		for _, k := range kids {
-			ids = append(ids, k.ID)
+	// A direction that is not waiting on its descendants does not start while
+	// they run: the failed run already dropped its wait, so their results have
+	// nowhere to land, and a restart would put the top on the same ground as its
+	// own chain. A waiting direction is the intended exception — its wait is
+	// exactly "these children are mine", and a replacement session (handoff)
+	// keeps that wait, so the results still land.
+	if in.Wait == nil {
+		if kids := s.o.Store.ActiveDescendants(id); len(kids) > 0 {
+			ids := make([]string, 0, len(kids))
+			for _, k := range kids {
+				ids = append(ids, k.ID)
+			}
+			return "", fmt.Errorf("意图 %s 还有 %d 条子意图在下游运行（%s）：先等它们收口或取消，再启动父意图",
+				id, len(kids), strings.Join(ids, "、"))
 		}
-		return "", fmt.Errorf("意图 %s 还有 %d 条子意图在下游运行（%s）：先等它们收口或取消，再启动父意图",
-			id, len(kids), strings.Join(ids, "、"))
 	}
 	run, nodeID, err := s.o.PlanRun(in, continuedFrom)
 	if err != nil {
