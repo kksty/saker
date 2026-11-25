@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kksty/tianwu/internal/report"
 )
@@ -234,5 +235,35 @@ func TestReportFileRefusesStaleReport(t *testing.T) {
 	})
 	if res := serve(""); res.Code != http.StatusOK {
 		t.Fatalf("fresh index = %d %s, want 200", res.Code, res.Body.String())
+	}
+}
+
+// A report written with earlier project documents stays on disk but is no longer deliverable.
+func TestReportFileBecomesStaleAfterConstraintsChange(t *testing.T) {
+	s, _ := newBindingServer(t)
+	s.SetProjectSettings("Starting point", "Old constraints")
+	writeReportDir(t, s.CaseRoot, "r-scope", report.Meta{
+		Status: report.StatusReady, SourceDigest: s.contentDigest(), ScopeDigest: report.ScopeDigest(s.ReportScope()),
+	}, map[string]string{"index.md": "# Previous constraints"})
+	writeReportDir(t, s.CaseRoot, "r-legacy-scope", report.Meta{
+		Status: report.StatusReady, SourceDigest: s.contentDigest(), CreatedAt: time.Now().Add(-time.Minute),
+	}, map[string]string{"index.md": "# Previous constraints"})
+	if rec := call(t, s, http.MethodGet, "/api/reports/r-scope/file", nil); rec.Code != http.StatusOK {
+		t.Fatalf("initial report = %d %s", rec.Code, rec.Body.String())
+	}
+	rec := call(t, s, http.MethodPut, "/api/documents/constraints", map[string]any{"text": "New constraints", "revision": 0})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("save = %d %s", rec.Code, rec.Body.String())
+	}
+	for _, path := range []string{"/api/reports", "/api/reports/r-scope"} {
+		got := call(t, s, http.MethodGet, path, nil)
+		if got.Code != http.StatusOK || !strings.Contains(got.Body.String(), `"status":"stale"`) {
+			t.Fatalf("%s = %d %s", path, got.Code, got.Body.String())
+		}
+	}
+	for _, path := range []string{"/api/reports/r-scope/file", "/api/reports/r-legacy-scope/file"} {
+		if got := call(t, s, http.MethodGet, path, nil); got.Code != http.StatusConflict {
+			t.Fatalf("%s = %d %s", path, got.Code, got.Body.String())
+		}
 	}
 }

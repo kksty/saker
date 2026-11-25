@@ -134,15 +134,23 @@ export function proposalDecisionError(error: unknown, action: 'approve' | 'rejec
   return error instanceof Error ? error.message : String(error)
 }
 
+function notificationReceipt(result: ProposalDecisionResponse): string {
+  const notification = result.notification
+  if (!notification) return ''
+  return notification.notified
+    ? '通知已登记。'
+    : `通知未确认${notification.error ? `（${notification.error}）` : ''}。`
+}
+
 export function proposalApprovedReceipt(result: ProposalDecisionResponse): string {
   const intent = result.intent_id || result.proposal.intent_id || ''
-  return `已批准 v${result.proposal.version}，已生成待派发意图 ${intent}；点「派发」才会起 run。`
+  return `已批准 v${result.proposal.version}，已生成待派发意图 ${intent}；点「派发」才会起 run。${notificationReceipt(result)}`
 }
 
 export function proposalRejectedReceipt(result: ProposalDecisionResponse): string {
-  return `已驳回 v${result.proposal.version}，理由已回给提议者。`
+  return `已驳回 v${result.proposal.version}。${notificationReceipt(result)}`
 }
 
 export function proposalDispatchedReceipt(result: ProposalDecisionResponse): string {
-  return `已派发：intent=${result.intent_id || result.proposal.intent_id || ''} run=${result.run_id || result.proposal.run_id || ''}。`
+  return `已派发：intent=${result.intent_id || result.proposal.intent_id || ''} run=${result.run_id || result.proposal.run_id || ''}。${notificationReceipt(result)}`
 }

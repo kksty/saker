@@ -1,6 +1,9 @@
 package api
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -143,4 +146,36 @@ func TestProjectPauseCancelsAVerifierRun(t *testing.T) {
 	if !s.WaitIdle(5 * time.Second) {
 		t.Fatal("verifier run registry did not drain after the cancel")
 	}
+}
+
+// Configuration failures must be visible before acceptance, and concurrent submissions share one reservation.
+func TestReportSubmissionReturnsOneDurableRunReceipt(t *testing.T) {
+	s, st, _, cases := newPurposeServer(t)
+	s.Reports = &report.Generator{Store: st, Exec: s.Exec, CaseRoot: cases, Node: "removed-test-node"}
+	if rec := call(t, s, http.MethodPost, "/api/reports", nil); rec.Code != http.StatusConflict {
+		t.Fatalf("unavailable writer = %d %s", rec.Code, rec.Body.String())
+	}
+	if len(st.Runs()) != 0 {
+		t.Fatal("an invalid submission created a run")
+	}
+
+	s.Reports.Node = ""
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	s.Ctx = ctx
+	first := call(t, s, http.MethodPost, "/api/reports", nil)
+	var receipt struct {
+		RunID string `json:"run_id"`
+	}
+	if err := json.Unmarshal(first.Body.Bytes(), &receipt); err != nil || first.Code != http.StatusAccepted || receipt.RunID == "" {
+		t.Fatalf("receipt = %d %s, %v", first.Code, first.Body.String(), err)
+	}
+	if run, ok := st.GetRun(receipt.RunID); !ok || run.Purpose != "report" {
+		t.Fatalf("receipt names no report run: %+v", run)
+	}
+	if second := call(t, s, http.MethodPost, "/api/reports", nil); second.Code != http.StatusConflict {
+		t.Fatalf("second submission = %d %s", second.Code, second.Body.String())
+	}
+	cancel()
+	waitFor(t, 5*time.Second, func() bool { return !s.Reports.Busy() })
 }

@@ -8,6 +8,7 @@ package report
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -95,6 +96,7 @@ type Meta struct {
 	CreatedAt     time.Time  `json:"created_at"`
 	FinishedAt    *time.Time `json:"finished_at,omitempty"`
 	SourceDigest  string     `json:"source_digest"`
+	ScopeDigest   string     `json:"scope_digest,omitempty"`
 	Findings      int        `json:"findings"`
 	RunID         string     `json:"run_id,omitempty"`
 	Checks        []Check    `json:"checks,omitempty"`
@@ -102,16 +104,17 @@ type Meta struct {
 
 // Generator owns one report run at a time.
 type Generator struct {
-	ScopeFor   func() string
-	Policy     func() string
-	Admit      func(context.Context) (func(), error)
-	Store      *store.Store
-	Exec       executor.Executor
-	CaseRoot   string
-	Scope      string
-	Timeout    time.Duration
-	StaleAfter time.Duration
-	Skills     []string
+	ScopeFor        func() string
+	ReviewsDisabled func() bool
+	Policy          func() string
+	Admit           func(context.Context) (func(), error)
+	Store           *store.Store
+	Exec            executor.Executor
+	CaseRoot        string
+	Scope           string
+	Timeout         time.Duration
+	StaleAfter      time.Duration
+	Skills          []string
 	// Node is where the report is written; empty means the executor's default.
 	Node string
 	// NodeFor overrides Node at generation time. The report is a documentation
@@ -140,6 +143,18 @@ func (g *Generator) Busy() bool {
 	return g.running
 }
 
+// ScopeDigest binds the report to the project documents supplied to its writer.
+func ScopeDigest(scope string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(scope)))
+}
+
+func (g *Generator) scope() string {
+	if g.ScopeFor != nil {
+		return g.ScopeFor()
+	}
+	return g.Scope
+}
+
 func (g *Generator) staleAfter() time.Duration {
 	if g.StaleAfter > 0 {
 		return g.StaleAfter
@@ -152,21 +167,58 @@ func (g *Generator) Dir(id string) string {
 	return filepath.Join(g.CaseRoot, Dir, id)
 }
 
-// Generate runs one report. It refuses to start when a face is unaccounted:
-// a report that cannot say "what was not tested" is not worth a model run.
-func (g *Generator) Generate(ctx context.Context) (Meta, error) {
+func (g *Generator) reserve() bool {
 	g.mu.Lock()
+	defer g.mu.Unlock()
 	if g.running {
-		g.mu.Unlock()
-		return Meta{}, fmt.Errorf("已有报告在生成中")
+		return false
 	}
 	g.running = true
-	g.mu.Unlock()
-	defer func() {
-		g.mu.Lock()
-		g.running = false
-		g.mu.Unlock()
+	return true
+}
+
+func (g *Generator) release() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.running = false
+}
+
+// Start reserves the generator and persists a run before returning its receipt.
+func (g *Generator) Start(ctx context.Context, onError func(error)) (string, error) {
+	if !g.reserve() {
+		return "", fmt.Errorf("已有报告在生成中")
+	}
+	if err := g.preflight(); err != nil {
+		g.release()
+		return "", err
+	}
+	run, err := g.prepareRun()
+	if err != nil {
+		g.release()
+		return "", err
+	}
+	go func() {
+		defer g.release()
+		if _, err := g.generate(ctx, run); err != nil && onError != nil {
+			onError(err)
+		}
 	}()
+	return run.ID, nil
+}
+
+func (g *Generator) Generate(ctx context.Context) (Meta, error) {
+	if !g.reserve() {
+		return Meta{}, fmt.Errorf("已有报告在生成中")
+	}
+	defer g.release()
+	run, err := g.prepareRun()
+	if err != nil {
+		return Meta{}, err
+	}
+	return g.generate(ctx, run)
+}
+
+func (g *Generator) prepareRun() (model.Run, error) {
 
 	// Resolve the writing node first: a report whose node has vanished must fail
 	// before this run leaves a run row or a directory behind.
@@ -177,7 +229,7 @@ func (g *Generator) Generate(ctx context.Context) (Meta, error) {
 		}
 	}
 	if nodeID != "" && !executor.HasNode(g.Exec, nodeID) {
-		return Meta{}, fmt.Errorf("报告节点 %s 已不在 nodes.json 里", nodeID)
+		return model.Run{}, fmt.Errorf("报告节点 %s 已不在 nodes.json 里", nodeID)
 	}
 	if nodeID == "" {
 		nodeID = executor.ResolveNode(g.Exec, "")
@@ -187,10 +239,10 @@ func (g *Generator) Generate(ctx context.Context) (Meta, error) {
 	// the run under the store lock and records the frozen instruction versions on
 	// it. It is not a report yet: report.json — the file List() advertises — is
 	// written only after the freeze succeeds.
-	run, err := g.Store.AddRun(model.Run{Node: nodeID, Purpose: "report"})
-	if err != nil {
-		return Meta{}, err
-	}
+	return g.Store.AddRun(model.Run{Node: nodeID, Purpose: "report"})
+}
+
+func (g *Generator) generate(ctx context.Context, run model.Run) (Meta, error) {
 	fail := func(reason string) {
 		now := time.Now()
 		_, _ = g.Store.UpdateRun(run.ID, func(r *model.Run) {
@@ -205,12 +257,8 @@ func (g *Generator) Generate(ctx context.Context) (Meta, error) {
 	// written in between produced a report whose snapshot, source digest and
 	// checks disagreed about the input the writer actually read (F3/F2).
 	policy := model.PremiseVerifiedOnly
-	scope := ""
-	if g.ScopeFor != nil {
-		scope = g.ScopeFor()
-	} else {
-		scope = g.Scope
-	}
+	scope := g.scope()
+	reviewsDisabled := g.ReviewsDisabled != nil && g.ReviewsDisabled()
 	if g.Policy != nil {
 		policy = g.Policy()
 	}
@@ -247,7 +295,7 @@ func (g *Generator) Generate(ctx context.Context) (Meta, error) {
 		fail(err.Error())
 		return Meta{}, err
 	}
-	if err := writeSnapshot(dir, db, copied, scope, nil); err != nil {
+	if err := writeSnapshot(dir, db, copied, scope, nil, reviewsDisabled); err != nil {
 		fail(err.Error())
 		return Meta{}, err
 	}
@@ -258,6 +306,7 @@ func (g *Generator) Generate(ctx context.Context) (Meta, error) {
 		Status:        StatusDraft,
 		CreatedAt:     time.Now(),
 		SourceDigest:  board.ContentDigest(board.BuildFromDB(db, 20)),
+		ScopeDigest:   ScopeDigest(scope),
 		Findings:      len(facts),
 		RunID:         run.ID,
 	}
@@ -316,7 +365,7 @@ func (g *Generator) Generate(ctx context.Context) (Meta, error) {
 		res, runErr = g.Exec.Run(ctx, executor.Request{
 			Prompt:  BuildPrompt(len(facts), scope),
 			WorkDir: dir,
-			Node:    nodeID,
+			Node:    run.Node,
 			Purpose: "report",
 			Skills:  g.Skills,
 		}, observe)
@@ -351,22 +400,25 @@ func (g *Generator) Generate(ctx context.Context) (Meta, error) {
 			reason = runErr.Error()
 		}
 	}
-	_, _ = g.Store.UpdateRun(run.ID, func(r *model.Run) {
-		r.Status = status
-		r.StartedAt = started
-		r.EndedAt = &now
-		r.Events = res.Events
-		r.ExitReason = reason
-		// The writing pass costs tokens like any other run; leaving them out
-		// hides the most expensive step of delivery. Unknown usage stays
-		// unknown (Known=false), never a fabricated zero.
-		r.Tokens = res.Tokens
-		r.StopReason = res.StopReason
-		r.Model = modelName
-		r.Usage = executor.UsageOf(res)
-	})
+	recordRun := func(status, reason string) {
+		_, _ = g.Store.UpdateRun(run.ID, func(r *model.Run) {
+			r.Status = status
+			r.StartedAt = started
+			r.EndedAt = &now
+			r.Events = res.Events
+			r.ExitReason = reason
+			// The writing pass costs tokens like any other run; leaving them out
+			// hides the most expensive step of delivery. Unknown usage stays
+			// unknown (Known=false), never a fabricated zero.
+			r.Tokens = res.Tokens
+			r.StopReason = res.StopReason
+			r.Model = modelName
+			r.Usage = executor.UsageOf(res)
+		})
+	}
 
 	if status == model.RunFailed {
+		recordRun(status, reason)
 		return Meta{}, fmt.Errorf("报告生成未成功结束：%s", reason)
 	}
 	checks := Validate(dir, db, g.staleAfter())
@@ -382,13 +434,16 @@ func (g *Generator) Generate(ctx context.Context) (Meta, error) {
 			break
 		}
 	}
-	if err := writeMeta(dir, meta); err != nil {
+	if err := writeChecks(dir, checks); err != nil {
+		recordRun(model.RunFailed, err.Error())
 		return meta, err
 	}
-	if err := writeChecks(dir, checks); err != nil {
+	if err := writeMeta(dir, meta); err != nil {
+		recordRun(model.RunFailed, err.Error())
 		return meta, err
 	}
 	finished = true
+	recordRun(model.RunDone, "")
 	return meta, nil
 }
 
@@ -480,7 +535,8 @@ func evidenceCopyName(e model.Evidence) string {
 // snapshot is the input the report run reads. It is written by the control
 // plane, never by the model: the model may describe the ledger, not extend it.
 type snapshot struct {
-	Scope string `json:"scope,omitempty"`
+	ReviewsDisabled bool   `json:"reviews_disabled"`
+	Scope           string `json:"scope,omitempty"`
 	// Instructions is the effective persistent constraint set this run obeyed
 	// (the same rows whose versions the run row froze and whose text the prompt
 	// carried). A report is only answerable if a later reader can tell what it
@@ -548,14 +604,10 @@ type factView struct {
 	Refs []model.Ref `json:"refs,omitempty"`
 }
 
-// latestReview is the newest verdict per fact. The ledger stores reviews in
-// write order, but a snapshot must not depend on that: take the max by time.
-func latestReview(db store.DB) map[string]model.Review {
-	out := make(map[string]model.Review, len(db.Reviews))
-	for _, r := range db.Reviews {
-		if old, ok := out[r.FactID]; !ok || r.CreatedAt.After(old.CreatedAt) {
-			out[r.FactID] = r
-		}
+func reviewsByFact(reviews []model.Review) map[string][]model.Review {
+	out := make(map[string][]model.Review)
+	for _, r := range reviews {
+		out[r.FactID] = append(out[r.FactID], r)
 	}
 	return out
 }
@@ -581,9 +633,9 @@ func rejectedFacts(facts []model.Fact) []model.Fact {
 	return out
 }
 
-func writeSnapshot(dir string, db store.DB, evidence map[string][]string, scope string, instructions []model.Instruction) error {
-	reviews := latestReview(db)
-	s := snapshot{Scope: scope, Goals: db.Goals}
+func writeSnapshot(dir string, db store.DB, evidence map[string][]string, scope string, instructions []model.Instruction, reviewsDisabled bool) error {
+	reviews := reviewsByFact(db.Reviews)
+	s := snapshot{Scope: scope, Goals: db.Goals, ReviewsDisabled: reviewsDisabled}
 	for _, in := range instructions {
 		s.Instructions = append(s.Instructions, instructionView{
 			ID: in.ID, Version: in.Version, IntentID: in.IntentID, Text: in.Text,
@@ -595,14 +647,14 @@ func writeSnapshot(dir string, db store.DB, evidence map[string][]string, scope 
 			Doc: f.Doc, Status: f.Status, Severity: f.Severity,
 			Evidence: evidence[f.ID], Refs: f.Refs,
 		}
-		if r, ok := reviews[f.ID]; ok {
+		if r, ok := model.LatestReviewForClaim(f, reviews[f.ID]); ok {
 			v.Review = viewOf(r)
 		}
 		s.Facts = append(s.Facts, v)
 	}
 	for _, f := range rejectedFacts(db.Facts) {
 		v := rejectedView{ID: f.ID, Kind: f.Kind, Title: f.Title, Summary: f.Summary}
-		if r, ok := reviews[f.ID]; ok {
+		if r, ok := model.LatestReviewForClaim(f, reviews[f.ID]); ok {
 			v.Review = viewOf(r)
 		}
 		s.Rejected = append(s.Rejected, v)
@@ -642,6 +694,10 @@ func (g *Generator) Preflight() error {
 	if g.Busy() {
 		return fmt.Errorf("已有报告在生成中")
 	}
+	return g.preflight()
+}
+
+func (g *Generator) preflight() error {
 	db := g.Store.Snapshot()
 	facts := reportable(db.Facts)
 	if len(facts) == 0 {

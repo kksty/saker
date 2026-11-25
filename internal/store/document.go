@@ -110,6 +110,9 @@ func (s *Store) SaveDocument(expected uint64, kind, text, by string) (model.Docu
 	if !found && expected != 0 {
 		return model.Document{}, ErrDocumentConflict
 	}
+	if found && current.Text == text {
+		return current, nil
+	}
 	next := model.Document{
 		Kind: kind, Revision: expected + 1, Text: text,
 		UpdatedAt: time.Now(), UpdatedBy: by,
@@ -119,6 +122,29 @@ func (s *Store) SaveDocument(expected uint64, kind, text, by string) (model.Docu
 		return model.Document{}, err
 	}
 	return next, nil
+}
+
+// CurrentGoal returns the earliest open goal and its revision from one ledger read.
+func (s *Store) CurrentGoal() (model.Goal, uint64, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	current := s.currentGoalLocked()
+	if current == nil {
+		return model.Goal{}, 0, false
+	}
+	revision := s.records[recordKey("goal", current.ID)].version
+	return detachGoal(*current), revision, true
+}
+
+func (s *Store) currentGoalLocked() *model.Goal {
+	var current *model.Goal
+	for i := range s.db.Goals {
+		g := &s.db.Goals[i]
+		if !g.Closed && (current == nil || g.CreatedAt.Before(current.CreatedAt)) {
+			current = g
+		}
+	}
+	return current
 }
 
 // GoalRevision is the revision of the goal document: it is the goal row's own
@@ -162,6 +188,27 @@ func (s *Store) GoalDocumentHistory(goalID string) []model.Document {
 // statement changed but the revision did not, and the console would then
 // overwrite a newer edit without a conflict.
 func (s *Store) SaveGoalDocument(expected uint64, goalID, statement, start, instructionRef, runID, by string) (model.Document, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.saveGoalDocumentLocked(expected, goalID, statement, start, instructionRef, runID, by)
+}
+
+// SaveCurrentGoalStatement binds the draft to the current goal under the same
+// lock as the revision check. The document editor changes only the statement.
+func (s *Store) SaveCurrentGoalStatement(expected uint64, goalID, statement, by string) (model.Document, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	goal := s.currentGoalLocked()
+	if goal == nil || goal.ID != goalID {
+		return model.Document{}, ErrDocumentConflict
+	}
+	if strings.TrimSpace(statement) == goal.Statement {
+		return s.saveGoalDocumentLocked(expected, goalID, statement, goal.Start, goal.InstructionRef, goal.CreatedByRun, by)
+	}
+	return s.saveGoalDocumentLocked(expected, goalID, statement, goal.Start, "", "", by)
+}
+
+func (s *Store) saveGoalDocumentLocked(expected uint64, goalID, statement, start, instructionRef, runID, by string) (model.Document, error) {
 	statement = strings.TrimSpace(statement)
 	if statement == "" {
 		return model.Document{}, fmt.Errorf("目标文档不能为空")
@@ -169,8 +216,6 @@ func (s *Store) SaveGoalDocument(expected uint64, goalID, statement, start, inst
 	if strings.TrimSpace(by) == "" {
 		return model.Document{}, fmt.Errorf("文档保存必须记录修改人")
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	var current uint64
 	if r, ok := s.records[recordKey("goal", goalID)]; ok {
 		current = r.version
@@ -189,10 +234,10 @@ func (s *Store) SaveGoalDocument(expected uint64, goalID, statement, start, inst
 		if g.Closed {
 			return model.Document{}, fmt.Errorf("目标已关闭")
 		}
-		if err := s.bindGoalInstructionLocked(instructionRef, runID); err != nil {
-			return model.Document{}, err
-		}
 		if g.Statement != statement || strings.TrimSpace(start) != g.Start || g.InstructionRef != instructionRef {
+			if err := s.bindGoalInstructionLocked(instructionRef, runID); err != nil {
+				return model.Document{}, err
+			}
 			g.Statement, g.Start, g.InstructionRef = statement, strings.TrimSpace(start), instructionRef
 			g.CreatedByRun = runID
 			// Who wrote these words, not only which run supplied the instruction:
@@ -229,4 +274,3 @@ func (s *Store) SaveGoalDocument(expected uint64, goalID, statement, start, inst
 		UpdatedAt: time.Now(), UpdatedBy: by, GoalID: goalID,
 	}, nil
 }
-

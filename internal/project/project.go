@@ -172,6 +172,11 @@ type Project struct {
 // ScopeText and DescriptionText are the locked reads. The hub used to read the
 // embedded fields directly, which raced with PUT /api/projects/{id}.
 func (p *Project) ScopeText() string {
+	if p.Store != nil {
+		if doc, ok := p.Store.Document(store.DocumentScope); ok {
+			return strings.TrimSpace(doc.Text)
+		}
+	}
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.Scope
@@ -255,6 +260,11 @@ func (p *Project) PauseKindOf() string {
 }
 
 func (p *Project) DescriptionText() string {
+	if p.Store != nil {
+		if doc, ok := p.Store.Document(store.DocumentConstraints); ok {
+			return strings.TrimSpace(doc.Text)
+		}
+	}
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.Description
@@ -267,11 +277,19 @@ func (p *Project) DescriptionText() string {
 // time unknown" instead of comparing it as if it were old.
 func (p *Project) BriefRevisedAt() time.Time {
 	p.mu.RLock()
-	defer p.mu.RUnlock()
-	if !p.ScopeUpdatedAt.IsZero() {
-		return p.ScopeUpdatedAt
+	revision := p.ScopeUpdatedAt
+	if revision.IsZero() {
+		revision = p.Created
 	}
-	return p.Created
+	p.mu.RUnlock()
+	if p.Store != nil {
+		for _, doc := range p.Store.Documents() {
+			if (doc.Kind == store.DocumentScope || doc.Kind == store.DocumentConstraints) && doc.UpdatedAt.After(revision) {
+				revision = doc.UpdatedAt
+			}
+		}
+	}
+	return revision
 }
 
 // NodeBinding returns the project's node allowlist and default node.
@@ -799,10 +817,7 @@ func (m *Manager) SetDescription(id, description string) error {
 // applicable instruction: "" (never revised) falls back to project creation, and
 // a project with neither is reported as unknown rather than as year 1.
 func (p *Project) BriefRevision() time.Time {
-	if !p.ScopeUpdatedAt.IsZero() {
-		return p.ScopeUpdatedAt
-	}
-	return p.Created
+	return p.BriefRevisedAt()
 }
 
 // SetMaxRuns writes the project's own concurrency cap; nil restores "inherit

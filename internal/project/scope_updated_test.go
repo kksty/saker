@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/kksty/tianwu/internal/store"
 )
 
 // The brief's revision time is what lets a reader tell "the operator changed the
@@ -118,5 +120,46 @@ func TestLegacyManifestIsDatedByItsLedgerNotByStartup(t *testing.T) {
 	}
 	if stamp := got.BriefRevision(); stamp.Before(time.Now().Add(-time.Minute)) {
 		t.Fatalf("first edit left the stamp at %v", stamp)
+	}
+}
+
+// Once a document is edited, its ledger revision survives a manifest that still has the initial text.
+func TestBriefUsesLedgerDocumentsAfterReopen(t *testing.T) {
+	root := t.TempDir()
+	mgr, err := Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := mgr.Create("Document project", "Original scope")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := mgr.SetDescription(p.ID, "Original constraints"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.Store.SaveDocument(0, store.DocumentScope, "Revised scope", "operator"); err != nil {
+		t.Fatal(err)
+	}
+	doc, err := p.Store.SaveDocument(0, store.DocumentConstraints, "Revised constraints", "operator")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project := reopened.Get(p.ID)
+	if project == nil {
+		t.Fatal("project did not reopen")
+	}
+	defer project.Store.Close()
+	if project.ScopeText() != "Revised scope" || project.DescriptionText() != "Revised constraints" {
+		t.Fatalf("wrong brief after reopen: %q / %q", project.ScopeText(), project.DescriptionText())
+	}
+	if !project.BriefRevisedAt().Equal(doc.UpdatedAt) {
+		t.Fatalf("brief revision = %s, want %s", project.BriefRevisedAt(), doc.UpdatedAt)
 	}
 }

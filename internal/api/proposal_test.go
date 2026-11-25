@@ -500,3 +500,48 @@ func TestProposalNotFound(t *testing.T) {
 		t.Fatalf("approve missing = %d %s", rec.Code, rec.Body.String())
 	}
 }
+
+// Active pagination must include older work even when a newer page is all history.
+func TestProposalQueueListsActiveAndHistoricalPagesIndependently(t *testing.T) {
+	s, _ := newBindingServer(t)
+	for _, id := range []string{"old-active", "new-active", "newer-closed"} {
+		p, _, err := s.Store.CreateProposal(model.Proposal{
+			ID: id, IdempotencyKey: id, Title: id, FromParticipantID: "test-participant",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if id == "newer-closed" {
+			if _, _, err := s.Store.DecideProposal(p.ID, p.Version, false, "synthetic decision", "operator"); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	read := func(path string) (ids []string, next string, total int) {
+		t.Helper()
+		rec := call(t, s, http.MethodGet, path, nil)
+		var page struct {
+			Rows  []model.Proposal `json:"proposals"`
+			Next  string           `json:"next_cursor"`
+			Total int              `json:"total"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &page); err != nil || rec.Code != http.StatusOK {
+			t.Fatalf("%s = %d %s (%v)", path, rec.Code, rec.Body.String(), err)
+		}
+		for _, p := range page.Rows {
+			ids = append(ids, p.ID)
+		}
+		return ids, page.Next, page.Total
+	}
+	if rows, _, total := read("/api/proposals?status=closed"); total != 1 || len(rows) != 1 || rows[0] != "newer-closed" {
+		t.Fatalf("unexpected history: %v (%d)", rows, total)
+	}
+	rows, cursor, total := read("/api/proposals?status=active&limit=1")
+	if total != 2 || len(rows) != 1 || cursor == "" {
+		t.Fatalf("unexpected first page: %v (%d), cursor=%q", rows, total, cursor)
+	}
+	last, next, total := read("/api/proposals?status=active&limit=1&cursor=" + cursor)
+	if total != 2 || len(last) != 1 || rows[0] == last[0] || next != "" {
+		t.Fatalf("unexpected second page: %v (%d), cursor=%q", last, total, next)
+	}
+}

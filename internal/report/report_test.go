@@ -293,7 +293,7 @@ func TestSnapshotCarriesRefsWithoutEvidence(t *testing.T) {
 		ID: "f_2", IntentID: "in_1", Kind: "vuln", Title: "只在线上", Status: "unverified",
 		Refs: []model.Ref{{Scheme: model.RefURL, Locator: "https://target/admin"}},
 	}}}
-	if err := writeSnapshot(dir, db, map[string][]string{}, "10.0.0.0/24", nil); err != nil {
+	if err := writeSnapshot(dir, db, map[string][]string{}, "10.0.0.0/24", nil, false); err != nil {
 		t.Fatal(err)
 	}
 	raw, err := os.ReadFile(filepath.Join(dir, Snapshot))
@@ -344,7 +344,7 @@ func TestSnapshotCarriesReviewAndRejected(t *testing.T) {
 				Notes: "重跑注入成功", VerifierRun: "r_4", CreatedAt: now},
 		},
 	}
-	if err := writeSnapshot(dir, db, map[string][]string{}, "", nil); err != nil {
+	if err := writeSnapshot(dir, db, map[string][]string{}, "", nil, false); err != nil {
 		t.Fatal(err)
 	}
 	raw, err := os.ReadFile(filepath.Join(dir, Snapshot))
@@ -541,5 +541,31 @@ func TestBuildPromptDefersOutlineToSkill(t *testing.T) {
 	}
 	if strings.Contains(p, "覆盖表") {
 		t.Errorf("prompt must not ask for a coverage table (D30):\n%s", p)
+	}
+}
+
+// Re-declaring a fact clears its current verdict. An older receipt is history
+// and cannot supply either report prose or a fresh observation date.
+func TestReportUsesOnlyReviewsOfTheCurrentClaim(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Now()
+	fact := model.Fact{ID: "f_a", Kind: "vuln", Status: "unverified", ClaimVersion: 2, ClaimHash: "current", CreatedAt: now.Add(-60 * 24 * time.Hour)}
+	db := store.DB{
+		Facts:   []model.Fact{fact},
+		Reviews: []model.Review{{FactID: fact.ID, ClaimVersion: 1, ClaimHash: "superseded", Verdict: "pass", CreatedAt: now}},
+	}
+	if err := writeSnapshot(dir, db, nil, "", nil, true); err != nil {
+		t.Fatal(err)
+	}
+	snap := readSnapshotFile(t, dir)
+	if !snap.ReviewsDisabled || snap.Facts[0].Status != "unverified" || snap.Facts[0].Review != nil {
+		t.Fatalf("snapshot misstates review status: %+v", snap)
+	}
+	if got := staleness(db, DefaultStaleAfter); got == "" {
+		t.Fatal("a review for the old claim made the current claim look fresh")
+	}
+	db.Facts[0].ObservedAt = &now
+	if got := staleness(db, DefaultStaleAfter); got != "" {
+		t.Fatalf("current observation date did not make the claim fresh: %s", got)
 	}
 }

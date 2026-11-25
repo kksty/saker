@@ -344,18 +344,6 @@ func (h *hub) attachState(p *project.Project, paused bool, pauseReason string) *
 	}
 	srv.Ctx = ctx
 	srv.Project = p
-	// Scope and constraints live in project.json, which outlives the ledger; the
-	// document row and its revision history live in the ledger. A save must write
-	// both, or a restart would show the old text with a new revision.
-	srv.PersistDoc = func(kind, text string) error {
-		switch kind {
-		case store.DocumentScope:
-			return h.mgr.SetScope(p.ID, text)
-		case store.DocumentConstraints:
-			return h.mgr.SetDescription(p.ID, text)
-		}
-		return nil
-	}
 	srv.SetPaused(paused)
 	if h.cfg.Nodes != nil {
 		srv.LocalNode = h.cfg.Nodes.LocalID()
@@ -518,16 +506,17 @@ func (h *hub) attachState(p *project.Project, paused bool, pauseReason string) *
 		// starting (hub_review_schedule_test.go), not by a boolean.
 		srv.SetAutoVerify(false)
 		srv.Reports = &report.Generator{
-			ScopeFor: srv.Constraints,
-			Policy:   p.PremisePolicyView,
-			Admit:    admitAuxiliary,
-			Store:    p.Store,
-			Exec:     srv.DefaultModelExecutor(h.cfg.Nodes.Executor(h.cfg.Timeout)),
-			CaseRoot: p.CaseDir,
-			Scope:    srv.Constraints(),
-			Timeout:  h.cfg.Timeout,
-			Skills:   h.cfg.ReportSkills,
-			Track:    srv.TrackPurposeRun,
+			ScopeFor:        srv.ReportScope,
+			ReviewsDisabled: srv.ReviewsDisabled,
+			Policy:          p.PremisePolicyView,
+			Admit:           admitAuxiliary,
+			Store:           p.Store,
+			Exec:            srv.DefaultModelExecutor(h.cfg.Nodes.Executor(h.cfg.Timeout)),
+			CaseRoot:        p.CaseDir,
+			Scope:           srv.Constraints(),
+			Timeout:         h.cfg.Timeout,
+			Skills:          h.cfg.ReportSkills,
+			Track:           srv.TrackPurposeRun,
 			// The writing pass is journaled too; it is the most expensive step of
 			// delivery, so it deserves the same audit trail (D138).
 			Log: srv.OpenPurposeRunLog,
@@ -1977,9 +1966,12 @@ func (h *hub) importProject(w http.ResponseWriter, r *http.Request) {
 	// legitimate 4 GiB archive on a slow link would hit it, so this one route
 	// extends the read deadline; the body cap and the route's operator-only gate
 	// still bound it.
-	if rc := http.NewResponseController(w); rc != nil {
-		_ = rc.SetReadDeadline(time.Now().Add(importReadDeadline))
-	}
+	deadline := time.Now().Add(importReadDeadline)
+	rc := http.NewResponseController(w)
+	_ = rc.SetReadDeadline(deadline)
+	// The server's write deadline also runs during the body upload. Keep a
+	// separate response budget for validation and publishing after the upload.
+	_ = rc.SetWriteDeadline(deadline.Add(10 * time.Minute))
 	src := ""
 	cleanup := func() {}
 	ct := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type")))

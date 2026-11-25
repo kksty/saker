@@ -128,7 +128,12 @@ function rowButtons(r: ReactTestRenderer, id: string) {
 interface Events { closed: number; changed: number }
 
 async function mount(rows: unknown[], events: Events): Promise<ReactTestRenderer> {
-  api.proposals = async () => ({ proposals: rows, total: rows.length })
+  api.proposals = async (status?: string) => {
+    const filtered = (rows as { status: string }[]).filter(row =>
+      status === 'active' ? ['proposed', 'approved'].includes(row.status)
+        : status === 'closed' ? !['proposed', 'approved'].includes(row.status) : true)
+    return { proposals: filtered, total: filtered.length }
+  }
   await act(async () => {
     renderer = create(
       React.createElement(OperatorProposalsDialog, {
@@ -251,4 +256,33 @@ test('a decision in flight counts as busy, so the dialog cannot be closed mid-wr
   await act(async () => { button(r, '关闭弹窗').props.onClick() })
   assert.equal(events.closed, 1, 'once the decision settles the dialog closes normally')
   assert.equal(events.changed, 1)
+})
+
+// History can be longer than the API page and must never crowd out active items.
+test('loads the active queue through its last page independently of history', async () => {
+  api.proposals = async (status?: string, _limit?: number, cursor?: string) => {
+    if (status === 'active') {
+      if (cursor === 'first') return { proposals: [row({ id: 'pending_older', title: 'Older pending record' })], total: 2 }
+      return { proposals: [row({ id: 'first' })], total: 2, next_cursor: 'first' }
+    }
+    return { proposals: [], total: 101, truncated: true }
+  }
+  await act(async () => {
+    renderer = create(React.createElement(OperatorProposalsDialog, { onClose() {}, onChanged() {} }))
+  })
+  assert.match(pageText(renderer!), /Older pending record/)
+  assert.match(pageText(renderer!), /已处理101 条/)
+})
+
+test('rejection reports notification failure separately from the saved decision', async () => {
+  const target = row({ id: 'pending_notification' })
+  api.rejectProposal = async () => ({
+    proposal: { ...target, status: 'rejected', version: 4 },
+    notification: { notified: false, error: 'simulated write failure' },
+  })
+  const r = await mount([target], { closed: 0, changed: 0 })
+  await act(async () => { rowButton(r, target.id, '驳回').props.onClick() })
+  await act(async () => { r.root.findByType('textarea').props.onChange({ target: { value: 'Synthetic decision' } }) })
+  await act(async () => { buttonContaining(r, '确认驳回').props.onClick() })
+  assert.match(pageText(r), /已驳回 v4。通知未确认（simulated write failure）/)
 })

@@ -285,23 +285,18 @@ func staleness(db store.DB, staleAfter time.Duration) string {
 		return ""
 	}
 	now := time.Now()
-	freshest := make(map[string]time.Time, len(db.Facts))
-	for _, r := range db.Reviews {
-		if r.Verdict != "pass" {
-			continue
-		}
-		if r.CreatedAt.After(freshest[r.FactID]) {
-			freshest[r.FactID] = r.CreatedAt
-		}
-	}
+	reviews := reviewsByFact(db.Reviews)
 	var stale []string
 	for _, f := range reportable(db.Facts) {
 		anchoredAt := f.CreatedAt
-		if at := freshest[f.ID]; at.After(anchoredAt) {
-			anchoredAt = at
+		if f.ObservedAt != nil {
+			anchoredAt = *f.ObservedAt
+		}
+		if r, ok := model.LatestReviewForClaim(f, reviews[f.ID]); ok && r.Verdict == "pass" && r.CreatedAt.After(anchoredAt) {
+			anchoredAt = r.CreatedAt
 		}
 		if now.Sub(anchoredAt) > staleAfter {
-			stale = append(stale, f.ID+" 采集于 "+f.CreatedAt.Format("2006-01-02"))
+			stale = append(stale, f.ID+" 最近观测或复核于 "+anchoredAt.Format("2006-01-02"))
 		}
 	}
 	if len(stale) > 0 {

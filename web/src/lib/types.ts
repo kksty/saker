@@ -965,6 +965,7 @@ export interface ProposalPage {
   proposals: Proposal[]
   total?: number
   truncated?: boolean
+  next_cursor?: string
 }
 
 /** The delivery receipt of the one notification a proposal transition sends. */
@@ -1669,6 +1670,7 @@ export interface ReportUnreported {
  * `unreported` is optional because a server older than that field simply does
  * not answer it — absent means "not provided", never "0 facts". */
 export interface ReportPrecheck {
+  reviews_disabled?: boolean
   reportable: number
   unverified: number
   rejected: number

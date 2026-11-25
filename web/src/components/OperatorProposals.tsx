@@ -56,9 +56,9 @@ import type { Proposal } from '@/lib/types'
  */
 export function OperatorProposalsCard() {
   const [open, setOpen] = useState(false)
-  const polled = usePoll(() => api.proposals(), 9_000)
+  const polled = usePoll(() => api.proposals('active', 3), 9_000)
   const rows = orderProposals(polled.data?.proposals ?? [])
-  const count = activeProposalCount(rows)
+  const count = polled.data?.total ?? activeProposalCount(rows)
   const openRows = rows.filter((row) => row.status === 'proposed' || row.status === 'approved')
 
   return (
@@ -99,8 +99,8 @@ export function OperatorProposalsCard() {
                 </p>
               </li>
             ))}
-            {openRows.length > 3 && (
-              <li className="text-[10.5px] text-ink-3">另有 {openRows.length - 3} 条，打开「管理」查看。</li>
+            {count > 3 && (
+              <li className="text-[10.5px] text-ink-3">另有 {count - 3} 条，打开「管理」查看。</li>
             )}
           </ul>
         )}
@@ -118,11 +118,23 @@ export function OperatorProposalsCard() {
 /** The proposal queue grouped by the action it is waiting for. Exported so the
  *  component test can render it with a stubbed api. */
 export function OperatorProposalsDialog({ onClose, onChanged }: { onClose: () => void; onChanged: () => void }) {
-  const rows = useLoad(() => api.proposals(), [])
-  const sorted = orderProposals(rows.data?.proposals ?? [])
-  const pending = sorted.filter((row) => row.status === 'proposed')
-  const approved = sorted.filter((row) => row.status === 'approved')
-  const history = sorted.filter((row) => row.status !== 'proposed' && row.status !== 'approved')
+  const [historyCursors, setHistoryCursors] = useState<string[]>([])
+  const historyCursor = historyCursors[historyCursors.length - 1]
+  const rows = useLoad(async () => {
+    const [firstPage, historyPage] = await Promise.all([api.proposals('active'), api.proposals('closed', 100, historyCursor)])
+    const active = [...firstPage.proposals]
+    let cursor = firstPage.next_cursor
+    while (cursor) {
+      const page = await api.proposals('active', 100, cursor)
+      active.push(...page.proposals)
+      cursor = page.next_cursor
+    }
+    return { active: orderProposals(active), history: historyPage }
+  }, [historyCursor])
+  const pending = (rows.data?.active ?? []).filter((row) => row.status === 'proposed')
+  const approved = (rows.data?.active ?? []).filter((row) => row.status === 'approved')
+  const history = orderProposals(rows.data?.history.proposals ?? [])
+  const historyCount = rows.data?.history.total ?? history.length
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [receipt, setReceipt] = useState('')
@@ -286,7 +298,7 @@ export function OperatorProposalsDialog({ onClose, onChanged }: { onClose: () =>
         <section aria-label="已处理的提议" className="space-y-2">
           <div className="flex items-center gap-2">
             <div className="tw-section-title">已处理</div>
-            <span className="tw-nums font-mono text-[11px] text-ink-3">{history.length} 条</span>
+            <span className="tw-nums font-mono text-[11px] text-ink-3">{historyCount} 条</span>
             <Button
               size="xs"
               variant="ghost"
@@ -299,12 +311,30 @@ export function OperatorProposalsDialog({ onClose, onChanged }: { onClose: () =>
             </Button>
           </div>
           {historyShown && (
-            <ul role="list" aria-label="已处理提议列表" className="space-y-2">
-              {history.map((proposal) => (
-                <ProposalRow key={proposal.id} proposal={proposal} busy readOnly />
-              ))}
-              {history.length === 0 && <li className="text-[11px] text-ink-3">还没有处理过的提议。</li>}
-            </ul>
+            <>
+              <ul role="list" aria-label="已处理提议列表" className="space-y-2">
+                {history.map((proposal) => (
+                  <ProposalRow key={proposal.id} proposal={proposal} busy readOnly />
+                ))}
+                {history.length === 0 && !rows.loading && <li className="text-[11px] text-ink-3">这一页没有已处理的提议。</li>}
+              </ul>
+              {(historyCursor || rows.data?.history.next_cursor) && (
+                <div className="flex justify-end gap-2">
+                  <Button size="xs" variant="ghost" disabled={!historyCursor || rows.refreshing} onClick={() => setHistoryCursors((pages) => pages.slice(0, -1))}>上一页</Button>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    disabled={!rows.data?.history.next_cursor || rows.refreshing}
+                    onClick={() => {
+                      const cursor = rows.data?.history.next_cursor
+                      if (cursor) setHistoryCursors((pages) => [...pages, cursor])
+                    }}
+                  >
+                    下一页
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </section>
       </DialogContent>

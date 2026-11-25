@@ -146,7 +146,7 @@ test('the copy describes permanent messages to the commander', () => {
   assert.match(messages, /<OperatorInstructionsCard \/>/)
   // The sidebar card stays read-only: it opens the dialog and never draws an
   // editor of its own.
-  const card = /export function OperatorInstructionsCard\(\) \{([\s\S]*?)\n\}\n/.exec(surface)
+  const card = /export function OperatorInstructionsCard\(\) \{([\s\S]*?)\r?\n\}\r?\n/.exec(surface)
   assert.ok(card, 'the sidebar card must stay its own component')
   assert.doesNotMatch(card[1], /<Textarea/)
   assert.doesNotMatch(card[1], /api\.updateInstruction/)

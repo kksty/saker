@@ -330,26 +330,38 @@ func (s *Server) listProposals(w http.ResponseWriter, r *http.Request) {
 	if limit > proposalListLimitMax {
 		limit = proposalListLimitMax
 	}
-	all := s.Store.Proposals()
-	matched := make([]model.Proposal, 0, len(all))
-	for _, p := range all {
+	cursor := strings.TrimSpace(r.URL.Query().Get("cursor"))
+	afterCursor := cursor == ""
+	page := make([]model.Proposal, 0, limit)
+	total, remaining := 0, 0
+	for _, p := range s.Store.Proposals() {
 		if !visibleProposal(p, r) {
 			continue
 		}
-		if status != "" && p.Status != status {
-			continue
+		active := p.Status == model.ProposalProposed || p.Status == model.ProposalApproved
+		matches := status == "" || status == p.Status || status == "active" && active || status == "closed" && !active
+		if matches {
+			total++
+			if afterCursor {
+				remaining++
+				if len(page) < limit {
+					page = append(page, p)
+				}
+			}
 		}
-		matched = append(matched, p)
+		if p.ID == cursor {
+			afterCursor = true
+		}
 	}
-	page := matched
-	if len(page) > limit {
-		page = page[:limit]
+	if !afterCursor {
+		writeErr(w, http.StatusBadRequest, "提议分页位置已经失效，请刷新")
+		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"proposals": page,
-		"total":     len(matched),
-		"truncated": len(matched) > len(page),
-	})
+	out := map[string]any{"proposals": page, "total": total, "truncated": remaining > len(page)}
+	if remaining > len(page) {
+		out["next_cursor"] = page[len(page)-1].ID
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *Server) getProposal(w http.ResponseWriter, r *http.Request) {

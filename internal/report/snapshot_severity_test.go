@@ -20,7 +20,7 @@ func TestSnapshotCarriesTheFactSeverityForTheWriterToCopy(t *testing.T) {
 		ID: "f_1", Kind: "vuln", Title: "越权读订单", Status: "verified",
 		Severity: model.SeverityCritical,
 	}}}
-	if err := writeSnapshot(dir, db, nil, "", nil); err != nil {
+	if err := writeSnapshot(dir, db, nil, "", nil, false); err != nil {
 		t.Fatal(err)
 	}
 	raw, err := os.ReadFile(filepath.Join(dir, Snapshot))

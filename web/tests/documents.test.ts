@@ -79,7 +79,7 @@ test('the page keeps the document-only shape and does not reintroduce entries', 
   )
   assert.match(source, /api\.documents/)
   assert.match(source, /api\.documentHistory/)
-  assert.match(source, /api\.saveDocument\(kind, documentSaveBody\(doc, draft\)\)/)
+  assert.match(source, /api\.saveDocument\(kind, documentSaveBody\(editBase, draft\)\)/)
   // Per-item authorization vocabulary must not come back through this page.
   for (const banned of ['as_authorization', 'visible_to_commander', 'scope: ', 'revoked']) {
     assert.equal(source.includes(banned), false, `Documents must not mention ${banned}`)
@@ -130,4 +130,10 @@ test('an edit from the goal editor carries a revision, so a stale save is refuse
   assert.match(dialog, /api\.updateGoal\(goal\.id,statement,start,revision as number\)/)
   // No revision means no save: never a silent overwrite.
   assert.match(dialog, /revision\s*===\s*undefined/)
+})
+// Revisions are scoped to an individual goal, so a save must also carry its identity.
+test('a goal document save keeps the goal id from the draft base', () => {
+  assert.deepEqual(documentSaveBody({ revision: 1, goal_id: 'first' }, 'Draft'), {
+    text: 'Draft', revision: 1, goal_id: 'first',
+  })
 })

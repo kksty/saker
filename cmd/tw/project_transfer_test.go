@@ -10,12 +10,28 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kksty/tianwu/internal/api"
 	"github.com/kksty/tianwu/internal/model"
 	"github.com/kksty/tianwu/internal/node"
 	"github.com/kksty/tianwu/internal/project"
 )
+
+type importDeadlineRecorder struct {
+	*httptest.ResponseRecorder
+	readDeadline, writeDeadline time.Time
+}
+
+func (r *importDeadlineRecorder) SetReadDeadline(deadline time.Time) error {
+	r.readDeadline = deadline
+	return nil
+}
+
+func (r *importDeadlineRecorder) SetWriteDeadline(deadline time.Time) error {
+	r.writeDeadline = deadline
+	return nil
+}
 
 func transferNode(t *testing.T) *node.Registry {
 	t.Helper()
@@ -105,10 +121,14 @@ func TestProjectExportAndImportHandlers(t *testing.T) {
 	}
 	req := httptest.NewRequest(http.MethodPost, "/api/projects/import", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/zip")
-	rec = httptest.NewRecorder()
-	targetHub.importProject(rec, req)
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("import = %d %s", rec.Code, rec.Body.String())
+	transfer := &importDeadlineRecorder{ResponseRecorder: httptest.NewRecorder()}
+	targetHub.importProject(transfer, req)
+	if transfer.Code != http.StatusCreated {
+		t.Fatalf("import = %d %s", transfer.Code, transfer.Body.String())
+	}
+	// The default write deadline can expire during a permitted long upload.
+	if transfer.readDeadline.IsZero() || !transfer.writeDeadline.After(transfer.readDeadline) {
+		t.Fatalf("upload read deadline %s leaves no response budget %s", transfer.readDeadline, transfer.writeDeadline)
 	}
 	got := targetMgr.Get(p.ID)
 	if got == nil {

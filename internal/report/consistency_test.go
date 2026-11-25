@@ -395,3 +395,65 @@ func TestFailedOrCanceledReportLeavesNoAdvertisedDraft(t *testing.T) {
 		}
 	})
 }
+
+// The writer can deliver reviewed findings, unreviewed candidates, and a mixture.
+func TestReportDeliveryByReviewState(t *testing.T) {
+	for _, mode := range []string{"verified", "unverified", "mixed"} {
+		t.Run(mode, func(t *testing.T) {
+			st, root, reviewed, ev := reportRunFixture(t)
+			var candidate model.Fact
+			if mode == "unverified" {
+				var err error
+				candidate, err = st.UpdateFact(reviewed.ID, func(f *model.Fact) { f.Summary = "Synthetic new observation" })
+				if err != nil {
+					t.Fatal(err)
+				}
+				if candidate.Status != "unverified" {
+					t.Fatalf("fixture status = %s", candidate.Status)
+				}
+			}
+			if mode == "mixed" {
+				var err error
+				candidate, err = st.AddFact(model.Fact{IntentID: reviewed.IntentID, Kind: "vuln", Title: "Synthetic observation", Origin: model.OriginDeclared, Status: "unverified"})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			g := Generator{Store: st, CaseRoot: root, ReviewsDisabled: func() bool { return mode == "unverified" }, Exec: &hookExec{run: func(ctx context.Context, req executor.Request, emit func(executor.Event)) (executor.Result, error) {
+				rows := []Finding{}
+				if mode != "unverified" {
+					evidenceRel := EvidenceDir + "/" + ev.ID + "-proof.txt"
+					writeCompleteReport(t, req.WorkDir, reviewed.ID, evidenceRel)
+					var err error
+					rows, err = ReadFindings(req.WorkDir)
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				if mode != "verified" {
+					rows = append(rows, Finding{Fact: candidate.ID, Verdict: VerdictCandidate, Title: "Synthetic observation"})
+				}
+				if mode == "unverified" {
+					if err := os.WriteFile(filepath.Join(req.WorkDir, IndexFile), []byte("# Synthetic report"), 0600); err != nil {
+						t.Fatal(err)
+					}
+				}
+				raw, err := json.Marshal(rows)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(req.WorkDir, Findings), raw, 0600); err != nil {
+					t.Fatal(err)
+				}
+				return executor.Result{StopReason: "completed"}, nil
+			}}}
+			if err := g.Preflight(); err != nil {
+				t.Fatal(err)
+			}
+			meta, err := g.Generate(context.Background())
+			if err != nil || meta.Status != StatusReady {
+				t.Fatalf("delivery %s: meta=%+v err=%v", mode, meta, err)
+			}
+		})
+	}
+}

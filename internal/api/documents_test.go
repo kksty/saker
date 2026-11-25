@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kksty/tianwu/internal/board"
 	"github.com/kksty/tianwu/internal/decider"
@@ -116,7 +117,7 @@ func TestGoalDocumentIsTheGoalAndGoalEditorNeedsRevision(t *testing.T) {
 	}
 
 	rec := call(t, s, http.MethodPut, "/api/documents/goal", map[string]any{
-		"text": "拿到数据库读写权限", "revision": goalDoc.Revision,
+		"text": "拿到数据库读写权限", "revision": goalDoc.Revision, "goal_id": goalDoc.GoalID,
 	})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("save goal = %d %s", rec.Code, rec.Body.String())
@@ -179,7 +180,7 @@ func TestGoalDocumentIsTheGoalAndGoalEditorNeedsRevision(t *testing.T) {
 	// not a phantom current+1.
 	before := s.Store.GoalRevision(goalDoc.GoalID)
 	same := call(t, s, http.MethodPut, "/api/documents/goal", map[string]any{
-		"text": "换成这个目标", "revision": before,
+		"text": "换成这个目标", "revision": before, "goal_id": goalDoc.GoalID,
 	})
 	if same.Code != http.StatusOK || !strings.Contains(same.Body.String(), `"changed":false`) {
 		t.Fatalf("same-text save = %d %s", same.Code, same.Body.String())
@@ -217,5 +218,32 @@ func TestCommanderRoundCarriesThreeDocumentsInOrder(t *testing.T) {
 	prompt := decider.CommanderRoundPrompt(board.BuildFromDB(p.Store.Snapshot(), 0), "", docs, decider.ContextStatus{}, decider.RoundContext{})
 	if strings.Count(prompt, docs) != 1 {
 		t.Fatalf("commander round does not render the documents verbatim:\n%s", prompt)
+	}
+}
+
+// Two goals can share a revision. A draft for the closed goal must not edit its replacement.
+func TestGoalDocumentSaveIsBoundToTheDisplayedGoal(t *testing.T) {
+	s, p := newBindingServer(t)
+	first, err := p.Store.AddGoal(model.Goal{Statement: "First", CreatedAt: time.Now().Add(-time.Hour)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := p.Store.AddGoal(model.Goal{Statement: "Second", CreatedAt: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := getDocuments(t, s).Documents[store.DocumentGoal]
+	if doc.GoalID != first.ID || doc.Revision != p.Store.GoalRevision(second.ID) {
+		t.Fatalf("unexpected fixture: %+v", doc)
+	}
+	if _, err := p.Store.CloseGoal(first.ID, "superseded", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	rec := call(t, s, http.MethodPut, "/api/documents/goal", map[string]any{
+		"text": "Draft for first", "revision": doc.Revision, "goal_id": doc.GoalID,
+	})
+	got := getDocuments(t, s).Documents[store.DocumentGoal]
+	if rec.Code != http.StatusConflict || got.GoalID != second.ID || got.Text != second.Statement {
+		t.Fatalf("stale save = %d, current goal = %+v", rec.Code, got)
 	}
 }

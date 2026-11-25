@@ -648,8 +648,8 @@ export const api = {
   // Proposals: executors suggest a next intent; the console (operator) and the
   // commander decide. Approval only creates a pending intent — a separate
   // dispatch starts the run — so the UI keeps those as two distinct actions.
-  proposals: (status?: Proposal['status'], limit = 100) =>
-    get<ProposalPage>(`${pbase()}/api/proposals${queryString({ status: status ?? '', limit })}`),
+  proposals: (status?: Proposal['status'] | 'active' | 'closed', limit = 100, cursor?: string) =>
+    get<ProposalPage>(`${pbase()}/api/proposals${queryString({ status: status ?? '', limit, cursor })}`),
   proposal: (id: string) => get<{ proposal: Proposal }>(`${pbase()}/api/proposals/${encodeURIComponent(id)}`),
   approveProposal: (id: string, body: { expected_version: number; note?: string }) =>
     post<ProposalDecisionResponse>(`${pbase()}/api/proposals/${encodeURIComponent(id)}/approve`, body),
@@ -669,7 +669,7 @@ export const api = {
     get<DocumentsResponse>(`/p/${encodeURIComponent(id)}/api/documents`),
   documentHistory: (kind: DocumentKind, limit = 20) =>
     get<DocumentHistoryResponse>(`${pbase()}/api/documents/${kind}/history${queryString({ limit })}`),
-  saveDocument: (kind: DocumentKind, body: { text: string; revision: number }) =>
+  saveDocument: (kind: DocumentKind, body: { text: string; revision: number; goal_id?: string }) =>
     put<DocumentSaveResponse>(`${pbase()}/api/documents/${kind}`, body),
 
   // Sticky operator stop: holds the direction (and its whole subtree) so the
@@ -911,7 +911,7 @@ export const api = {
   // land, how many are still unverified (they can only be candidates), how many
   // are rejected, and whether a report is already being written (D100).
   reportPrecheck: () => get<ReportPrecheck>(`${pbase()}/api/reports/precheck`),
-  createReport: () => post<{ queued: boolean }>(`${pbase()}/api/reports`),
+  createReport: () => post<{ queued: boolean; run_id: string }>(`${pbase()}/api/reports`),
   report: (id: string) => get<ReportMeta>(`${pbase()}/api/reports/${encodeURIComponent(id)}`),
   // A body is only served for a report that passed its own checks and still
   // matches the ledger; anything else comes back as 409 with the reason, which

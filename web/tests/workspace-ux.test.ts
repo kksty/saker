@@ -167,7 +167,7 @@ test('report polling continues past the first refresh and finds a completed repo
   api.reports = async () => rows
   api.runs = async () => runs
   api.reportPrecheck = async () => ({running, unverified: 0})
-  api.createReport = async () => { posts++; return {queued: true} }
+  api.createReport = async () => { posts++; return {queued: true, run_id: 'new-run'} }
   await act(async () => { renderer = create(React.createElement(Reports)) })
   const generate = () => renderer!.root.findAllByType('button').find(node => node.children.includes('生成报告'))!
   await act(async () => { await generate().props.onClick() })
@@ -181,7 +181,7 @@ test('report polling continues past the first refresh and finds a completed repo
   assert.ok(JSON.stringify(renderer!.toJSON()).includes('生成中'))
   running = false
   runs = [{...runs[0], status: 'done'}]
-  rows = [{id: 'new-report', status: 'ready', findings: 2, created_at: '2020-01-01T00:00:00Z'}]
+  rows = [{id: 'new-report', run_id: 'new-run', status: 'ready', findings: 2, created_at: '2020-01-01T00:00:00Z'}]
   await act(async () => { for (const tick of timers.values()) tick() })
   assert.ok(JSON.stringify(renderer!.toJSON()).includes('new-report'))
   assert.equal(generate().props.disabled, false)
@@ -287,7 +287,7 @@ test('a failed precheck read stops generation and says 预检不可用 instead o
   api.reports = async () => []
   api.runs = async () => []
   api.reportPrecheck = async () => { throw new Error('预检请求超时') }
-  api.createReport = async () => { posts++; return {queued: true} }
+  api.createReport = async () => { posts++; return {queued: true, run_id: 'new-run'} }
   await act(async () => { renderer = create(React.createElement(Reports)) })
   const generate = () => renderer!.root.findAllByType('button').find(node => node.children.includes('生成报告'))!
   await act(async () => { await generate().props.onClick() })
@@ -318,7 +318,7 @@ test('the precheck names the facts no report cites and the reports it could not 
       uncounted: ['rep_failed'],
     },
   })
-  api.createReport = async () => ({queued: true})
+  api.createReport = async () => ({queued: true, run_id: 'new-run'})
   await act(async () => { renderer = create(React.createElement(Reports)) })
   const text = JSON.stringify(renderer!.toJSON())
   assert.ok(text.includes('未进过报告的事实'))
@@ -374,4 +374,18 @@ test('a report id that is not in the list says so instead of opening the first r
   } finally {
     window.location.search = before
   }
+})
+
+// Explicit review-off mode still produces a report, with candidates kept unverified.
+test('report generation can queue unverified candidates when reviews are disabled', async () => {
+  let posts = 0
+  api.reports = async () => []
+  api.runs = async () => []
+  api.reportPrecheck = async () => ({running: false, unverified: 2, reviews_disabled: true})
+  api.createReport = async () => { posts++; return {queued: true, run_id: 'candidates-run'} }
+  await act(async () => { renderer = create(React.createElement(Reports)) })
+  const generate = renderer!.root.findAllByType('button').find(node => node.children.includes('生成报告'))!
+  await act(async () => { await generate.props.onClick() })
+  assert.equal(posts, 1)
+  assert.match(JSON.stringify(renderer!.toJSON()), /已排队/)
 })

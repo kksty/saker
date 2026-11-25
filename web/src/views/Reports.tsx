@@ -59,22 +59,15 @@ export function Reports({
   const list = usePoll(api.reports, 4000)
   const progress = usePoll(api.reportPrecheck, 4000)
   const runs = usePoll(api.runs, 4000)
-  const [pendingReport, setPendingReport] = useSessionState('report.pending.v1', '')
+  const [pendingReport, setPendingReport] = useSessionState('report.pending.v2', '')
   const [failure, setFailure] = useState('')
-  const pending = useMemo(() => {
-    try {
-      const value = JSON.parse(pendingReport)
-      return Array.isArray(value.reports) && Array.isArray(value.runs) ? value as { reports: string[]; runs: string[] } : null
-    } catch { return null }
-  }, [pendingReport])
   const reportRuns = (runs.data ?? []).filter(r => r.purpose === 'report')
-  const trackedRun = pending ? reportRuns.find(r => !pending.runs.includes(r.id)) : undefined
-  const completed = pending ? (list.data ?? []).find(r => !pending.reports.includes(r.id) && r.status !== 'draft') : undefined
+  const trackedRun = pendingReport ? reportRuns.find(r => r.id === pendingReport) : undefined
+  const completed = pendingReport ? (list.data ?? []).find(r => r.run_id === pendingReport && r.status !== 'draft') : undefined
   const generating = progress.data?.running || (list.data ?? []).some(r => r.status === 'draft') || reportRuns.some(r => r.status === 'running')
   useEffect(() => {
     if (!pendingReport) return
-    if (!pending) { setPendingReport(''); return }
-    if (completed || (trackedRun && trackedRun.status !== 'running')) {
+    if (completed || trackedRun?.status === 'failed' || trackedRun?.status === 'canceled') {
       setPendingReport('')
       list.reload()
       if (trackedRun?.status === 'failed' || trackedRun?.status === 'canceled') {
@@ -88,8 +81,6 @@ export function Reports({
             ? '报告已生成，可在下方查看和下载。'
             : `报告已产出（${statusLabel(completed.status)}），正文不对外提供；下方报告行可看状态与校验结果。`,
         )
-      } else {
-        setNote('报告运行已结束，正在更新报告列表。')
       }
     }
   }, [pendingReport, completed, trackedRun])
@@ -112,10 +103,9 @@ export function Reports({
     setNote('')
     setFailure('')
     try {
-      const [existingReports, existingRuns] = await Promise.all([api.reports(), api.runs()])
-      await api.createReport()
+      const { run_id } = await api.createReport()
       setNote('已排入生成队列：一次独立的报告撰写运行（不占用指挥官/执行者），写完才出现在列表里。')
-      setPendingReport(JSON.stringify({ reports: existingReports.map(r => r.id), runs: existingRuns.map(r => r.id) }))
+      setPendingReport(run_id)
       list.reload()
       progress.reload()
       runs.reload()
@@ -157,7 +147,7 @@ export function Reports({
         progress.reload()
         return
       }
-      if (verdict.precheck.unverified > 0) {
+      if (verdict.precheck.unverified > 0 && !verdict.precheck.reviews_disabled) {
         setUnverified(verdict.precheck.unverified)
         return
       }
@@ -204,7 +194,7 @@ export function Reports({
           <a className="ml-2 underline underline-offset-2" href="?view=runs">查看运行进度</a>
         </Callout>
       )}
-      {pending && !generating && progress.data && !progress.error && !runs.error && !list.error && (
+      {pendingReport && !generating && progress.data && !progress.error && !runs.error && !list.error && (
         <p className="mb-3 text-[12px] leading-relaxed text-ink-2">
           若等待没有进展，可先查看运行记录。
           <Button size="xs" variant="ghost" onClick={() => { setPendingReport(''); setNote('已结束等待；如需重新生成，请先核对运行记录。') }}>
@@ -287,7 +277,7 @@ export function Reports({
                 <b className="tw-nums font-mono font-semibold text-ink">{fmtInt(verdict.precheck.reportable)}</b>
               </span>
               <span className="inline-flex items-baseline gap-1.5">
-                <span className="text-ink-3">未复核</span>
+                <span className="text-ink-3">{progress.data?.reviews_disabled ? '未复核（复核关闭）' : '未复核'}</span>
                 <b className="tw-nums font-mono font-semibold text-ink">{fmtInt(verdict.precheck.unverified)}</b>
               </span>
               <span className="inline-flex items-baseline gap-1.5">

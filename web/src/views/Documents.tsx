@@ -77,18 +77,20 @@ function DocumentCard({
   const title = kind === 'goal' ? `${meta.title}（当前）` : meta.title
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
+  const [editBase, setEditBase] = useState<ProjectDocument>()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [showHistory, setShowHistory] = useState(false)
   const history = useLoad(
     () => (showHistory && doc ? api.documentHistory(kind) : Promise.resolve(null)),
-    [showHistory, kind, doc?.revision],
+    [showHistory, kind, doc?.goal_id, doc?.revision],
   )
 
   if (loading) return <SkeletonCard />
 
   function startEdit() {
     setDraft(doc?.text ?? '')
+    setEditBase(doc)
     setEditing(true)
     setError('')
   }
@@ -99,11 +101,11 @@ function DocumentCard({
   }
 
   async function save() {
-    if (!doc || busy) return
+    if (!editBase || busy) return
     setBusy(true)
     setError('')
     try {
-      await api.saveDocument(kind, documentSaveBody(doc, draft))
+      await api.saveDocument(kind, documentSaveBody(editBase, draft))
       setEditing(false)
       onSaved()
     } catch (e) {

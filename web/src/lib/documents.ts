@@ -77,8 +77,9 @@ export function documentSaveError(error: unknown): string {
 /** The save body: the new text plus the revision this page actually read. Without
  *  the second half a save silently overwrites whatever landed in between. */
 export function documentSaveBody(
-  doc: { revision: number },
+  doc: { revision: number; goal_id?: string },
   text: string,
-): { text: string; revision: number } {
-  return { text, revision: doc.revision }
+): { text: string; revision: number; goal_id?: string } {
+  const body = { text, revision: doc.revision }
+  return doc.goal_id ? { ...body, goal_id: doc.goal_id } : body
 }

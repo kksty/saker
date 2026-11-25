@@ -52,11 +52,6 @@ type Server struct {
 	Store    *store.Store
 	Exec     executor.Executor
 	DataDir  string
-	// PersistDoc writes one saved document to the project manifest (scope and
-	// constraints live in project.json, which outlives the ledger). The hub
-	// supplies it; a bare test server leaves it nil and only the in-memory
-	// snapshot and the ledger revision change.
-	PersistDoc func(kind, text string) error
 	// Metrics is the Phase 1 sidecar recorder. It never writes the ledger and
 	// nil (a bare test server or an unwritable directory) is a no-op.
 	Metrics *metrics.Recorder
@@ -1483,9 +1478,8 @@ func steerPrompt(in model.Intent, note, refFact string) string {
 // auxiliary runs get this text and nothing about where it comes from: the
 // document is re-read every round by the mechanism, not explained in a prompt.
 func (s *Server) Constraints() string {
-	s.settingsMu.RLock()
-	defer s.settingsMu.RUnlock()
-	return strings.TrimSpace(s.Description)
+	_, constraints := s.projectDocuments()
+	return constraints
 }
 
 // CommanderDocs is the text a commander round carries before the board: the
@@ -1493,9 +1487,7 @@ func (s *Server) Constraints() string {
 // own heading. The goal is also in board.goals, which is a known redundancy: the
 // documents are the base the prompt is built from, so they are injected whole.
 func (s *Server) CommanderDocs() string {
-	s.settingsMu.RLock()
-	scope, desc := strings.TrimSpace(s.Scope), strings.TrimSpace(s.Description)
-	s.settingsMu.RUnlock()
+	scope, desc := s.projectDocuments()
 	var b strings.Builder
 	if desc != "" {
 		b.WriteString("## 约束\n" + desc + "\n\n")
@@ -1520,9 +1512,25 @@ func (s *Server) SetProjectSettings(scope, description string) {
 }
 
 func (s *Server) scopeText() string {
+	scope, _ := s.projectDocuments()
+	return scope
+}
+
+func (s *Server) projectDocuments() (scope, constraints string) {
 	s.settingsMu.RLock()
-	defer s.settingsMu.RUnlock()
-	return strings.TrimSpace(s.Scope)
+	scope, constraints = s.Scope, s.Description
+	s.settingsMu.RUnlock()
+	if s.Store != nil {
+		for _, doc := range s.Store.Documents() {
+			switch doc.Kind {
+			case store.DocumentScope:
+				scope = doc.Text
+			case store.DocumentConstraints:
+				constraints = doc.Text
+			}
+		}
+	}
+	return strings.TrimSpace(scope), strings.TrimSpace(constraints)
 }
 
 // maxRunsLimit is the cap this project actually enforces: its own setting when
@@ -3442,32 +3450,21 @@ func (s *Server) createReport(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 503, "报告未启用（未找到 harness）")
 		return
 	}
-	if err := s.Reports.Preflight(); err != nil {
+	runID, err := s.Reports.Start(s.Ctx, func(err error) { log.Printf("report: %v", err) })
+	if err != nil {
 		writeErr(w, 409, err.Error())
 		return
 	}
-	// Generate() refuses to start while another run owns the generator, but that
-	// refusal happened inside the goroutine, after this handler had already
-	// answered 202. Check the same lock here so "queued" is true.
-	if s.Reports.Busy() {
-		writeErr(w, 409, "已有报告在生成中")
-		return
-	}
-	go func() {
-		if _, err := s.Reports.Generate(s.Ctx); err != nil {
-			log.Printf("report: %v", err)
-		}
-	}()
-	writeJSON(w, 202, map[string]any{"queued": true})
+	writeJSON(w, 202, map[string]any{"queued": true, "run_id": runID})
 }
 
 // listReports returns every report, with the staleness recomputed: a report is
 // only as good as the ledger it was written from (docs/08, D27).
 func (s *Server) listReports(w http.ResponseWriter, r *http.Request) {
-	cur := s.contentDigest()
+	cur, scope, revisedAt := s.contentDigest(), report.ScopeDigest(s.ReportScope()), s.reportDocumentRevision()
 	list := report.List(s.CaseRoot)
 	for i := range list {
-		list[i].Status = effectiveStatus(list[i], cur)
+		list[i].Status = effectiveStatus(list[i], cur, scope, revisedAt)
 	}
 	writeJSON(w, 200, map[string]any{"reports": list})
 }
@@ -3477,11 +3474,43 @@ func (s *Server) listReports(w http.ResponseWriter, r *http.Request) {
 // moved no longer matches it, and that is stale from then on. The list, the
 // detail view and the file handler read this one function, so a report cannot be
 // listed as stale and still be served as fresh.
-func effectiveStatus(m report.Meta, digest string) string {
-	if m.Status == report.StatusReady && m.SourceDigest != "" && m.SourceDigest != digest {
-		return report.StatusStale
+func effectiveStatus(m report.Meta, digest, scope string, revisedAt time.Time) string {
+	if m.Status == report.StatusReady {
+		ledgerChanged := m.SourceDigest != "" && m.SourceDigest != digest
+		scopeChanged := m.ScopeDigest != "" && m.ScopeDigest != scope
+		// Reports written before scope fingerprints can still be invalidated
+		// by a later project-document revision.
+		legacyScopeChanged := m.ScopeDigest == "" && !m.CreatedAt.IsZero() && revisedAt.After(m.CreatedAt)
+		if ledgerChanged || scopeChanged || legacyScopeChanged {
+			return report.StatusStale
+		}
 	}
 	return m.Status
+}
+
+// ReportScope is the project briefing shown to the report writer.
+func (s *Server) ReportScope() string {
+	var parts []string
+	scope, constraints := s.projectDocuments()
+	if scope != "" {
+		parts = append(parts, "## 起点\n"+scope)
+	}
+	if constraints != "" {
+		parts = append(parts, "## 内置约束\n"+constraints)
+	}
+	return strings.Join(parts, "\n\n")
+}
+
+func (s *Server) reportDocumentRevision() time.Time {
+	var latest time.Time
+	if s.Store != nil {
+		for _, doc := range s.Store.Documents() {
+			if (doc.Kind == store.DocumentScope || doc.Kind == store.DocumentConstraints) && doc.UpdatedAt.After(latest) {
+				latest = doc.UpdatedAt
+			}
+		}
+	}
+	return latest
 }
 
 // contentDigest is the ledger fingerprint reports are compared against.
@@ -3553,11 +3582,12 @@ func (s *Server) reportPrecheck(w http.ResponseWriter, r *http.Request) {
 		unreported = unreported[:unreportedLimit]
 	}
 	writeJSON(w, 200, map[string]any{
-		"reportable": reportable,
-		"unverified": unverified,
-		"rejected":   rejected,
-		"withdrawn":  withdrawn,
-		"running":    s.Reports != nil && s.Reports.Busy(),
+		"reportable":       reportable,
+		"unverified":       unverified,
+		"rejected":         rejected,
+		"withdrawn":        withdrawn,
+		"running":          s.Reports != nil && s.Reports.Busy(),
+		"reviews_disabled": s.ReviewsDisabled(),
 		"unreported": map[string]any{
 			"total":      total,
 			"limit":      unreportedLimit,
@@ -3623,7 +3653,7 @@ func (s *Server) getReport(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "report not found")
 		return
 	}
-	m.Status = effectiveStatus(m, s.contentDigest())
+	m.Status = effectiveStatus(m, s.contentDigest(), report.ScopeDigest(s.ReportScope()), s.reportDocumentRevision())
 	writeJSON(w, 200, m)
 }
 
@@ -3656,8 +3686,8 @@ func (s *Server) serveReportFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	status := meta.Status
-	if meta.Status == report.StatusReady && meta.SourceDigest != "" {
-		status = effectiveStatus(meta, s.contentDigest())
+	if meta.Status == report.StatusReady && s.Store != nil {
+		status = effectiveStatus(meta, s.contentDigest(), report.ScopeDigest(s.ReportScope()), s.reportDocumentRevision())
 	}
 	if status != report.StatusReady && filepath.Clean(rel) != report.ChecksFile {
 		writeErr(w, 409, reportNotDeliverable(meta, status))

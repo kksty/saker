@@ -43,17 +43,8 @@ type documentRevision struct {
 // creation time. More than one open goal is possible (the commander may append),
 // and the console says so without editing a different one here.
 func (s *Server) currentGoalDocument() (model.Goal, bool) {
-	open := []model.Goal{}
-	for _, g := range s.Store.Goals() {
-		if !g.Closed {
-			open = append(open, g)
-		}
-	}
-	if len(open) == 0 {
-		return model.Goal{}, false
-	}
-	sort.SliceStable(open, func(i, j int) bool { return open[i].CreatedAt.Before(open[j].CreatedAt) })
-	return open[0], true
+	g, _, ok := s.Store.CurrentGoal()
+	return g, ok
 }
 
 func (s *Server) documentsView() map[string]documentView {
@@ -66,8 +57,8 @@ func (s *Server) documentsView() map[string]documentView {
 	}
 	out[store.DocumentScope] = fallback(store.DocumentScope, s.scopeText())
 	out[store.DocumentConstraints] = fallback(store.DocumentConstraints, s.Constraints())
-	if g, ok := s.currentGoalDocument(); ok {
-		out[store.DocumentGoal] = documentView{Text: g.Statement, GoalID: g.ID, Revision: s.Store.GoalRevision(g.ID)}
+	if g, revision, ok := s.Store.CurrentGoal(); ok {
+		out[store.DocumentGoal] = documentView{Text: g.Statement, GoalID: g.ID, Revision: revision}
 	}
 	return out
 }
@@ -165,19 +156,18 @@ func (s *Server) saveDocument(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Text     string `json:"text"`
 		Revision uint64 `json:"revision"`
+		GoalID   string `json:"goal_id"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 256<<10)).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, "请求体不是合法 JSON")
 		return
 	}
-	goalID := ""
 	if kind == store.DocumentGoal {
-		g, ok := s.currentGoalDocument()
+		_, ok := s.currentGoalDocument()
 		if !ok {
 			writeJSON(w, http.StatusConflict, map[string]any{"error": "没有未收口的目标可写", "code": "document_no_open_goal"})
 			return
 		}
-		goalID = g.ID
 	}
 	var doc model.Document
 	var err error
@@ -186,7 +176,7 @@ func (s *Server) saveDocument(w http.ResponseWriter, r *http.Request) {
 	// later mount change cannot make the ledger lie about who saved.
 	by := documentAuthor(r)
 	if kind == store.DocumentGoal {
-		doc, err = s.Store.SaveGoalDocument(req.Revision, goalID, req.Text, "", "", "", by)
+		doc, err = s.Store.SaveCurrentGoalStatement(req.Revision, req.GoalID, req.Text, by)
 	} else {
 		doc, err = s.Store.SaveDocument(req.Revision, kind, req.Text, by)
 	}
@@ -195,7 +185,7 @@ func (s *Server) saveDocument(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, map[string]any{
 			"error":   "文档已被改过：刷新看当前版再改",
 			"code":    "document_conflict",
-			"current": map[string]any{"revision": current.Revision, "updated_at": current.UpdatedAt},
+			"current": map[string]any{"revision": current.Revision, "updated_at": current.UpdatedAt, "goal_id": current.GoalID},
 		})
 		return
 	}
@@ -203,39 +193,13 @@ func (s *Server) saveDocument(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if err := s.applyDocument(kind, goalID, req.Text); err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
-		return
+	if doc.Revision != req.Revision {
+		s.recordAction("document_save", kind, doc.Text)
 	}
-	s.recordAction("document_save", kind, req.Text)
 	// A save whose text did not change writes nothing; the revision it reports is
 	// the one that is really stored, and changed=false says why it did not move.
 	writeJSON(w, http.StatusOK, map[string]any{
 		"revision": doc.Revision, "updated_at": doc.UpdatedAt,
 		"changed": doc.Revision != req.Revision,
 	})
-}
-
-// applyDocument makes a saved revision effective: the in-memory prompt snapshot,
-// the project manifest (scope/constraints) and, for the goal, the goal object
-// itself. The document row already holds the same text; these are the readers
-// that existed before it.
-func (s *Server) applyDocument(kind, goalID, text string) error {
-	switch kind {
-	case store.DocumentScope:
-		s.SetProjectSettings(text, s.Constraints())
-		if s.PersistDoc != nil {
-			return s.PersistDoc(kind, text)
-		}
-	case store.DocumentConstraints:
-		s.SetProjectSettings(s.scopeText(), text)
-		if s.PersistDoc != nil {
-			return s.PersistDoc(kind, text)
-		}
-	case store.DocumentGoal:
-		// SaveGoalDocument already edited the statement in the same transaction;
-		// there is nothing left to apply.
-		return nil
-	}
-	return nil
 }
