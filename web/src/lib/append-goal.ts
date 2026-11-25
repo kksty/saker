@@ -33,7 +33,7 @@ export interface AppendGoalDraft {
 export const PAUSE_KIND_LABEL: Readonly<Record<string, string>> = {
   running: '运行中',
   waiting_human: '等待人工',
-  waiting_children: '等待意图',
+  waiting_other: '等待意图',
   waiting_action: '等待外部结果',
   waiting_resume: '等待恢复执行',
   completion_standby: '完成待命',

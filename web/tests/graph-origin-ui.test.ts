@@ -89,7 +89,7 @@ const panelProps = {
 function stepNode(over: Partial<GraphNode> = {}, intentOver: Partial<Intent> = {}): GraphNode {
   const intent: Intent = {
     id: 'in_peer',
-    title: '平级意图',
+    title: '执行者发起的意图',
     description: '',
     status: 'running',
     attempts: 1,
@@ -132,5 +132,4 @@ test('没有发起者记录、也没有助手调用时，面板不编造这两�
   const html = mountedJSON()
   assert.ok(html.includes('未记录'), 'legacy created_by reads 未记录')
   assert.equal(html.includes('本轮助手'), false, 'no helper block without a recorded call')
-  assert.equal(html.includes('平级发布'), false, 'no peer note without an executor origin')
 })

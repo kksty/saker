@@ -26,7 +26,7 @@ func (s *Store) RegisterOperatorWait(intentID, runID string, request model.Opera
 			strings.Join(in.Wait.Operator.AccessIDs, "\x00") == strings.Join(request.AccessIDs, "\x00") {
 			return *detachWait(in.Wait).Operator, nil
 		}
-		return model.OperatorWait{}, fmt.Errorf("已有等待条件：不能覆盖子意图或另一项人工操作")
+		return model.OperatorWait{}, fmt.Errorf("已有等待条件：不能覆盖另一项人工操作")
 	}
 	request.ID = s.uniqueIDLocked("op")
 	request.Response = ""

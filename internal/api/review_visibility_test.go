@@ -136,10 +136,10 @@ func TestReadinessAllowsPremiseWithoutEvidenceWithReviewsOff(t *testing.T) {
 	}
 }
 
-// Child intents and peer spawns share checkPremiseRefs. Closing review must not
-// exempt them from the type rule: a note is still not a premise, while an
+// Every intent that cites premises shares checkPremiseRefs. Closing review must
+// not exempt one from the type rule: a note is still not a premise, while an
 // unverified reviewable fact may be cited (its dispatch is gated separately).
-func TestChildPremiseRefsStayStrictWithReviewsOff(t *testing.T) {
+func TestPremiseRefsStayStrictWithReviewsOff(t *testing.T) {
 	s, p, f, _ := proofPolicyFixture(t)
 	s.SetReviewsDisabled(true)
 	note, err := p.Store.AddFact(model.Fact{Kind: "note", Title: "memo", Summary: "y"})

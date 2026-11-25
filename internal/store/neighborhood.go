@@ -61,7 +61,7 @@ func (s *Store) ReadNeighborhood(v ReadVersion, roots []string, direction string
 		// must lead back to the intent that pinned it, otherwise a root scoped
 		// read (/api/graph?root=fact:<id>) would lose the pin relation that the
 		// whole-graph read still shows. Keep it in the indexed relation set.
-		rows, err := tx.Query("SELECT source,target,relation FROM relations WHERE (source=? OR target=?) AND relation IN ('premise','reference','produces','delegates','supports','pin') ORDER BY source,target,relation", current.id, current.id)
+		rows, err := tx.Query("SELECT source,target,relation FROM relations WHERE (source=? OR target=?) AND relation IN ('premise','reference','produces','supports','pin') ORDER BY source,target,relation", current.id, current.id)
 		if err != nil {
 			return DB{}, false, err
 		}

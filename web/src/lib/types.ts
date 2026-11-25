@@ -1240,7 +1240,7 @@ export interface BoardView {
     held?: number
     claimed: number
     running: number
-    /** Directions whose turn yielded for child intents. */
+    /** Directions whose turn yielded for an external result or a human action. */
     waiting?: number
     /** Successful runs whose fixed review phase is still running. */
     reviewing?: number
@@ -1974,7 +1974,7 @@ export interface FleetProject {
     pending: number
     claimed: number
     running: number
-    /** Directions whose turn yielded for child intents. */
+    /** Directions whose turn yielded for an external result or a human action. */
     waiting?: number
     reviewing?: number
     done: number

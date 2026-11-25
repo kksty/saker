@@ -435,7 +435,7 @@ func TestDirectionParticipantCannotMessageTheOperator(t *testing.T) {
 	}
 }
 
-// TestWorkerCanCancelItsOwnChildOnly: a worker that can spawn a child intent
-// must be able to stop a mis-planned one, or the mistake keeps spending the
-// direction's budget. Everything else stays with the commander — a worker
-// cannot reach its parent, a sibling, or a top-level direction.
+// TestWorkerCanCancelItsOwnChildOnly: a worker must be able to stop a direction
+// it owns when that direction was mis-planned, or the mistake keeps spending the
+// budget. Everything else stays with the commander — a worker cannot reach a
+// sibling or a top-level direction.

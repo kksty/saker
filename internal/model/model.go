@@ -56,9 +56,9 @@ const (
 	StatusClaimed = "claimed"
 	StatusRunning = "running"
 	// StatusWaiting is a business state: the direction's current turn yielded
-	// because it is waiting for child intents (or for a wake). It has no live
-	// run, so the watchdog must not "recover" it and dispatch must not claim it;
-	// only its wait condition (or its deadline) moves it back to pending.
+	// because it is waiting for an external result, a human action, or a wake. It
+	// has no live run, so the watchdog must not "recover" it and dispatch must not
+	// claim it; only its wait condition (or its deadline) moves it back to pending.
 	StatusWaiting = "waiting"
 	// StatusReviewing is the fixed settlement phase between a successful run and
 	// done: the run's new report-bound facts are being re-proven. It has no live
@@ -346,13 +346,13 @@ func (in *Intent) ClearDoneDeclared() {
 // child that finishes just before registration cannot be lost: RegisterWait
 // evaluates once while holding the same lock and returns ready immediately.
 type Wait struct {
-	// Actions is mutually exclusive with Children and Operator. Only these
-	// explicitly selected external operations can release the waiting turn.
+	// Actions is mutually exclusive with Operator. Only these explicitly selected
+	// external operations can release the waiting turn.
 	Actions []string `json:"actions,omitempty"`
 	// Operator is an external condition, completed only by an operator receipt.
-	// It is mutually exclusive with Children and has no automatic deadline.
+	// It is mutually exclusive with Actions and has no automatic deadline.
 	Operator *OperatorWait `json:"operator,omitempty"`
-	// Mode is all (every child settled) or any (the first settled child).
+	// Mode is all (every action settled) or any (the first settled action).
 	Mode string `json:"mode,omitempty"`
 	// Deadline is optional. A ticker wakes the parent with a timeout result
 	// instead of leaving it waiting forever.
@@ -436,8 +436,9 @@ const (
 	WaitReasonTimeout = "timeout"
 )
 
-// WaitResult is one settled child's outcome. Status is the child intent's
-// terminal status; StopReason is its last run's harness stop reason.
+// WaitResult is one settled outcome of a wait. Status is the settled state of
+// the awaited operation; StopReason is the harness stop reason of the run that
+// produced it.
 type WaitResult struct {
 	ActionID    string    `json:"action_id,omitempty"`
 	Result      string    `json:"result,omitempty"`
@@ -451,8 +452,7 @@ type WaitResult struct {
 }
 
 // Settled reports whether a status is terminal for waiting purposes. Waiting is
-// deliberately not settled: a child that is itself waiting for grandchildren is
-// still open work.
+// deliberately not settled: a direction that is itself waiting is still open work.
 func Settled(status string) bool {
 	switch status {
 	case StatusDone, StatusFailed, StatusReviewFailed, StatusParked:

@@ -280,7 +280,7 @@ func buildGolden(t *testing.T) goldenDoc {
 			"v3 指挥官回合同样加 untrusted_input 段（board 是目标侧转写的材料），并锁进金样。",
 			"v3 两处边界各在 run journal 写一条 prompt_section（untrusted_input / untrusted_input_commander），只记段名与字节数。",
 			"v4 执行者开头恢复「意图是下一步、不是规定怎么打」：照做/改造/换路/上报由执行者判断，平台不校验是否照做；派发者附带的路线与步骤只是参考、不是完成条件。",
-			"v4 指挥官身份补回「意图不是待办清单」、代办目标变更须带 operator_message_id、可为某条意图补帮手（子意图或平级意图），并声明它附带的路线只是参考。",
+			"v4 指挥官身份补回「意图不是待办清单」、代办目标变更须带 operator_message_id，并声明它附带的路线只是参考。",
 		},
 	}
 }

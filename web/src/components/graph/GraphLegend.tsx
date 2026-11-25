@@ -117,22 +117,13 @@ function CrossedDot({ color }: { color: string }) {
   )
 }
 
-/** 发起者第二通道：形状，不是颜色。与 render.ts 的 originMarker 一一对应。 */
-function OriginGlyph({ shape }: { shape: 'diamond' | 'circle' | 'double-ring' }) {
+/** 发起者第二通道：形状，不是颜色。与 render.ts 的 originMarker 对应；执行者来源只在旧数据里出现，图例只列当前可产生的两种。 */
+function OriginGlyph({ shape }: { shape: 'diamond' | 'double-ring' }) {
   if (shape === 'diamond') {
     return (
       <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center" aria-hidden="true">
         <span className="h-2 w-2 rotate-45" style={{ background: ORIGIN_MARKER_COLOR }} />
       </span>
-    )
-  }
-  if (shape === 'circle') {
-    return (
-      <span
-        className="h-3 w-3 shrink-0 rounded-full border"
-        style={{ borderColor: ORIGIN_MARKER_COLOR }}
-        aria-hidden="true"
-      />
     )
   }
   return (
@@ -282,10 +273,6 @@ export function GraphLegend({ className }: { className?: string }) {
             <Row title="created_by_participant_id = commander：指挥官发起，执行者执行">
               <OriginGlyph shape="diamond" />
               指挥官（实心菱形）
-            </Row>
-            <Row title="created_by_participant_id = pt_<意图>：由另一个执行者发起，双方是平级，不是上游意图">
-              <OriginGlyph shape="circle" />
-              执行者（空心圆）
             </Row>
             <Row title="created_by_participant_id = operator：操作员直接发起">
               <OriginGlyph shape="double-ring" />

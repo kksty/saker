@@ -3,8 +3,8 @@ package collab
 // Role is the provenance of a participant id: who stamped CreatedBy on an
 // intent or FromParticipantID on a message. It answers "where did this row come
 // from" only. It is deliberately not a permission, not a rank, and not a
-// hierarchy: the one real hierarchy in the ledger is ParentID plus Wait, and
-// authorization is decided by the API's ownership rules.
+// hierarchy: the ledger records provenance, and authorization is decided by the
+// API's ownership rules.
 type Role string
 
 const (
@@ -13,9 +13,8 @@ const (
 	// RoleOperator is the person at the console.
 	RoleOperator Role = "operator"
 	// RoleExecutor is a running direction's participant id, as minted by
-	// ParticipantID. Both a child intent's creator and a peer-published intent's
-	// initiator land here: provenance alone cannot tell delegation from a
-	// peer publish (that is ParentID's job).
+	// ParticipantID. It records that a direction produced the row; it never
+	// decides who may read or change it.
 	RoleExecutor Role = "executor"
 	// RoleUnknown is an empty id or a value that is not a participant of this
 	// project (legacy rows without CreatedBy, or a malformed id).

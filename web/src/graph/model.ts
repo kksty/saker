@@ -410,8 +410,8 @@ export function buildGraph(
   const omittedFromFacts = new Set(
     details.filter((d) => d.omitted.includes('from_fact_ids')).map((d) => d.id),
   )
-  // Chronological order is the production order: a child intent is created after
-  // its parent, so one pass can resolve depths without guessing.
+  // Chronological order is the production order: an intent is created after the
+  // facts it cites, so one pass can resolve depths without guessing.
   const ordered = intents.toSorted((a, b) => {
     const at = a.created_at ?? ''
     const bt = b.created_at ?? ''

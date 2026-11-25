@@ -2,10 +2,9 @@ package collab
 
 import "testing"
 
-// RoleOf is the one provenance classifier: the board's emergence counters, the
-// lineage walkers and the console all read the same role, so its boundary cases
-// are pinned here. Provenance is not permission: an executor role covers both a
-// delegated child's creator and a peer-published direction's initiator.
+// RoleOf is the one provenance classifier: the console and the board read the
+// same role, so its boundary cases are pinned here. Provenance is not permission:
+// an executor id classifies as the executor role whatever created the row.
 func TestRoleOfClassifiesParticipantIDs(t *testing.T) {
 	cases := []struct {
 		name        string

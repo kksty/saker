@@ -193,7 +193,7 @@ func TestGraphStructuralOrderPagesByChainDepthDeterministically(t *testing.T) {
 		t.Fatalf("producer intent did not precede its produced fact: %v", first)
 	}
 	if pos["intent:"+fx.child.ID] >= pos["fact:"+fx.output.ID] {
-		t.Fatalf("child intent did not precede its produced fact: %v", first)
+		t.Fatalf("the producing intent did not precede its produced fact: %v", first)
 	}
 
 	// One full page keeps the same order inside each typed slice.

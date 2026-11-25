@@ -37,7 +37,8 @@ type View struct {
 	// They stay visible (the work still exists) but dispatchPending skips them
 	// until an explicit retry/run clears Hold.
 	Held []Item `json:"held_intents,omitempty"`
-	// Waiting are directions whose turn yielded for child intents. They are not
+	// Waiting are directions whose turn yielded for an external result or a
+	// human action. They are not
 	// in Open (nothing should dispatch them) but the commander still needs to
 	// see what the project is blocked on.
 	Waiting      []Item `json:"waiting_intents,omitempty"`
@@ -72,12 +73,6 @@ type View struct {
 	// sent again" made observable, and unlike a bare run count it does not
 	// inflate on purpose runs (verifier/report), which never claim an intent.
 	Redispatch RedispatchStats `json:"redispatch"`
-	// Emergence is what the model organised on its own: directions it created,
-	// workers it spawned, messages it sent, handoffs and self-stops. It is an
-	// observation aggregate — no path reads it back to gate or filter rows —
-	// and it is deliberately absent from ForPrompt: a model that can read its
-	// own autonomy score treats the score as a target. Only the API/console
-	// board carries it.
 	// PromptDigest is set only on the commander round prompt's copy of the view
 	// (ForPrompt). It labels the lists above as bounded top-N digests and gives
 	// the complete enumeration entries, so a model cannot read a 20-row list as
@@ -336,10 +331,9 @@ func (v View) HasIdleRun(d time.Duration) bool {
 const PromptSummaryRunes = 240
 
 // ForPrompt returns the summary-layer copy of the view for the commander's round
-// prompt: same shape, counts and ids, but the prose fields are clipped and the
-// emergence aggregate is dropped. The API and the console keep serving the
-// untouched View, so what the operator reads is still complete; slots are copied
-// per item so the input view is not mutated.
+// prompt: same shape, counts and ids, but the prose fields are clipped. The API
+// and the console keep serving the untouched View, so what the operator reads is
+// still complete; slots are copied per item so the input view is not mutated.
 func ForPrompt(v View) View {
 	return forPrompt(v, false)
 }

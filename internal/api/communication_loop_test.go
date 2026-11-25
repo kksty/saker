@@ -117,7 +117,7 @@ type threadMessageEnvelope struct {
 // participants involved (including the subtask) can read it.
 func TestMessageThreadCoversCommanderAndSubtaskParticipants(t *testing.T) {
 	f := newParentFixture(t)
-	child, err := f.p.Store.CreateIntent(model.Intent{Title: "子意图", CreatedBy: f.ident.ParticipantID})
+	child, err := f.p.Store.CreateIntent(model.Intent{Title: "下一步意图", CreatedBy: f.ident.ParticipantID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,21 +130,21 @@ func TestMessageThreadCoversCommanderAndSubtaskParticipants(t *testing.T) {
 	}
 	ask, _, err := f.p.Store.AddMessage(model.Message{
 		FromParticipantID: collab.CommanderID, ToParticipantID: f.ident.ParticipantID,
-		Kind: model.MessageQuestion, Text: "这个意图能不能拆一个只读子意图？",
+		Kind: model.MessageQuestion, Text: "这个意图能不能派一个只读的下一步意图？",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	accept, _, err := f.p.Store.AddMessage(model.Message{
 		FromParticipantID: f.ident.ParticipantID, ToParticipantID: collab.CommanderID,
-		Kind: "answer", Text: "可以，子意图已派出", InReplyTo: ask.ID,
+		Kind: "answer", Text: "可以，下一步意图已派出", InReplyTo: ask.ID,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	result, _, err := f.p.Store.AddMessage(model.Message{
 		FromParticipantID: collab.ParticipantID(child.ID), ToParticipantID: f.ident.ParticipantID,
-		Kind: model.MessageResult, Text: "子意图完成，结论见 fact", InReplyTo: accept.ID,
+		Kind: model.MessageResult, Text: "下一步意图完成，结论见 fact", InReplyTo: accept.ID,
 		FactRefs: []string{"f_subtask"},
 	})
 	if err != nil {

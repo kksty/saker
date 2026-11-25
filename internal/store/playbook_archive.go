@@ -33,8 +33,7 @@ func ValidatePattern(p *model.ExperiencePattern) error {
 	for _, e := range p.Edges {
 		source, target := names[e.Source], names[e.Target]
 		valid := e.Kind == "premise" && source == "fact" && target == "intent" ||
-			e.Kind == "produces" && source == "intent" && target == "fact" ||
-			e.Kind == "delegates" && source == "intent" && target == "intent" && e.Source != e.Target
+			e.Kind == "produces" && source == "intent" && target == "fact"
 		if !valid {
 			return fmt.Errorf("invalid experience pattern edge")
 		}

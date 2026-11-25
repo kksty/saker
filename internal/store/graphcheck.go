@@ -65,8 +65,8 @@ func PremiseClaimsChanged(in model.Intent, facts map[string]model.Fact) []string
 }
 
 // intentGraphCycleLocked reports the first dependency cycle in the recorded
-// graph, if any. Nodes are "fact:<id>" and "intent:<id>"; edges are
-// fact->intent (premise), intent->fact (produces) and parent->child (delegates).
+// graph, if any. Nodes are "fact:<id>" and "intent:<id>"; edges are fact->intent
+// (premise) and intent->fact (produces).
 // The search is a standard three-colour DFS; it runs only when a structural
 // field changes, so normal status/attempt writes do not pay for it.
 func (s *Store) intentGraphCycleLocked() (string, bool) {
