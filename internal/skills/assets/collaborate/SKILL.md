@@ -294,7 +294,7 @@ curl -s -H "$AUTH" -H 'Content-Type: application/json' -X POST "$API/intents/$SE
 - 子意图同样要写前提：`from_fact_ids` 注明派生自哪些已记录事实，可带 `context_fact_ids` / `pinned_fact_ids` / `interest_entity_refs` 作阅读焦点；没有事实可引的 bootstrap 必须在 `description` 里显式说明。
 - 子意图由控制面自动开跑（并发满会排队/提示），之后用下一节的 `wait` 等结果；父意图不占执行槽。
 - 子意图有自己的 case / run / 账本记录；用它是因为“这块活适合单独一个人做”。
-- 派错了就自己收掉：`POST $API/intents/<子意图>/cancel`，`{"reason":"为什么不再需要它"}`。只能取消自己派出的子意图；同僚、父意图和顶层方向的生命周期归指挥官，走 handoff。
+- 派错了就自己收掉：`POST $API/intents/<子意图>/cancel`，`{"reason":"为什么不再需要它"}`。只能取消自己派出的子意图；同僚、父意图和顶层意图的生命周期归指挥官，走 handoff。
 - **能自己做完就自己做**；卡住、需要并行推进或换一名执行者接手时才用。不是每轮都必须派。
 
 ## worker 名单、kill 与 restart
@@ -315,9 +315,9 @@ curl -s -H "$AUTH" -H 'Content-Type: application/json' -X POST "$API/workers/in_
 - restart 把 **failed / pending / review_failed** 的 worker 用原任务书再派一次：清 Hold、
   attempts+1，并写一条 `restart` 备注。只能拉起自己停的（`held_by` 是你）或看门狗的自动停止；
   `held_by` 是 operator / commander / 未记录时返回 409 `worker_held`，交给停止者或 operator。
-  restart 沿用原 `description/eval`，不用于改任务书；要改任务书再跑，先按当前规则重写方向，
+  restart 沿用原 `description/eval`，不用于改任务书；要改任务书再跑，先按当前规则重写意图，
   不要用 restart 假装任务书变了。
-- 不能 restart 自己：自己的方向用 retry/continue。
+- 不能 restart 自己：自己的意图用 retry/continue。
 
 ## 看结果与等待
 

@@ -65,7 +65,7 @@ flowchart TD
 
 名称固定为：**意图**是指挥官或执行者决定下一步交给执行者做的事（实体 `intent`，表、字段与 API 路径沿用 `intent` / `/api/intents`）；**图谱**是意图与事实的关系图（早先叫「事实意图图」，不再作为正式名称使用）；**任务**只指 harness 的一次工具调用，不指业务实体。
 
-四个词的分工（唯一一处细节，代码、提示词与文档都按这里）：
+这张表的分工（唯一一处细节，代码、提示词与文档都按这里）：
 
 | 词 | 含义 | 标识符 |
 | --- | --- | --- |
@@ -207,7 +207,7 @@ Windows 会话里还有三条工作口径，写给模型而不是平台限制，
 
 声明契约不再提供事实级 `from_fact_ids`：事实级引用不入账，派生关系只由意图的 `from_fact_ids` 表达；事实行写了该字段会被忽略，并在 run 的警告里点名，不留下一个看起来已登记的假出处。
 
-无前提意图在事实图上挂到项目节点。复核开启时，指挥官和执行者的事实提示词、会话的 `readiness` 与 focus 索引只为已核验事实提供标题和摘要；复核被关闭时未核验事实按原文进入（第 8 节的运行时开关），状态仍如实标 `unverified`。未核验条目在部分索引视图中保留结构化占位，焦点视图同时保留分层和查询入口。`hold` 表示取消或失败后需显式 retry；`held_by`/`hold_reason` 记录是谁、为什么停的（operator / commander / watchdog / 父执行者 participant）。父执行者只能 restart 自己停的 worker（沿用原任务书，写 restart 备注），operator/commander 的停止要由停止者或 operator 处理。重开或重试意图仍按原 `from_fact_ids` 检查前提准入。没有 run 收口的方向可以由指挥官或操作员判定完成（`POST /api/intents/{id}/settle`）：只对 failed / review_failed / parked / 已停止的 pending 生效，必须写说明并至少引用一条事实或运行；完成后带上 `done_declared_by`/`done_note`/`done_fact_ids`，与 run 自己收口的完成分开显示，操作员停的方向不能用它翻案。
+无前提意图在事实图上挂到项目节点。复核开启时，指挥官和执行者的事实提示词、会话的 `readiness` 与 focus 索引只为已核验事实提供标题和摘要；复核被关闭时未核验事实按原文进入（第 8 节的运行时开关），状态仍如实标 `unverified`。未核验条目在部分索引视图中保留结构化占位，焦点视图同时保留分层和查询入口。`hold` 表示取消或失败后需显式 retry；`held_by`/`hold_reason` 记录是谁、为什么停的（operator / commander / watchdog / 父执行者 participant）。父执行者只能 restart 自己停的 worker（沿用原任务书，写 restart 备注），operator/commander 的停止要由停止者或 operator 处理。重开或重试意图仍按原 `from_fact_ids` 检查前提准入。没有 run 收口的意图可以由指挥官或操作员判定完成（`POST /api/intents/{id}/settle`）：只对 failed / review_failed / parked / 已停止的 pending 生效，必须写说明并至少引用一条事实或运行；完成后带上 `done_declared_by`/`done_note`/`done_fact_ids`，与 run 自己收口的完成分开显示，操作员停的意图不能用它翻案。
 
 报告生成与交付是操作员侧的后处理：报告 run 只读账本快照与证据原件，由控制台显式触发，不依赖指挥官或执行者的会话状态。报告目录里的证据副本和证据端点按同一类不可信字节处理：Markdown 保持文本类型，HTML/SVG/XML 固定类型并加 CSP sandbox，其余文件禁止内容嗅探——捕获页即使被操作员直接打开，也不能以控制台源执行脚本。指挥官与执行者只负责测试本身，报告/复核的运行、输出与队列不出现在其 API 视野中（`/api/runs` 过滤 support purpose，`/api/artifacts`、`/api/traffic` 过滤 support run 的原生产物与抓包，board 不返回复核队列，`handoff_warnings` 不列 support run；项目 mux 的 `GET /api/messages` 对带意图身份的会话只返回它自己的收发箱，与 `/agent/` 一致，项目级视图只属于操作员和指挥官）。会话仍可从意图的 readiness 读取必要前提的派生复核状态（排队、进行中、冷却、暂停、未通过、未启用或不可复核）及一句处理提示：该状态用于等待或请操作员处理；它不含复核运行、输出与队列本身，也不给会话触发复核的入口；readiness 里的 `review_id`/`verifier_run` 只是断言回执标识，不是复核运行入口（run 内容端点对会话保持 404）。board 可以列出意图的 `reviewing`/`review_failed` 状态——那是意图生命周期，不是复核运行或队列。心跳、看门狗节拍、最后一次唤醒、轮次/用量/存活统计和 guard 脉冲属于控制面调度，不进入指挥官的 board 视图——会话的 board 只保留“指挥官是否启用、是否暂停、暂停原因”这类可操作的运行状态；会话只看到实际的 board 状态和明确发给它的消息。复核与报告共享一个实例级辅助模型并发（默认 1，即串行；可在设置中调整），不占执行者并发名额。
 
