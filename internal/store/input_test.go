@@ -172,3 +172,47 @@ func TestPrepareRunInputRecordsPremiseWithBrokenOriginal(t *testing.T) {
 		t.Fatalf("the missing original was not recorded: %v", gaps)
 	}
 }
+
+// A multi-round direction's settled first run does not make its facts citable
+// while that direction is running a second round: the assertion can still be
+// corrected, and the downstream would be pinned to a version that moves.
+func TestPremiseRefusesFactOwnedByARunningDirection(t *testing.T) {
+	s := open(t)
+	a, _ := s.CreateIntent(model.Intent{Title: "A"})
+	first, _ := s.AddRun(model.Run{IntentID: a.ID, Node: "local", Status: model.RunDone})
+	f, _ := s.AddFact(model.Fact{Kind: "service", Title: "obs", Summary: "s", IntentID: a.ID, SourceRunID: first.ID})
+	// A starts its second round: the run is live again, the fact is from run one.
+	if _, _, err := s.StartIntentRun(a.ID, "local", "", model.Run{}); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := s.CreateIntent(model.Intent{Title: "B", FromFactIDs: []string{f.ID}})
+	_, runB, _ := s.StartIntentRun(b.ID, "local", "", model.Run{})
+	_, _, err := s.PrepareRunInput(runB.ID, b, model.PremiseVerifiedOnly, DispatchGate{ReviewsOff: true})
+	if err == nil {
+		t.Fatal("a premise from a direction that is running its next round was admitted")
+	}
+	if !strings.Contains(err.Error(), "还没收口") {
+		t.Fatalf("refusal does not name the unsettled owner: %v", err)
+	}
+}
+
+// A direction may cite what its own earlier run produced: the retry/continue
+// path would otherwise refuse every downstream of its own work.
+func TestPremiseAllowsOwnEarlierRunFact(t *testing.T) {
+	s := open(t)
+	a, _ := s.CreateIntent(model.Intent{Title: "A"})
+	first, _ := s.AddRun(model.Run{IntentID: a.ID, Node: "local", Status: model.RunDone})
+	f, _ := s.AddFact(model.Fact{Kind: "service", Title: "own", Summary: "s", IntentID: a.ID, SourceRunID: first.ID})
+	in, _ := s.CreateIntent(model.Intent{Title: "A2", FromFactIDs: []string{f.ID}, ParentID: ""})
+	// Point the citing direction at the same direction id as the fact's owner.
+	if _, err := s.UpdateIntent(in.ID, func(i *model.Intent) { i.ID = a.ID }); err != nil {
+		t.Fatal(err)
+	}
+	self, ok := s.GetIntent(a.ID)
+	if !ok {
+		t.Fatal("intent lost")
+	}
+	if owner := s.PremiseOwnerStillLive(f, self.ID); owner != "" {
+		t.Fatalf("own fact treated as foreign: %s", owner)
+	}
+}

@@ -1,6 +1,6 @@
 import type { BadgeProps } from '@cyber/ui'
 import type { StatusKind } from '@cyber/ui'
-import type { FrontierItem, Intent, Run } from './types'
+import type { FrontierItem, Intent, IntentWait, Run } from './types'
 
 type BadgeVariant = NonNullable<BadgeProps['variant']>
 
@@ -68,6 +68,36 @@ const statusLabels: Record<string, string> = {
 export function statusLabel(status?: string): string {
   if (!status) return '—'
   return statusLabels[status] ?? status
+}
+
+/**
+ * One sentence for the persisted wait (`intent.wait`), in the operator's words.
+ * Children carry their current state, so 「等子意图」 tells which one is still
+ * running without opening each direction; a child that is no longer in the
+ * ledger is said as such instead of being dropped from the sentence.
+ */
+export function intentWaitText(
+  wait?: IntentWait,
+  childOf?: (id: string) => { status?: string; hold?: boolean } | undefined,
+): string {
+  if (!wait) return ''
+  if (wait.actions?.length) {
+    return `等待 ${wait.actions.length} 个外部动作（${wait.mode === 'any' ? '任一结果' : '全部结果'}）`
+  }
+  if (wait.operator) {
+    const state = wait.operator.resolution === 'unavailable' ? '（无法完成）' : ''
+    return `等待人工：${wait.operator.request}${state}`
+  }
+  const ids = wait.children ?? []
+  const parts = ids.map((id) => {
+    const child = childOf?.(id)
+    if (!child) return `${id}（不在账本）`
+    return `${id} ${child.hold ? '已停止' : statusLabel(child.status)}`
+  })
+  const mode = wait.mode === 'any' ? '任一即可' : '全部完成'
+  const implicit = wait.implicit ? '（控制面补的等待：还有意图未收口）' : ''
+  // 不写「子意图」：层级叫法另有口径，这里只说是哪几条、各自到哪一步。
+  return `等待 ${ids.length} 条意图（${mode}）${implicit}：${parts.join(' · ')}`
 }
 
 /**

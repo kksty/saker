@@ -119,6 +119,41 @@ func (s *Store) ActiveChildren(parentID string) []model.Intent {
 	return out
 }
 
+// RunningInCandidateGroup returns the one direction of a candidate group that
+// is already running (or claimed), excluding the one asking. A group is an
+// explicit statement of "these are alternatives": at most one runs, and the
+// dispatch gate is what enforces it. No premise-set heuristic: two directions
+// derived from the same facts are not alternatives unless someone said so.
+func (s *Store) RunningInCandidateGroup(group, excludeID string) (model.Intent, bool) {
+	if group == "" {
+		return model.Intent{}, false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, in := range s.db.Intents {
+		if in.ID == excludeID || in.CandidateGroup != group {
+			continue
+		}
+		if in.Status == model.StatusRunning || in.Status == model.StatusClaimed {
+			return detachIntent(in), true
+		}
+	}
+	return model.Intent{}, false
+}
+
+// ActiveDescendants returns the live part of the whole subtree below root: a
+// direction whose grandchild still runs is a chain with work in flight at two
+// levels, so "the middle layer settled" is not enough to restart the top.
+func (s *Store) ActiveDescendants(rootID string) []model.Intent {
+	var out []model.Intent
+	for _, in := range s.Descendants(rootID) {
+		if !model.Settled(in.Status) {
+			out = append(out, in)
+		}
+	}
+	return out
+}
+
 // Descendants returns the whole subtree below root, breadth-first, excluding
 // root. It is what a cancel uses to stop a direction's work without leaving
 // orphan children that can still write into a case nobody watches.

@@ -107,3 +107,63 @@ func TestUpdateIntentAcceptsValidStructureEdits(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// A direction that already runs keeps the parent it was admitted under: moving
+// it mid-flight would let one direction sit under two parents over its lifetime
+// and leaves "who is waiting for whom" unanswerable after the fact.
+func TestRunningIntentParentIsFrozen(t *testing.T) {
+	s := open(t)
+	parent, err := s.CreateIntent(model.Intent{Title: "父"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := s.CreateIntent(model.Intent{Title: "另一个父"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	in, err := s.CreateIntent(model.Intent{Title: "子", ParentID: parent.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.UpdateIntent(in.ID, func(i *model.Intent) { i.Status = model.StatusRunning }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.UpdateIntent(in.ID, func(i *model.Intent) { i.ParentID = other.ID }); !errors.Is(err, ErrIntentParentFrozen) {
+		t.Fatalf("re-parent of a running intent = %v, want ErrIntentParentFrozen", err)
+	}
+	kept, _ := s.GetIntent(in.ID)
+	if kept.ParentID != parent.ID {
+		t.Fatalf("parent moved to %q, want %q", kept.ParentID, parent.ID)
+	}
+}
+// The freeze starts from the first attempt, not from running: a failed
+// direction is expected to resume, and moving its child away changes what that
+// resume waits for. A direction that never ran can still be re-parented.
+func TestReparentFrozenAfterTheFirstAttempt(t *testing.T) {
+	s := open(t)
+	first, err := s.CreateIntent(model.Intent{Title: "第一个父"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := s.CreateIntent(model.Intent{Title: "第二个父"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	in, err := s.CreateIntent(model.Intent{Title: "子", ParentID: first.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.UpdateIntent(in.ID, func(i *model.Intent) {
+		i.Status = model.StatusFailed
+		i.RunID = "r_once"
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.UpdateIntent(in.ID, func(i *model.Intent) { i.ParentID = second.ID }); !errors.Is(err, ErrIntentParentFrozen) {
+		t.Fatalf("re-parent after a failed run = %v, want ErrIntentParentFrozen", err)
+	}
+	kept, _ := s.GetIntent(in.ID)
+	if kept.ParentID != first.ID {
+		t.Fatalf("parent moved to %q, want %q", kept.ParentID, first.ID)
+	}
+}

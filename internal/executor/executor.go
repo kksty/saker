@@ -358,7 +358,13 @@ type Result struct {
 	// harness can exit 0 after a failed turn, and that must not read as success.
 	StopReason string
 	IsError    bool
-	Tokens     int
+	// FailureClass is set by the executor when it knows how the turn died:
+	// "transport" (the link broke), "intentional" (the host closed on purpose),
+	// or "unknown" (stream ended with no reason). Empty means the run did not
+	// die on the AOP link, so the control plane must not infer a transport
+	// failure from words in the error text.
+	FailureClass string
+	Tokens       int
 	// Token breakdown and completeness from the harness turn_ended usage.
 	InputTokens       int
 	OutputTokens      int

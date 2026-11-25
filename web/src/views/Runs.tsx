@@ -21,6 +21,7 @@ import {
   fmtDuration,
   fmtInt,
   fmtTime,
+  intentWaitText,
   purposeLabel,
   runCancelReason,
   runMatchesFilter,
@@ -218,6 +219,13 @@ export function Runs({
   const { group: currentGroup, run: current } = selectRunHistory(groups, requestedRun ?? sessionRunID, requestedGroup)
   const selected = current?.id ?? null
   const currentIntent = current ? intentOf(current) : undefined
+  // A yield is not a stop: the run gave its slot back and will resume when the
+  // condition holds. Printing it as a cancel reason repeats the wait line below
+  // and reads as a decision someone made.
+  const yieldOnly =
+    current?.cancel_cause === 'child_wait' ||
+    current?.cancel_cause === 'operator_wait' ||
+    current?.cancel_cause === 'action_wait'
   const currentExecutor = current ? executorOf(current) : null
   const firstLoad = runs.loading && !runs.data
 
@@ -538,9 +546,26 @@ export function Runs({
                     <span className="text-warning">⚠ {current.warnings.length} 条交接告警</span>
                   ) : null}
                 </div>
-                {(current.status === 'canceled' || current.exit_reason) && (
+                {(current.status === 'canceled' || current.exit_reason) && !yieldOnly && (
                   <p className="text-[12px] leading-relaxed text-warning">
                     {current.status === 'canceled' ? runCancelReason(current) : current.exit_reason}
+                  </p>
+                )}
+                {/* 传输自愈与关闭原因都是账本字段，界面照抄；不按错误文本推断。 */}
+                {(current.auto_resume_attempt ?? 0) > 0 && (
+                  <p data-testid="run-auto-resume" className="text-[12px] leading-relaxed text-warning">
+                    网络中断，自动重跑第 {current.auto_resume_attempt} 次（上限 3）
+                  </p>
+                )}
+                {current.status === 'failed' && current.failure_class === 'intentional' && (
+                  <p data-testid="run-intentional-close" className="text-[12px] leading-relaxed text-ink-2">
+                    宿主主动关闭，未续跑
+                  </p>
+                )}
+                {/* 这条 run 所属意图在等什么：子意图带着当前状态，不必再逐条点开。 */}
+                {currentIntent?.wait && (
+                  <p data-testid="run-intent-wait" className="text-[12px] leading-relaxed text-ink-2">
+                    {intentWaitText(currentIntent.wait, (id) => intentByID.get(id))}
                   </p>
                 )}
                 {notice && <p role="status" className="text-[12px] text-ink-2">{notice}</p>}

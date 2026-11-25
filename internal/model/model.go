@@ -253,6 +253,11 @@ type Intent struct {
 	DelegatedByRun string `json:"delegated_by_run_id,omitempty"`
 	// IdempotencyKey dedupes repeated child creation by the same parent run.
 	IdempotencyKey string `json:"idempotency_key,omitempty"`
+	// CandidateGroup marks alternative next steps produced by one decision. At
+	// most one direction of a group runs at a time: dispatching one is the pick,
+	// and the others stay pending with the gate's reason. It is an explicit
+	// grouping, never derived from the premise set.
+	CandidateGroup string `json:"candidate_group,omitempty"`
 	// Wait is set while the direction is waiting for children. It is business
 	// state, not a sleep: the run ends, the slot is released, and a result event
 	// (or the deadline) moves the direction back to pending.
@@ -546,6 +551,15 @@ type Fact struct {
 	// reject it for the wrong reason (D35).
 	Proof       string   `json:"proof,omitempty"` // dynamic|static
 	EvidenceIDs []string `json:"evidence_ids,omitempty"`
+	// PendingEvidence is what a still-running declaration named as evidence
+	// before the ledger preserved it. Files are only admitted at settlement, so
+	// until then the fact has no evidence rows; without this field a reader
+	// cannot tell "wrote no evidence" from "evidence not preserved yet", and a
+	// commander reading the brief would demand a re-declaration that cannot
+	// change anything mid-run. It is display state, not part of the assertion:
+	// it is excluded from claimHash, never counts as evidence, and settlement
+	// clears it when the authoritative set is attached.
+	PendingEvidence []string `json:"pending_evidence,omitempty"`
 	// Tags are optional labels for reuse: playbooks use them for recall
 	// (`product:thinkphp`, `technique:rce`, `port:8080`). They are not an
 	// enum and never gate a write; the brief uses them to decide which
@@ -1067,6 +1081,15 @@ type Run struct {
 	// / error). It sits next to the exit code because a harness can exit 0 after
 	// a failed turn (docs/11-protocol.md).
 	StopReason string `json:"stop_reason,omitempty"`
+	// FailureClass is how the run died, recorded by the side that saw it die:
+	// transport (the link broke), intentional (the host closed on purpose),
+	// unknown (stream ended with no reason). It answers "was this the link?"
+	// from what happened, not from words found in the error text.
+	FailureClass string `json:"failure_class,omitempty"`
+	// AutoResumeAttempt counts the transport self-heal restarts of this
+	// direction in the current episode (0 = none). The console reads it to say
+	// "the link dropped, rerun #N" instead of showing a bare failure.
+	AutoResumeAttempt int `json:"auto_resume_attempt,omitempty"`
 	// LastState is the last harness status payload (compaction, context
 	// budget). It is diagnostic, not a ledger fact.
 	LastState string `json:"last_state,omitempty"`

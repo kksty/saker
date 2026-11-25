@@ -126,6 +126,14 @@ func (s *Server) readinessFromInputs(inputs readinessInputs, in model.Intent, po
 			} else if !reviewsOff && policy == model.PremiseVerifiedOnly && row.Reason == "" {
 				row.Reason = "缺少绑定当前断言的独立核验收据"
 			}
+			// The dispatch gate refuses a premise whose producer has not settled;
+			// readiness must say the same thing or the page shows "usable" for a
+			// direction that cannot start. One rule, two readers.
+			if row.Reason == "" && s.Store != nil {
+				if owner := s.Store.PremiseOwnerStillLive(f, in.ID); owner != "" {
+					row.Reason = fmt.Sprintf("来源 %s 还没收口：现在不能当必要前提；等它收口，或改用 context_fact_ids 只读参考", owner)
+				}
+			}
 			// Two different things wear the word "missing evidence": nothing was
 			// ever registered (a candidate relation the model built on its own —
 			// advisory), or an original was registered and cannot be opened. The

@@ -240,3 +240,113 @@ func TestDeclarationSeveritySurvivesOmission(t *testing.T) {
 		t.Fatal("a grade change must not look like a duplicate read")
 	}
 }
+
+// A declaration written while the run is still going names its evidence, but the
+// ledger preserves the files only at settlement. The row must say "declared, not
+// registered yet" — and naming evidence must not itself turn into a new
+// assertion, or every correction line would invalidate downstream premises.
+func TestApplyDeclarationLiveEvidenceIsPendingUntilSettlement(t *testing.T) {
+	st := openApplyLedger(t)
+	run := applyRun(t, st, 0)
+	line := applyLine("obs-ev", "带证据的观察", 0)
+	line.Evidence = []string{"raw/E1.txt"}
+
+	res, err := ApplyDeclaration(st, "in_1", run.ID, line, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, ok := st.FactByID(res.FactID)
+	if !ok {
+		t.Fatal("fact not stored")
+	}
+	if len(f.EvidenceIDs) != 0 {
+		t.Fatalf("live declaration registered evidence %v; only settlement may", f.EvidenceIDs)
+	}
+	if len(f.PendingEvidence) != 1 || f.PendingEvidence[0] != "raw/E1.txt" {
+		t.Fatalf("pending = %v, want the declared path", f.PendingEvidence)
+	}
+	if f.ClaimVersion != 1 {
+		t.Fatalf("claim version = %d, want 1: declaring evidence is not a new assertion", f.ClaimVersion)
+	}
+
+	// The finish settlement attaches the preserved ids: they become the
+	// authoritative set and the pending list goes away.
+	if _, err := ApplyDeclaration(st, "in_1", run.ID, line, []string{"e_1"}); err != nil {
+		t.Fatal(err)
+	}
+	settled, ok := st.FactByID(res.FactID)
+	if !ok {
+		t.Fatal("fact vanished")
+	}
+	if len(settled.EvidenceIDs) != 1 || settled.EvidenceIDs[0] != "e_1" {
+		t.Fatalf("settled evidence = %v, want [e_1]", settled.EvidenceIDs)
+	}
+	if len(settled.PendingEvidence) != 0 {
+		t.Fatalf("pending = %v after settlement, want empty", settled.PendingEvidence)
+	}
+	if settled.ClaimVersion != 2 {
+		t.Fatalf("claim version = %d after evidence attached, want 2", settled.ClaimVersion)
+	}
+}
+
+// Settlement attaches only the paths it could preserve. When some declared
+// path was dropped (missing file, out of bounds) the row must keep saying so
+// instead of falling back to "无证据", which reads as if nothing was declared.
+func TestApplyDeclarationKeepsDroppedPendingEvidence(t *testing.T) {
+	st := openApplyLedger(t)
+	run := applyRun(t, st, 0)
+	line := applyLine("obs-drop", "部分保全", 0)
+	line.Evidence = []string{"raw/E1.txt", "raw/E2.txt"}
+
+	res, err := ApplyDeclaration(st, "in_1", run.ID, line, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ApplyDeclaration(st, "in_1", run.ID, line, []string{"e_1"}); err != nil {
+		t.Fatal(err)
+	}
+	f, ok := st.FactByID(res.FactID)
+	if !ok {
+		t.Fatal("fact not stored")
+	}
+	if len(f.EvidenceIDs) != 1 || f.EvidenceIDs[0] != "e_1" {
+		t.Fatalf("evidence = %v, want the one preserved id", f.EvidenceIDs)
+	}
+	if len(f.PendingEvidence) != 2 {
+		t.Fatalf("pending = %v, want the declared paths kept when a path was dropped", f.PendingEvidence)
+	}
+
+	if _, err := ApplyDeclaration(st, "in_1", run.ID, line, []string{"e_1", "e_2"}); err != nil {
+		t.Fatal(err)
+	}
+	full, _ := st.FactByID(res.FactID)
+	if len(full.PendingEvidence) != 0 {
+		t.Fatalf("pending = %v after every path resolved, want empty", full.PendingEvidence)
+	}
+}
+
+// A live line that only corrects the summary carries no evidence list; it must
+// not erase what an earlier line declared. The files are still on disk and the
+// brief would otherwise fall back to "无证据".
+func TestApplyDeclarationSummaryCorrectionKeepsPendingEvidence(t *testing.T) {
+	st := openApplyLedger(t)
+	run := applyRun(t, st, 0)
+	line := applyLine("obs-keep", "原标题", 0)
+	line.Evidence = []string{"raw/E1.txt", "raw/E2.txt"}
+	res, err := ApplyDeclaration(st, "in_1", run.ID, line, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Same identity, new summary, no evidence field: the declared paths stay.
+	again := applyLine("obs-keep", "更正后的摘要", 0)
+	if _, err := ApplyDeclaration(st, "in_1", run.ID, again, nil); err != nil {
+		t.Fatal(err)
+	}
+	f, ok := st.FactByID(res.FactID)
+	if !ok {
+		t.Fatal("fact not stored")
+	}
+	if len(f.PendingEvidence) != 2 {
+		t.Fatalf("pending = %v after a summary-only correction, want the declared paths kept", f.PendingEvidence)
+	}
+}

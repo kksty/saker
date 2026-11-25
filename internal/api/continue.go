@@ -102,6 +102,9 @@ func (s *Server) continueIntentRun(id, note string) (string, string, error) {
 		return "", "", &continueError{"continue_conflict",
 			fmt.Sprintf("意图 %s 是 %s，只有 done / failed / review_failed / parked 的意图可以 continue", id, in.Status)}
 	}
+	if err := s.activeDescendantRefusal(id); err != nil {
+		return "", "", &continueError{"continue_children_running", err.Error()}
+	}
 	var prev model.Run
 	if in.RunID != "" {
 		prev, _ = s.Store.GetRun(in.RunID)

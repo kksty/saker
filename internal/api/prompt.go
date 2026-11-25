@@ -392,10 +392,23 @@ func renderFact(f model.Fact, showUnverified bool) string {
 		s.WriteString(clipRunes(summary, factSummaryRunes))
 		s.WriteString("\n")
 	}
-	if len(f.EvidenceIDs) == 0 {
-		s.WriteString("（无证据，视为未验证）\n")
-	} else {
+	switch {
+	case len(f.EvidenceIDs) > 0 && len(f.PendingEvidence) > 0:
+		// Settlement kept some but not all of what was declared: the row is
+		// backed, and it still says which declared paths are not in the ledger.
+		fmt.Fprintf(&s, "证据：%d 条；另有声明但未登记：%s\n",
+			len(f.EvidenceIDs), clipRunes(strings.Join(f.PendingEvidence, "、"), 240))
+	case len(f.EvidenceIDs) > 0:
 		fmt.Fprintf(&s, "证据：%d 条\n", len(f.EvidenceIDs))
+	case len(f.PendingEvidence) > 0:
+		// A running declaration carries its evidence paths, but the ledger only
+		// preserves the files at settlement. Calling that "no evidence" made a
+		// commander demand a re-declaration that cannot change anything mid-run;
+		// the paths are readable under the case directory, so show them.
+		fmt.Fprintf(&s, "（已声明 %d 条证据，收口时才登记，不是没有证据：%s）\n",
+			len(f.PendingEvidence), clipRunes(strings.Join(f.PendingEvidence, "、"), 240))
+	default:
+		s.WriteString("（无证据，视为未验证）\n")
 	}
 	return s.String()
 }
@@ -835,7 +848,7 @@ func writeHandoff(b *strings.Builder) {
 	// schema (audit F12). The collaborate skill explains optional collaboration
 	// fields only; it must not define a competing schema.
 	b.WriteString("- 声明字段（唯一来源；`collaborate` skill 只补充协作接口，不重复定义 schema）：\n")
-	b.WriteString("  - `declaration_id`：**这一条观察**的稳定标识；同一观察补证据或更正时沿用，不同观察绝不复用，没有稳定身份就留空，不要编造。\n")
+	b.WriteString("  - `declaration_id`：**这一条观察**的稳定标识；同一观察补证据或更正时沿用，不同观察绝不复用，没有稳定身份就留空，不要编造。补的证据要等本轮收口才登记进账本，运行中看到的是「已声明、待登记」，不是没写。\n")
 	b.WriteString("  - `entity_ref`：被观察的**实体身份**（如 `host:10.0.0.5`、`account:uid=2`），与观察身份分开；只记上下文，不改变本轮指派、不证明结论。\n")
 	b.WriteString("  - `source_ref`：有稳定外部来源时写来源身份（如 `report:<id>#<finding>`）；它只记出处，不证明结论。事实不写 `from_fact_ids`——事实级引用不入账，派生关系只由意图的 `from_fact_ids` 表达。\n")
 	b.WriteString("  - `tags`/`observed_at`/`execution_context_ref`：可选检索标签、RFC3339 观察时刻、明确引用的现场/资源标识。\n")
@@ -873,7 +886,6 @@ func writeHandoff(b *strings.Builder) {
 	b.WriteString("- 只在线上看到、留不下文件时写 `{\"url\":\"…\"}`：只记录范围与限制，不算证据。能存文件就存文件。\n")
 	b.WriteString("- 结论与证据照原文写，不要脱敏：口令、Cookie、令牌、哈希、序列号、内网地址都保留原始字符与编码。打码会让复核者无法重放，也让复现链断在证据上。\n")
 	b.WriteString("- 控制面的操作员凭据由操作员持有，不是你的身份，读到也不使用。\n")
-	b.WriteString("- 你自己派出的子意图派错了，可以直接取消：`POST /api/intents/<子意图>/cancel`，`{\"reason\":\"…\"}`，理由写清为什么不再需要它。别的意图（同僚、父意图、顶层意图）的生命周期不归你。\n")
 	b.WriteString("- 需要人接手、需要重开一个已停的意图、需要改目标或走审批时，用 handoff 写给指挥官：写明哪条意图、要它做什么、你手上有什么材料；它决定 continue、retry 还是别的。意图停放或结束不阻挡这条路径——材料照样交得出去，只是启动那一下由指挥官按。\n")
 	b.WriteString("- 跑完没结论也要写一条 `note`：试过什么、为什么放弃；`doc` 写清止于何处（试了什么、没试什么）。\"测过\"不等于\"测完\"。没写文件 = 这一轮没有交接。\n")
 }

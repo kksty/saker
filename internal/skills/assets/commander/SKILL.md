@@ -203,7 +203,7 @@ curl -s -H "$TW_AUTH" -H 'Content-Type: application/json' \
 
 项目暂停取消当前回合并保留会话；恢复优先续接因 pause/restart 中断的意图。done/failed/review_failed/parked 的既有意图可用 continue 续话；failed/review_failed/pending 可用 retry，resume=true 续接、false 重派。parked 若要重新进入普通派发先 reopen。先查 retry-preview 与既有运行，沿用原意图身份，不重复建立同一任务。若 retry/run/continue/handoff 返回 409 `held_by_operator`，说明这条意图是操作员停的：不要换入口重试，先发 operator request 或等操作员恢复；指挥官/看门狗停的意图可以自己拉起。
 
-同一观察更正或补证据时沿用 declaration_id/source_ref，更新同一 fact；新断言版本会使旧复核失效。未复核材料在 context_fact_ids 和叙述中也只能称待复核假设，不得当作已验证前提。
+同一观察更正或补证据时沿用 declaration_id/source_ref，更新同一 fact；新断言版本会使旧复核失效。运行中补的证据要等该意图收口才登记进账本，跑着时看到的是「已声明、待登记」，不是没写。未复核材料在 context_fact_ids 和叙述中也只能称待复核假设，不得当作已验证前提。
 
 操作员明确要求改变终点时，可使用 POST /api/goals 创建，或 POST /api/goals/<id>/update、/close；必须带 operator_message_id 指向操作员发给你的那条消息。update 带 statement/start，close 带 reason；保留原意，不扩大授权。/met 仍由操作员手动执行。向操作员发记录型提醒使用 POST $TW_AGENT/messages，to=operator，正文与幂等键按消息契约；accepted 不代表已读。
 

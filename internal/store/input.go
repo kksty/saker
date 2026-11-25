@@ -92,6 +92,16 @@ func (s *Store) PrepareRunInput(runID string, task model.Intent, policy string, 
 			return DB{}, nil, fmt.Errorf("premise %s is missing", id)
 		}
 		f := r.value.(model.Fact)
+		// A premise written by a direction that has not settled is not a
+		// premise yet: the row can still be corrected under the direction that
+		// cites it, and the downstream would be pinned to a version that no
+		// longer exists. This is an ordering rule, not a review gate — the same
+		// shape as depending only on facts that have already been produced.
+		// Waiting for the owner to settle, or citing the row as context instead,
+		// are the two ways out.
+		if owner := s.PremiseOwnerStillLive(f, task.ID); owner != "" {
+			return DB{}, nil, fmt.Errorf("premise %s：来源 %s 还没收口，现在不能当必要前提；等它收口，或改用 context_fact_ids 只读参考", id, owner)
+		}
 		if issue := model.PremiseIssue(f, policy); issue != "" {
 			if !(off && model.PremiseIssueReviewOnly(f)) {
 				return DB{}, nil, fmt.Errorf("premise %s claim v%d (%s): %s", id, f.ClaimVersion, policy, issue)
@@ -160,4 +170,38 @@ func (s *Store) PrepareRunInput(runID string, task model.Intent, policy string, 
 		db.Intents[i].InterestEntityRefs = append([]string(nil), task.InterestEntityRefs...)
 	}
 	return db, gaps, nil
+}
+
+// premiseOwnerStillLive names the run or direction that still owns this fact and
+// has not settled. Settlement is what makes an assertion stable enough to be a
+// necessary premise; while the producer is still running (or its direction is
+// waiting on children) the row may be corrected, and a downstream that mounted
+// it would point at a version that can change underneath. A fact with no source
+// run falls back to its direction; the dispatching direction itself is exempt so
+// a retry/continue can cite what its own earlier run produced.
+func (s *Store) PremiseOwnerStillLive(f model.Fact, selfIntent string) string {
+	// The dispatching direction may cite what its own earlier run produced:
+	// an intent has one run at a time, so its own facts are its own material.
+	if f.IntentID != "" && f.IntentID == selfIntent {
+		return ""
+	}
+	// Both checks run: a multi-round direction can have a settled first run
+	// while its second run is live, and citing the first run's fact is exactly
+	// the case the rule is about. Checking only the run let that through.
+	if f.SourceRunID != "" {
+		for _, r := range s.db.Runs {
+			if r.ID == f.SourceRunID && r.Status == model.RunRunning {
+				return "run " + r.ID
+			}
+		}
+	}
+	if f.IntentID == "" {
+		return ""
+	}
+	for _, i := range s.db.Intents {
+		if i.ID == f.IntentID && (i.Status == model.StatusRunning || i.Status == model.StatusWaiting) {
+			return "意图 " + i.ID
+		}
+	}
+	return ""
 }

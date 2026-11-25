@@ -550,6 +550,29 @@ func (s *Service) Start(id, prompt, continuedFrom string, resume, keepPrompt boo
 	if in.Status == model.StatusRunning || in.Status == model.StatusClaimed {
 		return "", fmt.Errorf("intent %s 已在运行", id)
 	}
+	// Alternatives from one decision run one at a time: dispatching one is the
+	// pick, and the rest keep their pending row so the decision stays visible.
+	// This is the group's own statement, not a guess from the premise set.
+	if group := strings.TrimSpace(in.CandidateGroup); group != "" {
+		if running, ok := s.o.Store.RunningInCandidateGroup(group, id); ok {
+			return "", fmt.Errorf("候选组 %s 里 %s 已在运行：同批一次只跑一条，等它收口或取消后再派这条",
+				group, running.ID)
+		}
+	}
+	// A direction whose live subtree still has work does not start: the failed
+	// run already dropped its wait, so the descendants' results have nowhere to
+	// land, and a restart would put the top on the same ground as its own chain.
+	// Waiting for them is the only reading that keeps the graph honest;
+	// cancelling them first is the operator's call. This is the one enforcement
+	// point: pump, redispatch, auto-resume and an explicit run all arrive here.
+	if kids := s.o.Store.ActiveDescendants(id); len(kids) > 0 {
+		ids := make([]string, 0, len(kids))
+		for _, k := range kids {
+			ids = append(ids, k.ID)
+		}
+		return "", fmt.Errorf("意图 %s 还有 %d 条子意图在下游运行（%s）：先等它们收口或取消，再启动父意图",
+			id, len(kids), strings.Join(ids, "、"))
+	}
 	run, nodeID, err := s.o.PlanRun(in, continuedFrom)
 	if err != nil {
 		return "", err
@@ -621,6 +644,7 @@ func (s *Service) Finish(runID, intentID, status, reason string, res executor.Re
 		r.Events = res.Events
 		r.DeclaredFacts = declared
 		r.StopReason = res.StopReason
+		r.FailureClass = res.FailureClass
 		if s.o.Redact != nil {
 			r.LastState = s.o.Redact(res.LastState)
 		} else {

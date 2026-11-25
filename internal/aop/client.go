@@ -272,6 +272,47 @@ func DisconnectReason(err error) string {
 	}
 }
 
+// Failure class values DisconnectClass returns. They are the only reading of a
+// dropped stream the control plane trusts; the reason text stays for humans.
+const (
+	FailureTransport   = "transport"
+	FailureIntentional = "intentional"
+	FailureUnknown     = "unknown"
+)
+
+// DisconnectClass classifies why the stream ended, so a run records the cause
+// instead of a sentence someone later pattern-matches. A close code is a
+// statement: 1000 (normal) and 1008 (policy) are deliberate. 1001 (going away)
+// is only a transport failure when the host said it is shutting down or
+// restarting; an unexplained 1001 is not a broken link and must not restart the
+// work. EOF with no close frame means the peer vanished — the link is the only
+// suspect, but nothing confirmed it, so it is "unknown".
+func DisconnectClass(err error) string {
+	var closed *ws.CloseError
+	switch {
+	case err == nil:
+		return FailureUnknown
+	case errors.As(err, &closed):
+		switch closed.Code {
+		case 1000, 1008:
+			return FailureIntentional
+		case 1001:
+			text := strings.ToLower(closed.Text)
+			for _, needle := range []string{"shutdown", "shutting down", "restart", "restarting", "going away", "升级", "重启", "关闭"} {
+				if strings.Contains(text, needle) {
+					return FailureTransport
+				}
+			}
+			return FailureIntentional
+		}
+		return FailureTransport
+	case errors.Is(err, io.EOF):
+		return FailureUnknown
+	default:
+		return FailureTransport
+	}
+}
+
 // Cursor is the last delivery cursor seen on the stream. A resumed turn uses it
 // as after_cursor so the host resends only the tail, not the whole session.
 func (c *Conn) Cursor() string {

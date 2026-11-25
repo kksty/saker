@@ -792,6 +792,13 @@ export interface Run {
   exit_reason?: string
   /** Structured reason for a canceled run: steer/retry/stop_loss/restart/watchdog. */
   cancel_cause?: string
+  /** How the run died, recorded by the side that saw it die: transport (the link
+   *  broke), intentional (the host closed on purpose), unknown (no reason). The
+   *  console reads it; it never re-derives the class from error text. */
+  failure_class?: string
+  /** Transport self-heal restarts of this direction in the current episode
+   *  (0 = none). Shown as "网络中断，自动重跑第 N 次（上限 3）". */
+  auto_resume_attempt?: number
   events: number
   declared_facts: number
   stop_reason?: string

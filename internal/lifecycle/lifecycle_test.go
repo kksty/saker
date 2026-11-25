@@ -638,3 +638,94 @@ func TestReapClaimsReturnsLostClaimToPendingAndFailsLostChild(t *testing.T) {
 	}
 	waitChan(t, h.settled, "child settlement")
 }
+
+// A parent that already delegated work does not start again while its children
+// run: the failed run dropped the wait, so the children's results have nowhere
+// to land, and a restart would put the parent on the same ground as them.
+func TestStartRefusesParentWithRunningChildren(t *testing.T) {
+	h := newHarness(t)
+	parent := h.createIntent(t, "父意图")
+	child := h.createIntent(t, "子意图")
+	if _, err := h.store.UpdateIntent(parent.ID, func(i *model.Intent) { i.Status = model.StatusFailed }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.store.UpdateIntent(child.ID, func(i *model.Intent) {
+		i.ParentID = parent.ID
+		i.Status = model.StatusRunning
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.svc.Start(parent.ID, "", "", false, false, ""); err == nil || !strings.Contains(err.Error(), "子意图") {
+		t.Fatalf("Start(parent with running child) = %v, want refusal naming the children", err)
+	}
+}
+
+// A settled middle layer does not make the chain safe to restart: the grandchild
+// is still work in flight two levels down, and its result lands on the middle
+// layer the failed top is waiting for.
+func TestStartRefusesParentWithRunningGrandchild(t *testing.T) {
+	h := newHarness(t)
+	parent := h.createIntent(t, "父意图")
+	middle := h.createIntent(t, "中间意图")
+	grandchild := h.createIntent(t, "孙意图")
+	if _, err := h.store.UpdateIntent(parent.ID, func(i *model.Intent) { i.Status = model.StatusFailed }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.store.UpdateIntent(middle.ID, func(i *model.Intent) {
+		i.ParentID = parent.ID
+		i.Status = model.StatusDone
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.store.UpdateIntent(grandchild.ID, func(i *model.Intent) {
+		i.ParentID = middle.ID
+		i.Status = model.StatusRunning
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.svc.Start(parent.ID, "", "", false, false, ""); err == nil || !strings.Contains(err.Error(), "子意图") {
+		t.Fatalf("Start(parent with running grandchild) = %v, want refusal naming the descendants", err)
+	}
+}
+// Alternatives from one decision run one at a time: two concurrent dispatches of
+// the same candidate group leave exactly one running, and the loser keeps a
+// pending row with the reason naming the winner.
+func TestStartRunsOneCandidateOfAGroup(t *testing.T) {
+	h := newHarness(t)
+	first, err := h.store.CreateIntent(model.Intent{Title: "候选 A", CandidateGroup: "g_alt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := h.store.CreateIntent(model.Intent{Title: "候选 B", CandidateGroup: "g_alt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var group sync.WaitGroup
+	errs := make([]error, 2)
+	group.Add(2)
+	for i, in := range []model.Intent{first, second} {
+		go func(i int, id string) {
+			defer group.Done()
+			_, errs[i] = h.svc.Start(id, "", "", false, false, "")
+		}(i, in.ID)
+	}
+	group.Wait()
+	started := 0
+	for _, err := range errs {
+		if err == nil {
+			started++
+			continue
+		}
+		if !strings.Contains(err.Error(), "候选组") {
+			t.Fatalf("loser error = %v, want the candidate-group reason", err)
+		}
+	}
+	if started != 1 {
+		t.Fatalf("started = %d of a two-candidate group, want exactly 1", started)
+	}
+	// A direction outside the group is not an alternative: it still starts.
+	plain := h.createIntent(t, "无关意图")
+	if _, err := h.svc.Start(plain.ID, "", "", false, false, ""); err != nil {
+		t.Fatalf("ungrouped direction refused: %v", err)
+	}
+}

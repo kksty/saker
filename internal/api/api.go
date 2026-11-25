@@ -799,6 +799,9 @@ type createIntentReq struct {
 	MaxTurns           int      `json:"max_turns"`
 	FromFactIDs        []string `json:"from_fact_ids"`
 	Skills             []string `json:"skills"`
+	// CandidateGroup names alternatives from one decision; at most one of the
+	// group runs at a time. Empty means the direction stands on its own.
+	CandidateGroup string `json:"candidate_group"`
 	// Node is the execution location; empty means the default node.
 	Node string `json:"node"`
 	// Profile is retired (the external gateway owns model routing). It is still
@@ -868,6 +871,7 @@ func (s *Server) createIntent(w http.ResponseWriter, r *http.Request) {
 		InterestEntityRefs: req.InterestEntityRefs,
 		Skills:             req.Skills,
 		Node:               req.Node,
+		CandidateGroup:     strings.TrimSpace(req.CandidateGroup),
 		// Who created this direction is recorded, not enforced: the operator
 		// and the commander share the console credential (D86), and ownership
 		// checks use DelegatedByRun/participant identity, never this field.
@@ -1663,6 +1667,9 @@ func (s *Server) ReopenIntent(id string) (model.Intent, error) {
 	if in.Status != model.StatusParked {
 		return model.Intent{}, fmt.Errorf("意图 %s 不是停放状态（%s）", id, in.Status)
 	}
+	if err := s.activeDescendantRefusal(id); err != nil {
+		return model.Intent{}, err
+	}
 	if in.RunID != "" {
 		if r, ok := s.Store.GetRun(in.RunID); ok && r.Status == model.RunRunning {
 			return model.Intent{}, errors.New("上一轮还在运行：先 cancel，再 reopen")
@@ -1887,6 +1894,25 @@ func (s *Server) RetryIntent(id, note string, resume bool) (string, error) {
 	return runID, err
 }
 
+// activeDescendantRefusal refuses a start-like write on a direction whose live
+// subtree still has work. A failed run drops the direction's wait, so the
+// descendants' results have nowhere to land; restarting the top would put it on
+// the same ground as its own chain. The dispatch gate enforces the same rule for
+// every path (pump, redispatch, auto-resume); this early copy exists so the
+// operator and the API get the reason before the row is CASed to pending.
+func (s *Server) activeDescendantRefusal(id string) error {
+	live := s.Store.ActiveDescendants(id)
+	if len(live) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(live))
+	for _, in := range live {
+		ids = append(ids, in.ID)
+	}
+	return fmt.Errorf("意图 %s 还有 %d 条子意图在下游运行（%s）：先等它们收口或取消，再启动这个意图",
+		id, len(live), strings.Join(ids, "、"))
+}
+
 func (s *Server) retryIntentRun(id, note string, resume bool) (string, int, error) {
 
 	in, ok := s.Store.GetIntent(id)
@@ -1896,6 +1922,9 @@ func (s *Server) retryIntentRun(id, note string, resume bool) (string, int, erro
 	if in.Status != model.StatusFailed && in.Status != model.StatusPending && in.Status != model.StatusReviewFailed {
 		return "", 0, &retryError{"retry_conflict",
 			fmt.Sprintf("意图 %s 是 %s，只有 failed / review_failed / pending 的意图可以 retry", id, in.Status)}
+	}
+	if err := s.activeDescendantRefusal(id); err != nil {
+		return "", 0, &retryError{"retry_children_running", err.Error()}
 	}
 	// The note is the decider's commentary for the operator and the next
 	// decision, not an executor constraint. It goes into Intent.Notes, which
@@ -2041,7 +2070,7 @@ func (s *Server) retryResumePrompt(in model.Intent, prev model.Run, note string)
 		fmt.Fprintf(&b, "- 当前有效指令与账本版本（以操作员最新一条消息/下发为准）：%s\n", scope)
 	}
 	if note != "" {
-		fmt.Fprintf(&b, "- 操作员备注：%s\n", note)
+		fmt.Fprintf(&b, "- 备注：%s\n", note)
 	}
 	return b.String()
 }
@@ -2671,6 +2700,14 @@ func (s *Server) finish(runID, intentID, status, reason string, res executor.Res
 	// An interrupted direction is restarted here, bounded, instead of waiting for
 	// the commander to notice the same work is missing (P1, 2026-11-23 review).
 	s.redispatchAfterCancel(runID, intentID)
+	// A run that died on the link (not on a judgement) continues on its own:
+	// same direction, same case, new run, spaced and bounded.
+	s.autoResumeAfterFailure(runID, intentID, status, res)
+	if status == model.RunDone {
+		// The direction produced a result: a later transport failure is a new
+		// episode and starts with a fresh budget.
+		resetAutoResumeBudget(intentID)
+	}
 }
 
 // holdExplicitlyCanceledIntent and the canceled-run semantics it protects live

@@ -294,7 +294,10 @@ func (e *Executor) Run(ctx context.Context, req executor.Request, emit func(exec
 				res.Output = droppedNote(conn, res.Output)
 				// The turn ended without turn_ended, so it stays a failure — but
 				// say which side ended the stream and whether the link or the
-				// host ended it: those are different findings.
+				// host ended it: those are different findings. The class is
+				// recorded on the result so the control plane reads the death,
+				// not the prose.
+				res.FailureClass = aop.DisconnectClass(conn.ReadError())
 				return res, errors.New(aop.DisconnectReason(conn.ReadError()))
 			}
 			if !ours(ev) {

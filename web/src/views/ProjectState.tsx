@@ -30,6 +30,7 @@ import {
   fmtInt,
   fmtTime,
   hasBrokenPremise,
+  intentWaitText,
   kindVariant,
   oneLine,
   runCancelDetail,
@@ -276,6 +277,7 @@ export function ProjectState({
                 <UnitDetail
                   unit={selected}
                   run={attempt}
+                  siblings={unitList}
                   onPickRun={pickRun}
                   onOpenIntent={onOpenIntent}
                   onOpenRun={onOpenRun}
@@ -729,6 +731,7 @@ function SteerCallout({ intent, onChanged }: { intent: Intent; onChanged?: () =>
 function UnitDetail({
   unit,
   run,
+  siblings,
   onPickRun,
   onOpenIntent,
   onOpenRun,
@@ -741,6 +744,8 @@ function UnitDetail({
 }: {
   unit?: Unit
   run?: Run
+  /** Every direction in the list: a wait names child ids, their state lives here. */
+  siblings?: Unit[]
   onPickRun: (id: string) => void
   onOpenIntent?: (id: string) => void
   onOpenRun?: (id: string) => void
@@ -766,6 +771,9 @@ function UnitDetail({
   }
 
   const { intent, attempts, pulse, frontier } = unit
+  // A wait names child ids only; the sentence reads better with the child's own
+  // state, so look it up in the same roster the page already has.
+  const childOf = (id: string) => siblings?.find((row) => row.intent.id === id)?.intent
   const reviewFailure = useReviewFailure(
     intent.status === 'review_failed' ? intent.review_failed_facts : undefined,
   )
@@ -868,18 +876,8 @@ function UnitDetail({
           {intent.wait && (
             <Callout tone="info" icon={<CircleDashed className="h-4 w-4" />}>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
-                <span>
-                  {intent.wait.actions?.length
-                    ? `等待 ${intent.wait.actions.length} 个外部动作（${intent.wait.mode === 'any' ? '任一结果' : '全部结果'}）`
-                    : intent.wait.operator
-                      ? `人工操作${intent.wait.operator.resolution === 'unavailable' ? '无法完成' : ''}：${intent.wait.operator.request}`
-                      : `等待 ${intent.wait.children?.length ?? 0} 个子意图（${intent.wait.mode === 'any' ? '任一即可' : '全部完成'}）`}
-                </span>
-                {(intent.wait.children ?? []).map((c) => (
-                  <Badge key={c} size="sm" variant="muted" className="font-mono">
-                    {shortID(c)}
-                  </Badge>
-                ))}
+                {/* 等待条件与子意图当前状态同一句：不必逐条点开才知道等的是谁、还差谁。 */}
+                <span data-testid="intent-wait">{intentWaitText(intent.wait, childOf)}</span>
                 {intent.wait.deadline && (
                   <span className="ml-auto font-mono text-[11px] tw-nums">截止 {fmtTime(intent.wait.deadline)}</span>
                 )}

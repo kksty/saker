@@ -78,6 +78,7 @@ func ApplyDeclaration(st *store.Store, intentID, runID string, df DeclaredFact, 
 			SourceRef:           df.SourceRef,
 			Origin:              model.OriginDeclared,
 			EvidenceIDs:         cloneList(evidenceIDs),
+			PendingEvidence:     pendingEvidence(evidenceIDs, df.Evidence, nil),
 			Refs:                cloneList(df.Refs),
 		})
 		if err != nil {
@@ -109,6 +110,7 @@ func ApplyDeclaration(st *store.Store, intentID, runID string, df DeclaredFact, 
 		if evidenceIDs != nil {
 			f.EvidenceIDs = next.EvidenceIDs
 		}
+		f.PendingEvidence = next.PendingEvidence
 		f.Refs = next.Refs
 	}); err != nil {
 		return ApplyResult{}, err
@@ -153,8 +155,31 @@ func declarationUpdate(existing model.Fact, df DeclaredFact, declaredBy, summary
 	if evidenceIDs != nil {
 		next.EvidenceIDs = cloneList(evidenceIDs)
 	}
+	next.PendingEvidence = pendingEvidence(evidenceIDs, df.Evidence, existing.PendingEvidence)
 	next.Refs = cloneList(df.Refs)
 	return next
+}
+
+// pendingEvidence is the declared-but-not-preserved list shown until the
+// settlement attaches the authoritative set. A non-nil settlement list is not
+// proof that everything resolved: ingest builds it from the entries it could
+// preserve, so a shorter list means declared paths were dropped (missing file,
+// out of bounds). Clearing the slot there would turn "declared 3, none kept"
+// into "无证据", which reads as if the writer never provided any.
+func pendingEvidence(evidenceIDs, declared, existing []string) []string {
+	if evidenceIDs == nil {
+		// A live re-declaration that only corrects the summary carries no
+		// evidence list. Erasing what an earlier line declared would turn the
+		// row back into "无证据" while the files are still on disk.
+		if len(declared) > 0 {
+			return cloneList(declared)
+		}
+		return cloneList(existing)
+	}
+	if len(evidenceIDs) < len(declared) {
+		return cloneList(declared)
+	}
+	return nil
 }
 
 // sameDeclarationFields compares exactly the fields declarationUpdate writes.
@@ -176,7 +201,8 @@ func sameDeclarationFields(a, b model.Fact) bool {
 	if a.ObservedAt != nil && !a.ObservedAt.Equal(*b.ObservedAt) {
 		return false
 	}
-	return slices.Equal(a.Tags, b.Tags) && slices.Equal(a.EvidenceIDs, b.EvidenceIDs) && slices.Equal(a.Refs, b.Refs)
+	return slices.Equal(a.Tags, b.Tags) && slices.Equal(a.EvidenceIDs, b.EvidenceIDs) &&
+		slices.Equal(a.PendingEvidence, b.PendingEvidence) && slices.Equal(a.Refs, b.Refs)
 }
 
 func cloneList[T any](in []T) []T {

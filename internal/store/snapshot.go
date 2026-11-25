@@ -82,6 +82,7 @@ func detachFact(f model.Fact) model.Fact {
 		f.RetractedAt = &at
 	}
 	f.EvidenceIDs = append([]string(nil), f.EvidenceIDs...)
+	f.PendingEvidence = append([]string(nil), f.PendingEvidence...)
 	f.Tags = append([]string(nil), f.Tags...)
 	f.Refs = append([]model.Ref(nil), f.Refs...)
 	return f

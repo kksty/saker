@@ -16,6 +16,12 @@ import (
 // or premise later).
 var ErrIntentGraphCycle = errors.New("图谱会出现环：事实—意图边只能沿已记录意图前进")
 
+// ErrIntentParentFrozen means a running direction cannot be moved to another
+// parent. The delegation is part of the graph shape the run was admitted under;
+// re-parenting mid-flight would let one direction sit under two parents over its
+// lifetime and makes "who is waiting for whom" unanswerable after the fact.
+var ErrIntentParentFrozen = errors.New("意图已在运行：不能再改父意图")
+
 // snapshotPremiseClaimsLocked records the claim version of every premise that
 // exists now. The board compares it later and reports "premise_changed" without
 // blocking the direction: a changed assertion is a judgement input, not an
@@ -137,7 +143,24 @@ func (s *Store) intentGraphCycleLocked() (string, bool) {
 // edit and refuses it if the resulting graph has a cycle, restoring the row it
 // replaced. Caller holds the write lock. It returns the (possibly updated) row
 // to persist.
+// hasRunHistory reports whether the direction already started a run. Reparenting
+// is frozen from the first attempt on, not only while running: after a failure
+// or a park the direction is expected to resume, and moving its child away
+// silently changes what that resume is waiting for. Attempts alone cannot be
+// the test (uncountAttempt can take it back to zero), and RunID survives cancel.
+func hasRunHistory(in model.Intent) bool {
+	switch in.Status {
+	case model.StatusClaimed, model.StatusRunning:
+		return true
+	}
+	return in.RunID != "" || in.Attempts > 0
+}
+
 func (s *Store) validateIntentStructureLocked(row *model.Intent, previous model.Intent) error {
+	if row.ParentID != previous.ParentID && hasRunHistory(previous) {
+		*row = previous
+		return ErrIntentParentFrozen
+	}
 	structural := !slices.Equal(row.FromFactIDs, previous.FromFactIDs) || row.ParentID != previous.ParentID
 	if !structural {
 		return nil
