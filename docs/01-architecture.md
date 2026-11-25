@@ -45,6 +45,53 @@ flowchart TD
     Review --> API
 ```
 
+### 1.1 事实与意图的运行模型
+
+这张图是调度的判据：意图只等前提，不等命令。
+
+```mermaid
+flowchart TD
+    Docs["项目文档：起点 / 终点 / 内置约束"] --> Create
+    Cmd["指挥官：读全局 board，定取舍"] --> Create
+    Exec["执行者：本轮判断出的下一步"] --> Create
+    Create["新建意图：只经账本"] --> Gate{"from 全部存在，且来源意图已收口？"}
+    Gate -- "否：来源在跑或等别人" --> Hold["保持未派发：原因写回"]
+    Hold --> Gate
+    Gate -- "是" --> Group{"同批候选组已有未收口的？"}
+    Group -- "是" --> Hold
+    Group -- "否" --> Ready["ready：调度器挑一条"]
+    Ready --> Run["一次 run = 一个会话"]
+    Run --> Out["产出写回：事实 + 证据"]
+    Out --> Fact["事实：不可删，可撤回，带断言版本"]
+    Fact --> Review{"复核开关"}
+    Review -- "开启" --> Verified["已核验：可作必要前提"]
+    Review -- "关闭" --> Unverified["未核验：可用，如实标注"]
+    Verified --> Gate
+    Unverified --> Gate
+    Run --> Msg["消息：只交换信息"]
+    Msg -.-> Cmd
+```
+
+**事实不可变。** 事实只能新增、更正、撤回，不能删除；撤回绑定当前断言版本并保留全部历史（`internal/store/store.go:571`、`internal/api/fact_withdraw.go:62`）。断言版本与指纹由 `claimHash` 计算（`internal/store/claim.go:31`），只有断言内容变化才递增（`internal/store/store.go:504-505`）；复核绑定断言版本，不随簿记字段漂移。
+
+**意图等前提。** 意图的 `from` 是必要前提（`internal/model/model.go:219`），`to` 是这一轮要产出的未来，完成时以 `done_fact_ids` 写回（`internal/model/model.go:334`），本轮产出仍以事实与证据入账。派发时冻结 from 的版本快照（`internal/store/input.go:85-158`）；from 必须存在，且**来源意图已收口**才算成立（`internal/store/input.go:102-104`、`PremiseOwnerStillLive` `:182`）。来源在跑或等别人时不算；两条例外分开算：其一是来源正在等我（`internal/store/input.go:208-215`），其二是本意图引用自己更早 run 产出的事实（`:183-187`）。复核开启时另加当前断言的独立核验要求；关闭时只放过「未核验且可复核」这一类，withdrawn、rejected 与不能作为必要前提的类别（如 note）仍然挡，且只记一条 gap、不当作已核验（`internal/store/input.go:105-137`、`internal/model/premise.go:33-55`）。
+
+**ready 调度。** 实际语义是「被派发且 ready 才跑」，不是「待办就自己跑」：顶层 pending 意图不会自动启动，要由指挥官显式发起（`internal/api/collab.go:398-401`）；子意图与唤醒由 `pump` 统一接管（`internal/api/collab.go:379-490`）。两条路进同一个准入（`internal/lifecycle/lifecycle.go:509-587`：暂停、容量、前提、候选组、父子同跑与状态，最后一次性认领）。
+
+**一个 run 一个会话。** 同一意图同一时刻只有一个 run 持有会话：认领意图与写 run 行在同一事务里完成（`internal/store/admission.go:12-52`），认领本身是唯一并发闸（`internal/store/store.go:250-275`）。会话 marker 记在意图自己的 case 下（`internal/aopexec/executor.go:231`）；`continue` 与 retry 的 resume 是显式复用同一会话（`internal/api/continue.go:119`、`internal/api/api.go:1952`），会话丢失才按账本重建。
+
+**产出以事实加证据写回。** 运行中的声明经 `ApplyDeclaration` 入账（`internal/ledger/apply.go:47`），收口时原件保全为证据行（`internal/ledger/ingest.go:353`）；只有账本里带摘要的原件才算可复核。
+
+**消息只交换信息。** 协作消息是账本对象（`internal/store/message.go:156`），用于通知、追问与请求人工访问；它不创建意图、不改变授权。
+
+**创建只走账本。** 顶层意图经 `POST /api/intents`（`internal/api/api.go:809`）落账，执行者的子意图与平级意图经 spawn（`internal/api/workers.go:130`、`internal/store/spawn.go:46`）落账；账本外没有第二条创建路径，调度只认账本行。
+
+**递归与平级。** 子意图运行中可再派，没有层级语义限制；平级发布不挂 `ParentID`，创建出来就是独立并行意图（`internal/store/spawn.go:46-110`）。扩张受谱系预算约束（每 run 上限、单谱系上限、执行者发起的深度上限；常量在 `internal/store/lineage.go:41-52`），超限是拒绝并说明，不排队、不吞掉。
+
+**候选组。** 同一决策的备选带 `candidate_group`（`internal/model/model.go:260`）；派发闸同组一次只放一条，占用判据是「已开始且未收口」：claimed、running、waiting、复核未收口的 reviewing 都算（waiting 的 run 虽结束，子树还在跑、它还会被唤醒；放另一条出去就是同批两条在飞），还没开跑的 pending 不算——否则同组两条 pending 会互相挡住（`internal/lifecycle/lifecycle.go:556-560`、`internal/store/collab.go:122-141`）。其余保持未派发并给出原因；选哪条、弃哪条由指挥官判断，平台不自动弃。
+
+**指挥官。** 读全局 board 定优先级、停止与裁决重复，但不垄断创建（执行者也能写下一步）；子意图失败与成功一样唤醒父意图，平台不替父意图重试（`internal/api/collab.go:674-699`）。
+
 ## 2. 角色与执行契约
 
 操作员定义项目文档的三份内容——起点（资产与背景）、终点、内置约束——以及测试时段和禁止动作，决定启动、暂停及人工授权。指挥官可以请求停止整个项目（持久暂停，只由操作员恢复），但不能启动或恢复项目；终点定义的默认写者是操作员，唯一的例外是活着的指挥官轮次引用操作员发给指挥官的明确消息（`operator_message_id`）代改，拒绝逻辑在 `internal/api/goal_edit.go:17`（要求指挥官身份、在跑 run、消息由操作员发给指挥官且非空），引用冻结在目标上；执行者不能停整个项目，只能把判断交回指挥官。可编辑的内置约束文档只表达这些边界，例如禁止删改目标业务数据；它不承担通用角色提示词的职责。新建项目顶部有「红队」与「日常渗透」两个场景按钮（`web/src/lib/project-scenarios.ts`）：点一下只把对应预设的**起点与终点**填进表单，不写内置约束、不改授权范围、不改暂停语义；代码里没有「场景」这个概念，某个场景不再需要就是删掉那条记录。

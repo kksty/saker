@@ -207,7 +207,8 @@ func (s *Server) autoResumeFire(runID, intentID string) {
 	}
 	resume := aopexec.CanResume(filepath.Join(s.CaseRoot, intentID))
 	note := "自动续跑（第 " + strconv.Itoa(attempt) + " 次）：上一轮是传输失败（连接中断/宿主关闭），不是判断结论"
-	if _, _, err := s.retryIntentRun(intentID, note, resume); err != nil {
+	_, _, err := s.retryIntentRun(intentID, note, resume)
+	if err != nil {
 		var re *retryError
 		if errors.As(err, &re) {
 			switch re.code {
@@ -222,13 +223,22 @@ func (s *Server) autoResumeFire(runID, intentID string) {
 				// A session that cannot be resumed is not a reason to leave the
 				// work dead: fall back to a fresh session with the handoff note,
 				// once.
-				if _, _, ferr := s.retryIntentRun(intentID, note+"；原会话不可续，改新会话继续", false); ferr != nil {
+				_, _, ferr := s.retryIntentRun(intentID, note+"；原会话不可续，改新会话继续", false)
+				if ferr != nil {
+					// The fallback never started a run either, so it does not
+					// spend one of three chances.
+					autoResumeRefund(intentID)
 					log.Printf("自动续跑 %s 失败：%v / 新会话：%v", intentID, err, ferr)
 					s.noteAutoResume(runID, intentID, attempt, "启动失败："+ferr.Error())
 				}
 				return
 			}
 		}
+		// Capacity, an unusable premise or a lost claim: the run never started, so
+		// this was not an attempt. Charging it here is what let a full instance
+		// burn all three chances in a few minutes and leave the direction with no
+		// way to heal itself.
+		autoResumeRefund(intentID)
 		log.Printf("自动续跑 %s 失败：%v", intentID, err)
 		s.noteAutoResume(runID, intentID, attempt, "启动失败："+err.Error())
 	}

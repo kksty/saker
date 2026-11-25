@@ -719,7 +719,7 @@ export const api = {
     return get<{ facts: Fact[] }>(`${pbase()}/api/facts${suffix}`).then((r) => r.facts ?? [])
   },
   fact: (id: string) =>
-    get<{ fact: Fact; evidence: Evidence[]; reviews: Review[] }>(
+    get<{ fact: Fact; version?: number; evidence: Evidence[]; reviews: Review[] }>(
       `${pbase()}/api/facts/${encodeURIComponent(id)}`,
     ),
   verifyFact: (id: string) =>
@@ -754,8 +754,15 @@ export const api = {
   enableReviews: () => post<{ disabled: boolean }>(`${pbase()}/api/verifier/enable`),
   // A human verdict: reject the conclusion, or put it back to unverified. There
   // is deliberately no "confirm" — that is what a verifier rerun is for.
-  reviewFact: (id: string, verdict: 'reject' | 'needs_evidence', notes: string) =>
-    post<{ review: Review }>(`${pbase()}/api/facts/${encodeURIComponent(id)}/review`, { verdict, notes }),
+  // A human verdict binds to the assertion version the operator actually read:
+  // the server refuses (409) when the claim changed meanwhile, so a stale page
+  // cannot silently reject a conclusion nobody saw.
+  reviewFact: (id: string, verdict: 'reject' | 'needs_evidence', notes: string, claimVersion?: number) =>
+    post<{ review: Review }>(`${pbase()}/api/facts/${encodeURIComponent(id)}/review`, {
+      verdict,
+      notes,
+      ...(claimVersion ? { claim_version: claimVersion } : {}),
+    }),
   // Withdrawal is neither a delete nor a verdict: the row stays in the ledger,
   // and a reason is mandatory. The server decides who may call it (operator, or
   // the authoring direction for its own still-unverified fact).

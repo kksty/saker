@@ -35,7 +35,7 @@ import { RetryIntentDialog } from '@/components/RetryIntentDialog'
 import { RunEvidenceView } from '@/components/RunEvidenceView'
 import { CancelReasonCallout } from './CancelReasonCallout'
 import { RunSummaryLine } from './RunSummaryLine'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { evidencePreviewFile, type PreviewFile } from '@/lib/evidence-preview'
 import { factDocLong, factDocText } from '@/lib/fact-doc'
 import { fmtBytes, fmtInt, fmtTime, kindVariant, runStatusLabel, severityLabel, severityVariant, shortID, statusKind, statusLabel } from '@/lib/format'
@@ -312,6 +312,38 @@ function NodeWorkspace({
       onChanged()
     } catch (e) {
       setNote(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * A human verdict is bound to the assertion the operator read. The version
+   * travels with the request; a 409 means the claim changed after the panel
+   * loaded, so the answer is "refresh and re-judge", never an automatic resend.
+   */
+  async function submitReview(
+    verdict: 'reject' | 'needs_evidence',
+    notes: string,
+    done: string,
+  ): Promise<boolean> {
+    if (!fact) return false
+    const seen = detail.data?.version ?? fact.claim_version
+    setBusy(true)
+    setNote('')
+    try {
+      await api.reviewFact(fact.id, verdict, notes, seen)
+      setNote(done)
+      onChanged()
+      return true
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        detail.reload()
+        setNote('这条事实的断言在你判定期间改过，已刷新到最新版本；请核对后重新判定。')
+      } else {
+        setNote(e instanceof Error ? e.message : String(e))
+      }
+      return false
     } finally {
       setBusy(false)
     }
@@ -1090,7 +1122,7 @@ function NodeWorkspace({
                 variant="ghost"
                 disabled={busy}
                 onClick={() =>
-                  run(() => api.reviewFact(fact.id, 'needs_evidence', '人工撤销驳回：回到未验证'), '已撤销驳回')
+                  void submitReview('needs_evidence', '人工撤销驳回：回到未验证', '已撤销驳回')
                 }
               >
                 <RotateCcw className="h-3.5 w-3.5" /> 撤销驳回
@@ -1182,13 +1214,12 @@ function NodeWorkspace({
               <Button
                 size="xs"
                 disabled={busy || !reason.trim()}
-                onClick={() =>
-                  run(async () => {
-                    await api.reviewFact(fact.id, 'reject', reason.trim())
+                onClick={async () => {
+                  if (await submitReview('reject', reason.trim(), '已判定不成立')) {
                     setRejecting(false)
                     setReason('')
-                  }, '已判定不成立')
-                }
+                  }
+                }}
               >
                 确认判定
               </Button>

@@ -1196,21 +1196,28 @@ func (s *Server) startRunOwned(id, prompt, continuedFrom string, resume, keepPro
 	return s.Lifecycle.Start(id, prompt, continuedFrom, resume, keepPrompt, owner)
 }
 
-// blockedPremises lists from_facts that no longer stand: gone, or rejected by a
-// review. They are why a queued direction cannot run.
+// blockedPremises lists from_facts that cannot be a necessary premise right now:
+// gone, withdrawn/rejected, a kind no review can establish, an assertion without
+// a current verdict, or a producer that has not settled. They are why a queued
+// direction cannot run.
+//
+// It reads the readiness rule instead of a shorter copy of it, because readiness
+// is the same judgement the input freeze applies (store.PrepareRunInput). The
+// earlier version read only the verdict half: a direction citing a producer that
+// was still running passed this gate, the run row was built, and the refusal
+// arrived later inside the run at the freeze — a 409 turned into a 202 plus a
+// failed run.
 func (s *Server) blockedPremises(in model.Intent) []string {
-	policy := s.premisePolicy()
+	if s.Store == nil || len(in.FromFactIDs) == 0 {
+		return nil
+	}
+	ready := s.readiness(s.Store.Snapshot(), in, s.premisePolicy(), false)
 	var out []string
-	for _, id := range in.FromFactIDs {
-		f, ok := s.Store.FactByID(id)
-		switch {
-		case !ok:
-			out = append(out, id+"（不存在）")
-		case model.PremiseIssue(f, policy) != "":
-			if issue := s.premiseIssue(f, s.ReviewsDisabled()); issue != "" {
-				out = append(out, id+"（"+issue+"）")
-			}
+	for _, p := range ready.Premises {
+		if p.Usable {
+			continue
 		}
+		out = append(out, p.ID+"（"+p.Reason+"）")
 	}
 	return out
 }
@@ -3386,6 +3393,11 @@ func (s *Server) reviewFact(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Verdict string `json:"verdict"`
 		Notes   string `json:"notes"`
+		// ClaimVersion is the assertion version the operator's page showed. It is
+		// optional so an older console keeps working; when it is absent the
+		// handler falls back to the version this request just read.
+		ClaimVersion uint64 `json:"claim_version"`
+		ClaimHash    string `json:"claim_hash"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, 400, "请求体不是合法 JSON")
@@ -3402,8 +3414,33 @@ func (s *Server) reviewFact(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "人工判定必须写理由")
 		return
 	}
-	rev, err := s.Store.ReviewFact(model.Review{FactID: id, Verdict: body.Verdict, Notes: notes})
+	// The verdict is a judgement about the text the operator read, so it names the
+	// version that page showed. Without it the store binds the verdict to whatever
+	// version is current at write time (store.go:1145): a page left open while the
+	// executor re-states the claim would then reject an assertion nobody read.
+	claimVersion, claimHash := f.ClaimVersion, f.ClaimHash
+	if body.ClaimVersion != 0 && body.ClaimVersion != f.ClaimVersion {
+		writeJSON(w, http.StatusConflict, map[string]any{
+			"error": fmt.Sprintf("断言已改为 v%d：这一条是看到 v%d 时的判断，刷新后再判",
+				f.ClaimVersion, body.ClaimVersion),
+			"code": "claim_changed", "claim_version": f.ClaimVersion,
+		})
+		return
+	}
+	if body.ClaimHash != "" {
+		claimHash = body.ClaimHash
+	}
+	rev, err := s.Store.ReviewFact(model.Review{
+		FactID: id, Verdict: body.Verdict, Notes: notes,
+		ClaimVersion: claimVersion, ClaimHash: claimHash,
+	})
 	if err != nil {
+		// The claim changed between the read above and the write: same answer as
+		// the early branch, so the console switches on one code.
+		if errors.Is(err, store.ErrReviewConflict) {
+			writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "claim_changed"})
+			return
+		}
 		writeErr(w, 500, err.Error())
 		return
 	}

@@ -115,24 +115,31 @@ func (s *Server) readinessFromInputs(inputs readinessInputs, in model.Intent, po
 		f, ok := inputs.facts[id]
 		if ok {
 			row.Title, row.Status, row.ClaimVersion = f.Title, f.Status, f.ClaimVersion
-			row.Reason = s.premiseIssue(f, reviewsOff)
-			// Only the verdict gate is dropped: a note or a withdrawn row is not
-			// waiting for a review.
-			if reviewsOff && model.PremiseIssueReviewOnly(f) {
-				row.Reason = ""
+			// The row exists: the "not recorded" reason above no longer applies.
+			// Every branch below fills in why (or leaves it empty for usable).
+			row.Reason = ""
+			// The freeze refuses an unsettled producer before it looks at any
+			// verdict (store/input.go:102), and no review can make that premise
+			// usable: the row can still be corrected under the direction that
+			// cites it. Report the reason the gate would report first, or the page
+			// tells the operator to wait for a review that cannot unblock it.
+			if s.Store != nil {
+				if owner := s.Store.PremiseOwnerStillLive(f, in.ID); owner != "" {
+					row.Reason = fmt.Sprintf("来源 %s 还没收口：现在不能当必要前提；等它收口，或改用 context_fact_ids 只读参考", owner)
+				}
+			}
+			if row.Reason == "" {
+				row.Reason = s.premiseIssue(f, reviewsOff)
+				// Only the verdict gate is dropped: a note or a withdrawn row is
+				// not waiting for a review.
+				if reviewsOff && model.PremiseIssueReviewOnly(f) {
+					row.Reason = ""
+				}
 			}
 			if proof, proven := model.CurrentProof(f, inputs.reviews); proven {
 				row.ReviewID, row.VerifierRun = proof.ID, proof.VerifierRun
 			} else if !reviewsOff && policy == model.PremiseVerifiedOnly && row.Reason == "" {
 				row.Reason = "缺少绑定当前断言的独立核验收据"
-			}
-			// The dispatch gate refuses a premise whose producer has not settled;
-			// readiness must say the same thing or the page shows "usable" for a
-			// direction that cannot start. One rule, two readers.
-			if row.Reason == "" && s.Store != nil {
-				if owner := s.Store.PremiseOwnerStillLive(f, in.ID); owner != "" {
-					row.Reason = fmt.Sprintf("来源 %s 还没收口：现在不能当必要前提；等它收口，或改用 context_fact_ids 只读参考", owner)
-				}
 			}
 			// Two different things wear the word "missing evidence": nothing was
 			// ever registered (a candidate relation the model built on its own —

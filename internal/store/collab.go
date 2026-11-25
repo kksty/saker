@@ -120,10 +120,18 @@ func (s *Store) ActiveChildren(parentID string) []model.Intent {
 }
 
 // RunningInCandidateGroup returns the one direction of a candidate group that
-// is already running (or claimed), excluding the one asking. A group is an
-// explicit statement of "these are alternatives": at most one runs, and the
+// is already in flight, excluding the one asking. A group is an explicit
+// statement of "these are alternatives": at most one runs at a time, and the
 // dispatch gate is what enforces it. No premise-set heuristic: two directions
 // derived from the same facts are not alternatives unless someone said so.
+//
+// "In flight" is "started and not settled", not a list of statuses:
+//   - waiting counts: its run ended, but its subtree still runs and it will be
+//     woken; letting a sibling out then puts two alternatives in flight, and
+//     the woken one re-runs work it already did.
+//   - Attempts > 0 excludes a direction that was never dispatched. A fresh
+//     group starts with every candidate pending; counting those as occupied
+//     would make each candidate block the others, so none could ever start.
 func (s *Store) RunningInCandidateGroup(group, excludeID string) (model.Intent, bool) {
 	if group == "" {
 		return model.Intent{}, false
@@ -134,7 +142,7 @@ func (s *Store) RunningInCandidateGroup(group, excludeID string) (model.Intent, 
 		if in.ID == excludeID || in.CandidateGroup != group {
 			continue
 		}
-		if in.Status == model.StatusRunning || in.Status == model.StatusClaimed {
+		if !model.Settled(in.Status) && in.Attempts > 0 {
 			return detachIntent(in), true
 		}
 	}

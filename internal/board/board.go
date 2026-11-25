@@ -115,9 +115,14 @@ type FrontierItem struct {
 	// (its last stop is why it died) but Ready is false: it needs an explicit
 	// retry, not the auto-dispatcher.
 	Status string `json:"status,omitempty"`
-	// Ready is false when a from_fact is missing or rejected, or when the
-	// direction has failed. Dispatch refuses those intents, so this is the
-	// reason a queued direction is not moving.
+	// Ready is the board's glance, not the dispatch gate: it covers what this
+	// snapshot can answer without the project's review mode or a byte check — the
+	// direction is pending/claimed and not held, and no from_fact is missing,
+	// withdrawn or rejected. The authoritative gate is the premise check in
+	// Lifecycle.Start (api.blockedPremises, one rule with api.readiness): it also
+	// refuses an unsettled producer, an assertion without a current verdict, a
+	// candidate group whose sibling already occupies it, and live descendants. A
+	// Ready=true row can still be refused there; never infer a dispatch from it.
 	Ready   bool     `json:"ready"`
 	Blocked []string `json:"blocked_on,omitempty"`
 	// Prerequisites is how many from_fact_ids the direction names. NoPremise
@@ -615,7 +620,8 @@ func BuildFromDB(db store.DB, limit int) View {
 		default:
 			continue
 		}
-		// Ready mirrors the real dispatch gate: pending/claimed and not held.
+		// Ready above: the glance, not the gate. This block adds the premise rows
+		// the snapshot can name, and Ready is cleared only for those.
 		// A canceled direction becomes pending+Hold, and claiming it would be a
 		// silent resurrection (D19), so advertising it as ready made the decider
 		// wait for work it had itself stopped.
