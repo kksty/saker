@@ -61,17 +61,45 @@ func checkUserSections(t *testing.T, got string, want userSections) {
 	if !ok {
 		t.Fatalf("没有「## 本轮指派」段：\n%s", got)
 	}
-	if want2 := want.tactic + "\n" + want.desc; body != want2 {
-		t.Fatalf("本轮指派段被追加了模板句（裁决「目标 vs 打法」就是这一类）\nwant:\n%q\ngot:\n%q", want2, body)
+	if got, want2 := fieldBody(body), want.tactic+"\n"+want.desc; got != want2 {
+		t.Fatalf("本轮指派段被追加了模板句（裁决「目标 vs 打法」就是这一类）\nwant:\n%q\ngot:\n%q", want2, got)
 	}
 
 	body, ok = sectionBody(got, "细节与约束")
 	if !ok {
 		t.Fatalf("没有「## 细节与约束」段：\n%s", got)
 	}
-	if body != want.doc {
-		t.Fatalf("细节与约束段被追加了模板句（把「只能 GET」改判成硬/软约束就是这一类）\nwant:\n%q\ngot:\n%q", want.doc, body)
+	if got := fieldBody(body); got != want.doc {
+		t.Fatalf("细节与约束段被追加了模板句（把「只能 GET」改判成硬/软约束就是这一类）\nwant:\n%q\ngot:\n%q", want.doc, got)
 	}
+}
+
+// fieldBody removes the rendering that keeps a field from becoming brief
+// structure — the labels and the fences — and leaves the words the field
+// carried. The structural rule itself is pinned in
+// prompt_field_injection_test.go; this file stays about words, and a template
+// sentence added alongside the rendering still fails the comparison.
+func fieldBody(section string) string {
+	var kept []string
+	inFence := false
+	for _, line := range strings.Split(section, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if backticksOnly(trimmed) {
+			inFence = !inFence
+			continue
+		}
+		if !inFence && trimmed == "说明：" {
+			continue
+		}
+		if !inFence {
+			if rest, ok := strings.CutPrefix(trimmed, "意图："); ok {
+				kept = append(kept, rest)
+				continue
+			}
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "\n")
 }
 
 // TestUserSectionsCarryOnlyTheUsersWords covers two of the three bad-input
@@ -90,8 +118,8 @@ func TestUserSectionsCarryOnlyTheUsersWords(t *testing.T) {
 		ID: "in_adv", Title: want.tactic, Description: want.desc, Doc: want.doc, Eval: "有可复判的证据",
 	}}, Runs: []model.Run{{ID: "r_adv", IntentID: "in_adv"}}}
 
-	regular := BuildPromptWithInstructions(db, db.Intents[0], want.constraints, "", "", 0, false, false, "", "", "")
-	reduced := buildPromptWithoutOptionalSummaries(db, db.Intents[0], want.constraints, "", "", 0, false, false, "", "", false)
+	regular := BuildPrompt(db, db.Intents[0], want.constraints, "", "", 0, false)
+	reduced := buildPromptWithoutOptionalSummaries(db, db.Intents[0], want.constraints, "", "", 0, false, false, "", false)
 
 	for name, got := range map[string]string{"常规路径": regular, "精简路径": reduced} {
 		got := got
@@ -110,8 +138,8 @@ func TestExecutorBriefCarriesNoStartOrGoal(t *testing.T) {
 	const tactic = "整理 10.0.0.0/24 的可达面"
 
 	db := store.DB{Intents: []model.Intent{{ID: "in_adv2", Title: tactic}}, Runs: []model.Run{{ID: "r_adv2", IntentID: "in_adv2"}}}
-	regular := BuildPromptWithInstructions(db, db.Intents[0], constraint, "", "", 0, false, false, "", "", "")
-	reduced := buildPromptWithoutOptionalSummaries(db, db.Intents[0], constraint, "", "", 0, false, false, "", "", false)
+	regular := BuildPrompt(db, db.Intents[0], constraint, "", "", 0, false)
+	reduced := buildPromptWithoutOptionalSummaries(db, db.Intents[0], constraint, "", "", 0, false, false, "", false)
 
 	for name, got := range map[string]string{"常规路径": regular, "精简路径": reduced} {
 		for _, bad := range []string{start, goal, "10.0.1.9"} {

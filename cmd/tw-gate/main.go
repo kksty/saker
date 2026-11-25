@@ -7,9 +7,9 @@
 //
 // The steps run serially and each one prints its elapsed time:
 //
-//  1. go build ./...
-//  2. go vet ./...
-//  3. go test ./... -count=1 (plus -test-flags, default -timeout 20m)
+//  1. go build ./cmd/... ./internal/...
+//  2. go vet ./cmd/... ./internal/...
+//  3. go test ./cmd/... ./internal/... -count=1 (plus -test-flags, default -timeout 20m)
 //  4. frontend: pnpm --dir web typecheck / test / build (unless -skip-web)
 //  5. embedded-artifact freshness: internal/web/static must not gain differences
 //     the rebuild did not have before; a pre-existing dirty tree is not a failure
@@ -51,6 +51,17 @@ import (
 // goproxyDefault mirrors scripts/build-harness.*: a fresh Linux run has no
 // module cache yet, and the project documents this mirror as its default.
 const goproxyDefault = "https://goproxy.cn,direct"
+
+// goPackages is the pattern set every Go step compiles, vets and tests.
+//
+// It is deliberately not "./...": the default data directory is ./data, inside
+// the module root, and a test engagement stores the target's own source files
+// under data/projects/<id>/cases/<case>/raw/. Go treats those as packages, so
+// "./..." fails on exactly the machines that have run a real project — the
+// gate would be red for having been used. Every package this repository owns
+// lives under cmd/ or internal/; TestGoPackagesCoverTheModule fails if one
+// appears elsewhere.
+var goPackages = []string{"./cmd/...", "./internal/..."}
 
 // config is the resolved invocation.
 type config struct {
@@ -154,16 +165,16 @@ func run(cfg config) error {
 	var aopProto *buildinfo.AOPProtoInfo
 
 	steps := []step{
-		{name: "go build ./...", run: func() error {
-			return runCommand(root, nil, "go", "build", "./...")
+		{name: "go build " + strings.Join(goPackages, " "), run: func() error {
+			return runCommand(root, nil, "go", append([]string{"build"}, goPackages...)...)
 		}},
-		{name: "go vet ./...", run: func() error {
-			return runCommand(root, nil, "go", "vet", "./...")
+		{name: "go vet " + strings.Join(goPackages, " "), run: func() error {
+			return runCommand(root, nil, "go", append([]string{"vet"}, goPackages...)...)
 		}},
-		{name: "go test ./... -count=1 " + strings.TrimSpace(cfg.testFlags), run: func() error {
+		{name: "go test " + strings.Join(goPackages, " ") + " -count=1 " + strings.TrimSpace(cfg.testFlags), run: func() error {
 			args := []string{"test", "-count=1"}
 			args = append(args, strings.Fields(cfg.testFlags)...)
-			args = append(args, "./...")
+			args = append(args, goPackages...)
 			return runCommand(root, nil, "go", args...)
 		}},
 	}

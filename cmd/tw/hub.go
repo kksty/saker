@@ -78,8 +78,8 @@ type hubConfig struct {
 	SkillsDir    string
 	ReportSkills []string
 	MaxRuns      int
-	// MaxWorkers caps live intent runs across all projects (0 = uncapped),
-	// the instance-wide counterpart of sapper's MAX_WORKERS (docs/17 §3.5).
+	// MaxWorkers caps live intent runs across all projects (0 = uncapped):
+	// the instance-wide counterpart of a per-project run cap (docs/17 §3.5).
 	MaxWorkers  int
 	IdleTimeout time.Duration
 	KB          *kb.Library
@@ -213,20 +213,21 @@ func (h *hub) clampMaxTokens(m settings.Model) settings.Model {
 
 // start builds every project that exists at boot.
 //
-// A restart is an operator action, not permission to spend: every saved
-// project comes up paused even when its manifest said running, and stays
-// paused until the operator explicitly resumes it. The pause is written to the
-// manifest so a second restart cannot silently resume an engagement either; it
-// is also applied in memory when that write fails, so a read-only disk cannot
-// turn a restart into an auto-start.
+// A project that was running when the previous process died comes up paused: the
+// crash sweep inside attachState must converge the dead runs before any work can
+// start. Once that reconciliation is done, attachBoot hands the restart-caused
+// pause to the watchdog recovery, which clears it and continues the project on its
+// own; an explicit pause (operator, commander stop, completion stand-by, or a
+// cause-less pause) is a decision and stays paused until the operator resumes it.
 func (h *hub) start() {
 	for _, p := range h.mgr.All() {
 		h.attachBoot(p)
 	}
 }
 
-// attachBoot is the boot path: it persists the default-paused state first, then
-// builds the runtime from it.
+// attachBoot is the boot path: it persists the default-paused state first, builds
+// the runtime from it, then lets the recovery clear the pauses that a crash
+// created.
 func (h *hub) attachBoot(p *project.Project) *kit {
 	// A cause persisted before the restart still owns the classification: the
 	// forced boot pause must not rewrite "commander requested stop" into the
@@ -235,9 +236,7 @@ func (h *hub) attachBoot(p *project.Project) *kit {
 	wasPaused := p.IsPaused()
 	if !wasPaused {
 		if err := p.SetPausedWithKind(true, project.PauseKindRestart); err != nil {
-			log.Printf("project %s: 无法持久化启动暂停状态：%v（本进程仍按暂停启动）", p.ID, err)
-		} else {
-			log.Printf("project %s: 重启后默认暂停，等你点「继续项目」", p.ID)
+			log.Printf("project %s: 无法持久化启动暂停状态：%v（本进程仍按暂停启动，恢复后重写）", p.ID, err)
 		}
 	}
 	// The boot reason is the persisted cause's own sentence, not a fixed one: the
@@ -251,6 +250,15 @@ func (h *hub) attachBoot(p *project.Project) *kit {
 	// badge and append-and-continue both switch on the machine code.
 	if kind != "" {
 		k.srv.RestorePauseKind(kind)
+	}
+	// Recover ran inside attachState, so the orphan rows are already converged.
+	// Only a project that was running (or carried last boot's restart marker) is
+	// recovered by the watchdog; everything else keeps its pause. A failed boot
+	// pause write leaves kind empty, but "it was running before this process
+	// started" is itself the restart evidence, so classify the runtime first.
+	if !wasPaused || kind == project.PauseKindRestart {
+		k.srv.RestorePauseKind(project.PauseKindRestart)
+		k.srv.ResumeAfterRestart()
 	}
 	return k
 }
@@ -270,7 +278,10 @@ func pauseKindReason(kind string) string {
 	case pauseKindCompletionStandby:
 		return "目标已完成，项目待命：新增目标或点「继续项目」后恢复派发"
 	case project.PauseKindRestart:
-		return "控制面重启后项目默认暂停：确认现场后点「继续项目」"
+		// The recovery normally clears this pause before the console is served;
+		// the sentence stays because a failed manifest write can leave it behind
+		// for the operator to resolve.
+		return "控制面重启：对账后自动恢复；若仍暂停，确认现场后点「继续项目」"
 	case "", "unrecorded":
 		// No stored cause: a manifest written before the codes existed. Saying
 		// "the operator paused it" would invent the one fact we do not have.

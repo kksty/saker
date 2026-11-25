@@ -75,8 +75,6 @@ function panel(element = node) {
     onSelectFact() {},
     onClose() {},
     onChanged() {},
-    childRefresh: 0,
-    onChildIntent() {},
   })
 }
 

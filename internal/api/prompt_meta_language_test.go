@@ -70,7 +70,7 @@ func TestExecutorBriefSectionOrder(t *testing.T) {
 		Runs:    []model.Run{{ID: "r_x", IntentID: "in_x"}},
 	}
 	docs := "不要删除或修改真实数据。测试产物清不掉就记录后继续。"
-	p := BuildPromptWithInstructions(db, db.Intents[0], docs, "", "", 0, false, false, "", "", "")
+	p := BuildPrompt(db, db.Intents[0], docs, "", "", 0, false)
 
 	if !strings.HasPrefix(p, contract.OperatorPriority) {
 		t.Fatalf("operator priority is not the first paragraph:\n%s", p)
@@ -104,7 +104,7 @@ func TestExecutorBriefSectionOrder(t *testing.T) {
 func TestConstraintDocumentPassesThroughVerbatim(t *testing.T) {
 	db := store.DB{Intents: []model.Intent{{ID: "in_x", Title: "t"}}}
 	docs := "授权文档：只测 A 段，不要碰 B 段。"
-	p := BuildPromptWithInstructions(db, db.Intents[0], docs, "", "", 0, false, false, "", "", "")
+	p := BuildPrompt(db, db.Intents[0], docs, "", "", 0, false)
 	if got := strings.Count(p, docs); got != 1 {
 		t.Fatalf("a document containing the word was filtered or duplicated (%d)", got)
 	}
@@ -123,8 +123,8 @@ func TestBothBriefPathsCarryNoRetiredPhrases(t *testing.T) {
 		Runs:    []model.Run{{ID: "r_x", IntentID: "in_x"}},
 	}
 	docs := "不删改真实数据。"
-	full := BuildPromptWithInstructions(db, db.Intents[0], docs, "", "", 0, false, false, "", "", "")
-	compact := buildPromptWithoutOptionalSummaries(db, db.Intents[0], docs, "", "", 0, false, false, "", "", false)
+	full := BuildPrompt(db, db.Intents[0], docs, "", "", 0, false)
+	compact := buildPromptWithoutOptionalSummaries(db, db.Intents[0], docs, "", "", 0, false, false, "", false)
 	for name, p := range map[string]string{"regular": full, "compact": compact} {
 		assertNoRetiredPhrases(t, name+" brief", p)
 		if got := strings.Count(p, docs); got != 1 {

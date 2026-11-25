@@ -115,43 +115,6 @@ func TestAutoResumeRefundReturnsAnUnusedSlot(t *testing.T) {
 // A failed parent whose children are still running is not restarted: RunFailed
 // cleared the parent's wait, so the children's results already have nowhere to
 // land, and restarting would put the parent on the same ground as its children.
-func TestAutoResumeSkipsParentWhoseChildrenStillRun(t *testing.T) {
-	st, err := store.Open(t.TempDir() + "/ledger.sqlite")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := &Server{Store: st}
-	parent, err := st.CreateIntent(model.Intent{Title: "父意图"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	child, err := st.CreateIntent(model.Intent{Title: "子意图"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := st.UpdateIntent(parent.ID, func(i *model.Intent) { i.Status = model.StatusFailed }); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := st.UpdateIntent(child.ID, func(i *model.Intent) {
-		i.ParentID = parent.ID
-		i.Status = model.StatusRunning
-	}); err != nil {
-		t.Fatal(err)
-	}
-	resetAutoResumeBudget(parent.ID)
-	t.Cleanup(func() { resetAutoResumeBudget(parent.ID) })
-
-	s.autoResumeFire("r_parent", parent.ID)
-
-	got, ok := st.GetIntent(parent.ID)
-	if !ok || got.Status != model.StatusFailed {
-		t.Fatalf("parent status = %q, want failed (no restart while children run)", got.Status)
-	}
-	if used := autoResumeUsed(parent.ID); used != 0 {
-		t.Fatalf("budget = %d, want 0: a skipped restart spends no chance", used)
-	}
-}
-
 // A direction already retried by the operator (or the pump) between the timer
 // being armed and firing is left alone: that work is already running.
 func TestAutoResumeFireLeavesADirectionAlreadyTakenAlone(t *testing.T) {
@@ -170,7 +133,7 @@ func TestAutoResumeFireLeavesADirectionAlreadyTakenAlone(t *testing.T) {
 	resetAutoResumeBudget(in.ID)
 	t.Cleanup(func() { resetAutoResumeBudget(in.ID) })
 
-	s.autoResumeFire("r_taken", in.ID)
+	s.autoResumeFire("r_taken", in.ID, nil)
 
 	got, _ := st.GetIntent(in.ID)
 	if got.Status != model.StatusPending {

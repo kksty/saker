@@ -589,7 +589,7 @@ function UnitRow({
               ? `等待 ${intent.wait.actions.length} 个外部动作`
               : intent.wait.operator
                 ? `等待人工：${intent.wait.operator.request}`
-                : `等 ${intent.wait.children?.length ?? 0} 个下游意图${intent.wait.mode ? ` · ${intent.wait.mode === 'any' ? '任一' : '全部'}` : ''}`}
+                : '等待回执'}
           </span>
         ) : latest ? (
           <span className="min-w-0 flex-1 basis-[12rem] truncate font-mono tw-nums">
@@ -806,11 +806,6 @@ function UnitDetail({
                 >
                   {intentStateLabel(intent, reviewFailure.data)}
                 </Badge>
-                {intent.parent_intent_id && (
-                  <Badge size="sm" variant="muted" title={`上游意图 ${intent.parent_intent_id}`}>
-                    下游意图
-                  </Badge>
-                )}
                 <DoneDeclaredBadge intent={intent} />
                 {intent.hold && (
                   <Badge size="sm" variant="warning">
@@ -877,7 +872,7 @@ function UnitDetail({
             <Callout tone="info" icon={<CircleDashed className="h-4 w-4" />}>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
                 {/* 等待条件与下游意图当前状态同一句：不必逐条点开才知道等的是谁、还差谁。 */}
-                <span data-testid="intent-wait">{intentWaitText(intent.wait, childOf)}</span>
+                <span data-testid="intent-wait">{intentWaitText(intent.wait)}</span>
                 {intent.wait.deadline && (
                   <span className="ml-auto font-mono text-[11px] tw-nums">截止 {fmtTime(intent.wait.deadline)}</span>
                 )}

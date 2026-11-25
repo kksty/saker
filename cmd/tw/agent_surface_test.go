@@ -74,6 +74,13 @@ func TestAgentTokenSeesOnlyTheBattlefield(t *testing.T) {
 		{http.MethodGet, "/p/p1/api/runs/r_1/events"},
 		{http.MethodGet, "/p/p1/api/messages"},
 		{http.MethodPost, "/p/p1/api/messages/m_1/retract"},
+		// Proposals: reads are battlefield state, and the commander decides them
+		// on this base. Filing/withdrawing stays on the participant face.
+		{http.MethodGet, "/p/p1/api/proposals"},
+		{http.MethodGet, "/p/p1/api/proposals/pr_1"},
+		{http.MethodPost, "/p/p1/api/proposals/pr_1/approve"},
+		{http.MethodPost, "/p/p1/api/proposals/pr_1/reject"},
+		{http.MethodPost, "/p/p1/api/proposals/pr_1/dispatch"},
 		{http.MethodGet, "/p/p1/api/participants"},
 		// The commander note is served on this same base to the commander's
 		// per-session identity; an executor's identity gets the same 404 as a
@@ -169,6 +176,10 @@ func TestAgentTokenSeesOnlyTheBattlefield(t *testing.T) {
 		{http.MethodGet, "/p/p1/api/graph/export"},
 		{http.MethodPost, "/p/p1/api/playbooks/pb_1/archive"},
 		{http.MethodPost, "/p/p1/api/retrieval/unknown"},
+		// Proposals are filed and withdrawn by the executors on the participant
+		// face; the project face only exposes the decision routes.
+		{http.MethodPost, "/p/p1/api/proposals"},
+		{http.MethodPost, "/p/p1/api/proposals/pr_1/withdraw"},
 	}
 	for _, tc := range hidden {
 		if got := do(agent.Token, tc.method, tc.path); got != http.StatusNotFound {

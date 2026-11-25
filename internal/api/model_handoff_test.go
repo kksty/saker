@@ -12,9 +12,7 @@ import (
 
 func TestHandoffStartsNewSessionOnSameGateway(t *testing.T) {
 	f := newParentFixture(t)
-	// Create the child while the fixture is still "running": a waiting parent
-	// cannot delegate.
-	child, _, err := f.p.Store.CreateChildIntent(f.ident.IntentID, model.Intent{Title: "子", CreatedBy: f.ident.ParticipantID})
+	action, _, err := f.p.Store.BeginAction(f.ident.IntentID, f.run.ID, "handoff-test", "fixture", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +25,7 @@ func TestHandoffStartsNewSessionOnSameGateway(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := f.p.Store.RegisterWait(f.ident.IntentID, f.run.ID, model.Wait{
-		Children: []string{child.ID}, Mode: model.WaitAll,
+		Actions: []string{action.ID}, Mode: model.WaitAll,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +47,7 @@ func TestHandoffStartsNewSessionOnSameGateway(t *testing.T) {
 		t.Fatalf("intent = %+v", resp.Intent)
 	}
 	if resp.Handoff.ToProfile != "" || resp.Handoff.FromRun != f.run.ID ||
-		resp.Handoff.Note != "换到慢模型继续核对" || len(resp.Handoff.Children) != 1 {
+		resp.Handoff.Note != "换到慢模型继续核对" || resp.Handoff.Wait == nil || resp.Handoff.Wait.Actions[0] != action.ID {
 		t.Fatalf("handoff = %+v", resp.Handoff)
 	}
 	if resp.RunID == "" {
@@ -78,26 +76,10 @@ func TestHandoffStartsNewSessionOnSameGateway(t *testing.T) {
 
 func TestHandoffVersionConflictAndFinishedIntent(t *testing.T) {
 	f := newParentFixture(t)
-	if _, err := f.p.Store.UpdateIntent(f.ident.IntentID, func(i *model.Intent) {
-		i.Status = model.StatusPending
-		i.RunID = ""
-	}); err != nil {
+	if _, err := f.p.Store.RegisterOperatorWait(f.ident.IntentID, f.run.ID, model.OperatorWait{Request: "fixture"}); err != nil {
 		t.Fatal(err)
 	}
-	// Keep the direction waiting across both handoffs: a pending child would be
-	// settled by the fake executor and the second request would be "已结束".
-	child, _, err := f.p.Store.CreateChildIntent(f.ident.IntentID, model.Intent{Title: "保持打开", CreatedBy: f.ident.ParticipantID})
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Keep the scheduler from running the child: this test is about the handoff
-	// version CAS, not about the child finishing.
-	if _, err := f.p.Store.UpdateIntent(child.ID, func(i *model.Intent) { i.Hold = true }); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := f.p.Store.RegisterWait(f.ident.IntentID, "", model.Wait{
-		Children: []string{child.ID}, Mode: model.WaitAll,
-	}); err != nil {
+	if _, err := f.p.Store.UpdateIntent(f.ident.IntentID, func(i *model.Intent) { i.Status = model.StatusWaiting }); err != nil {
 		t.Fatal(err)
 	}
 	if rec := f.call(t, nil, http.MethodPost, "/api/intents/"+f.ident.IntentID+"/handoff", map[string]any{
@@ -202,54 +184,5 @@ func TestFinishRecordsUsage(t *testing.T) {
 	if !got.Usage.Known || got.Usage.InputTokens != 1_000_000 || got.Usage.OutputTokens != 100_000 ||
 		got.Usage.CachedInputTokens != 400_000 || got.Usage.Requests != 2 {
 		t.Fatalf("usage = %+v", got.Usage)
-	}
-}
-
-func TestIntentUsageSummarizesDirectAndSubtreeOnce(t *testing.T) {
-	f := newParentFixture(t)
-	child, _, err := f.p.Store.CreateChildIntent(f.ident.IntentID, model.Intent{Title: "子", CreatedBy: f.ident.ParticipantID})
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Direct parent run (the fixture row) and a child run, plus a child run whose
-	// usage was never reported: it must stay unknown instead of counting as zero.
-	if _, err := f.p.Store.UpdateRun(f.run.ID, func(r *model.Run) {
-		r.Usage = model.Usage{InputTokens: 100, OutputTokens: 50, TotalTokens: 150, Requests: 1, Known: true}
-	}); err != nil {
-		t.Fatal(err)
-	}
-	childRun, err := f.p.Store.AddRun(model.Run{IntentID: child.ID, Node: "local"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := f.p.Store.UpdateRun(childRun.ID, func(r *model.Run) {
-		r.Usage = model.Usage{InputTokens: 200, OutputTokens: 100, CachedInputTokens: 50, TotalTokens: 300, Requests: 2, Known: true}
-	}); err != nil {
-		t.Fatal(err)
-	}
-	unknown, err := f.p.Store.AddRun(model.Run{IntentID: child.ID, Node: "local"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := f.p.Store.UpdateRun(unknown.ID, func(r *model.Run) { r.Usage = model.Usage{} }); err != nil {
-		t.Fatal(err)
-	}
-
-	w := call(t, f.srv, http.MethodGet, "/api/intents/"+f.ident.IntentID+"/usage", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("usage: %d %s", w.Code, w.Body.String())
-	}
-	var resp struct {
-		Direct  usageSummary `json:"direct"`
-		Subtree usageSummary `json:"subtree"`
-	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatal(err)
-	}
-	if resp.Direct.Runs != 1 || resp.Direct.TotalTokens != 150 {
-		t.Fatalf("direct = %+v", resp.Direct)
-	}
-	if resp.Subtree.Runs != 3 || resp.Subtree.TotalTokens != 450 || resp.Subtree.UnknownRuns != 1 {
-		t.Fatalf("subtree = %+v", resp.Subtree)
 	}
 }

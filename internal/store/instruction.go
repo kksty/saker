@@ -20,36 +20,25 @@ var (
 const MaxInstructionRunes = 4000
 const MaxActiveInstructionBytes = 64 << 10
 
-// ApplicableInstructions is a projection, not a second instruction store. The
-// ancestry comes from recorded delegation, including children created later.
-func ApplicableInstructions(db DB, intentID string, commander bool) []model.Instruction {
-	ancestors := instructionAncestors(db, intentID)
+// ApplicableInstructions selects active project constraints and exact intent constraints.
+func ApplicableInstructions(db DB, _ string, commander bool) []model.Instruction {
+	if !commander {
+		return nil
+	}
 	out := []model.Instruction{}
 	for _, in := range db.Instructions {
-		if in.State == model.InstructionActive && (commander || in.IntentID == "" || ancestors[in.IntentID]) {
+		if in.State == model.InstructionActive {
 			out = append(out, in)
 		}
 	}
 	return out
 }
 
-func InstructionAppliesTo(db DB, in model.Instruction, intentID string) bool {
+func InstructionAppliesTo(_ DB, in model.Instruction, intentID string) bool {
 	if in.IntentID == "" {
 		return true
 	}
-	return instructionAncestors(db, intentID)[in.IntentID]
-}
-
-func instructionAncestors(db DB, intentID string) map[string]bool {
-	ancestors := map[string]bool{}
-	parents := map[string]string{}
-	for _, in := range db.Intents {
-		parents[in.ID] = in.ParentID
-	}
-	for id := intentID; id != "" && !ancestors[id]; id = parents[id] {
-		ancestors[id] = true
-	}
-	return ancestors
+	return in.IntentID == intentID
 }
 
 func instructionVersions(rows []model.Instruction) map[string]uint64 {
@@ -232,7 +221,7 @@ func (s *Store) PreparePurposeInput(runID string, policies ...string) (DB, []mod
 		if r.Status != model.RunRunning || (r.Purpose != "verifier" && r.Purpose != "report") {
 			return DB{}, nil, fmt.Errorf("辅助运行已结束或用途不符")
 		}
-		rows := ApplicableInstructions(s.db, r.IntentID, r.Purpose == "report")
+		var rows []model.Instruction
 		if len(policies) > 0 {
 			r.PremisePolicy = policies[0]
 		}
@@ -256,8 +245,6 @@ func (s *Store) queueInstructionNoticesLocked(in model.Instruction) {
 		}
 		if r.Purpose == "commander" {
 			targets[collab.CommanderID] = i
-		} else if r.Purpose == "" && InstructionAppliesTo(s.db, in, r.IntentID) {
-			targets[collab.ParticipantID(r.IntentID)] = i
 		}
 	}
 	// Deterministic recipient ordering also makes the durable seq reproducible.
@@ -266,7 +253,7 @@ func (s *Store) queueInstructionNoticesLocked(in model.Instruction) {
 		people = append(people, to)
 	}
 	slices.Sort(people)
-	notice := fmt.Sprintf("持久指令 %s 已更新至 v%d（%s）。这是变更通知；当前有效口径以本轮指令全集及 GET /api/instructions/%s 为准。旧版本不再生效；笔记/历史判断里抄录的旧约束请按本轮集合核对并删改，撤销通知不重新授权。", in.ID, in.Version, in.State, in.ID)
+	notice := fmt.Sprintf("永久消息 %s 已更新至 v%d（%s）。按 GET /api/instructions/%s 核对当前版本。消息用于沟通和记录待办。", in.ID, in.Version, in.State, in.ID)
 	for _, to := range people {
 		id, now := s.uniqueIDLocked("m"), time.Now()
 		m := model.Message{ID: id, EventID: id, Seq: s.nextMessageSeqLocked(), FromParticipantID: in.CreatedBy, ToParticipantID: to, Kind: "instruction", Durable: true, InstructionID: in.ID, InstructionVersion: in.Version, Text: notice, IdempotencyKey: fmt.Sprintf("instruction:%s:%d:%s", in.ID, in.Version, to), Status: model.MessageQueued, CreatedAt: now, UpdatedAt: now}

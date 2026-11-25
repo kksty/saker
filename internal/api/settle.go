@@ -150,7 +150,6 @@ func (s *Server) settleIntent(w http.ResponseWriter, r *http.Request) {
 	// A settled direction will not consume its children's results, and settling
 	// does not go through the lifecycle that normally orphans them: fail the
 	// unstarted ones here, exactly as parking does.
-	s.failUnstartedChildren(cur)
 	// A waiting parent reads the child's terminal state, so a declared done has
 	// to run the same evaluation a finished run would.
 	s.pump()

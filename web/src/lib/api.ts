@@ -14,12 +14,9 @@ import type {
   BoardResponse,
   ChatResult,
   ChatTarget,
-  ChildIntent,
   CommunicationQueue,
   CommunicationStatus,
   ContinueIntentResult,
-  CreateChildIntentBody,
-  CreateChildIntentResult,
   Decision,
   DeciderStatus,
   DocumentHistoryResponse,
@@ -62,6 +59,9 @@ import type {
   ProjectExportResult,
   ProjectImportResult,
   ProjectInfo,
+  Proposal,
+  ProposalDecisionResponse,
+  ProposalPage,
   SkippedProject,
   VulnLibraryQuarantine,
   CreateProjectOptions,
@@ -557,18 +557,6 @@ export const api = {
     get<{ intent: Intent; facts: Fact[]; facts_total?: number; facts_has_more?: boolean }>(
       `${pbase()}/api/intents/${encodeURIComponent(id)}`,
     ),
-  children: (id: string) =>
-    get<{ children: ChildIntent[] }>(`${pbase()}/api/intents/${encodeURIComponent(id)}/children`).then(
-      (r) => r.children ?? [],
-    ),
-  // Delegate one piece of work under a live direction. The parent keeps running;
-  // the child gets its own run and starts as soon as capacity allows. The console
-  // sends the idempotency key it generated, so a retry finds the same child.
-  createChildIntent: (parentId: string, body: CreateChildIntentBody) =>
-    post<CreateChildIntentResult>(
-      `${pbase()}/api/intents/${encodeURIComponent(parentId)}/children`,
-      body,
-    ),
   // Continue a finished direction on the harness session its last run left
   // behind: the brief is not re-sent, only how the previous turn ended. 409 with
   // code continue_unavailable means there is no session left and a fresh retry
@@ -581,7 +569,7 @@ export const api = {
     )
   },
   intentUsage: (id: string) =>
-    get<{ direct: UsageSummary; subtree: UsageSummary }>(
+    get<{ direct: UsageSummary }>(
       `${pbase()}/api/intents/${encodeURIComponent(id)}/usage`,
     ),
   // verifyBytes re-hashes every original behind the premises. It is opt-in and
@@ -647,8 +635,28 @@ export const api = {
     get<InstructionHistoryResponse>(
       `${pbase()}/api/instructions/${encodeURIComponent(id)}/history${queryString({ limit })}`,
     ),
+  // Editing the body and revoking are the same versioned update: the version
+  // and state this page read travel back, so a stale write is refused (409)
+  // instead of overwriting what another window changed.
+  updateInstruction: (
+    id: string,
+    body: { version: number; text: string; state: Instruction['state'] },
+  ) => put<Instruction>(`${pbase()}/api/instructions/${encodeURIComponent(id)}`, body),
   revokeInstruction: (id: string, body: { version: number; text: string; state: 'revoked' }) =>
     put<Instruction>(`${pbase()}/api/instructions/${encodeURIComponent(id)}`, body),
+
+  // Proposals: executors suggest a next intent; the console (operator) and the
+  // commander decide. Approval only creates a pending intent — a separate
+  // dispatch starts the run — so the UI keeps those as two distinct actions.
+  proposals: (status?: Proposal['status'], limit = 100) =>
+    get<ProposalPage>(`${pbase()}/api/proposals${queryString({ status: status ?? '', limit })}`),
+  proposal: (id: string) => get<{ proposal: Proposal }>(`${pbase()}/api/proposals/${encodeURIComponent(id)}`),
+  approveProposal: (id: string, body: { expected_version: number; note?: string }) =>
+    post<ProposalDecisionResponse>(`${pbase()}/api/proposals/${encodeURIComponent(id)}/approve`, body),
+  rejectProposal: (id: string, body: { expected_version: number; reason: string }) =>
+    post<ProposalDecisionResponse>(`${pbase()}/api/proposals/${encodeURIComponent(id)}/reject`, body),
+  dispatchProposal: (id: string, body: { expected_version: number }) =>
+    post<ProposalDecisionResponse>(`${pbase()}/api/proposals/${encodeURIComponent(id)}/dispatch`, body),
 
   // The three project documents. One call returns all three with their revision;
   // a save carries the revision it read, so a newer write cannot be overwritten

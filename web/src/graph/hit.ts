@@ -45,10 +45,8 @@ export const HOVERABLE_EDGE_KINDS: ReadonlySet<GraphEdge['kind']> = new Set([
   'supports',
   'goal',
   'brief',
-  'spawn',
   // 发起边: a derived provenance line. Hoverable/selectable so the operator can
   // read who launched a peer direction, but it is excluded from layout/depth.
-  'origin',
 ])
 
 /** The curve is sampled in this many segments; hit-testing and painting agree. */

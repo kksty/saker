@@ -43,7 +43,9 @@ const (
 	// forces a project that was running to come up paused. It is its own code
 	// because "the operator paused it" is a different fact: without it a restart
 	// was reported as a manual pause, and the console told the operator they had
-	// stopped something they never touched.
+	// stopped something they never touched. It is a crash marker, not a decision:
+	// once the boot crash sweep has converged the orphan rows, the watchdog
+	// recovery clears it and continues the project on its own.
 	PauseKindRestart = "restart_pause"
 )
 
@@ -910,4 +912,3 @@ func (p *Project) write() error {
 	}
 	return os.Rename(tmp, path)
 }
-

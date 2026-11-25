@@ -187,7 +187,6 @@ func (s *Server) buildHandoff(in model.Intent, note string) model.Handoff {
 	}
 	if in.Wait != nil {
 		w := *in.Wait
-		w.Children = append([]string(nil), in.Wait.Children...)
 		w.Actions = append([]string(nil), in.Wait.Actions...)
 		w.Results = append([]model.WaitResult(nil), in.Wait.Results...)
 		h.Wait = &w
@@ -197,12 +196,8 @@ func (s *Server) buildHandoff(in model.Intent, note string) model.Handoff {
 	for _, ev := range db.Evidence {
 		evidence[ev.ID] = ev.URI
 	}
-	subtree := map[string]bool{in.ID: true}
-	for _, d := range s.Store.Descendants(in.ID) {
-		subtree[d.ID] = true
-	}
 	for _, f := range db.Facts {
-		if !subtree[f.IntentID] || f.Unusable() {
+		if f.IntentID != in.ID || f.Unusable() {
 			continue
 		}
 		if f.Status != "verified" && len(f.EvidenceIDs) == 0 {
@@ -235,9 +230,6 @@ func (s *Server) buildHandoff(in model.Intent, note string) model.Handoff {
 		}
 		h.Attempts = append(h.Attempts, fmt.Sprintf("%s/%s: %s", r.Status, r.Model, clipRunes(reason, 200)))
 	}
-	for _, child := range s.Store.Children(in.ID) {
-		h.Children = append(h.Children, child.ID)
-	}
 	if msgs := s.Store.Messages(1); len(msgs) > 0 {
 		h.MessageCursor = msgs[len(msgs)-1].Seq
 	}
@@ -266,14 +258,6 @@ type handoffAuthorization struct {
 	// Briefing is the authorization boundary plus project description, as the
 	// task book renders it.
 	Briefing string
-	// Instructions is the applicable persistent instruction text, verbatim
-	// (empty when the project has none).
-	Instructions string
-	// InstructionIDs are the ids frozen into the replaced run, with the versions
-	// that run actually read. The replacement re-reads them from the ledger: the
-	// text above is what this task book renders, the ids are what makes the set
-	// checkable instead of taken on trust.
-	InstructionIDs []string
 	// BriefRevision is when the operator last rewrote the brief; zero means the
 	// project predates the field (the caller falls back to creation time).
 	BriefRevision time.Time
@@ -297,21 +281,6 @@ func handoffSection(db store.DB, in model.Intent, h model.Handoff, auth handoffA
 	// the time it reaches the operator's words. The text is rendered verbatim;
 	// no heading explains what it is or how it outranks the handoff note.
 	writeScope(&b, auth.Briefing)
-	if strings.TrimSpace(auth.Instructions) != "" {
-		b.WriteString("\n### 当前持久指令（原文）\n")
-		b.WriteString(auth.Instructions)
-		b.WriteString("\n")
-	}
-	// The ids make the set checkable. A replacement that only reads the rendered
-	// text cannot tell whether the previous run had a different set, and after a
-	// compaction nothing else in the brief would say so.
-	b.WriteString("\n### 本轮有效指令\n")
-	if len(auth.InstructionIDs) == 0 {
-		b.WriteString("这一轮没有有效指令。\n")
-	} else {
-		b.WriteString(strings.Join(auth.InstructionIDs, "、"))
-		b.WriteString("。\n")
-	}
 	revision := "未知（升级前写入的项目没有修订时间）"
 	if !auth.BriefRevision.IsZero() {
 		revision = auth.BriefRevision.Format(time.RFC3339)
@@ -359,24 +328,6 @@ func handoffSection(db store.DB, in model.Intent, h model.Handoff, auth handoffA
 			fmt.Fprintf(&b, "- %s\n", a)
 		}
 	}
-	if len(h.Children) > 0 {
-		b.WriteString("\n### 子意图\n")
-		for _, child := range db.Intents {
-			if child.ParentID != in.ID {
-				continue
-			}
-			fmt.Fprintf(&b, "- `%s` %s：%s", child.ID, child.Title, child.Status)
-			if child.RunID != "" {
-				for _, r := range db.Runs {
-					if r.ID == child.RunID {
-						fmt.Fprintf(&b, "（run %s %s）", r.Status, clipRunes(r.StopReason, 80))
-						break
-					}
-				}
-			}
-			b.WriteString("\n")
-		}
-	}
 	if h.Wait != nil && !h.Wait.WakePending {
 		if h.Wait.Operator != nil {
 			fmt.Fprintf(&b, "\n### 人工交接\n请求 %s：%s。人工是否完成以控制面收据为准，不能自行确认。\n", h.Wait.Operator.ID, h.Wait.Operator.Request)
@@ -388,9 +339,6 @@ func handoffSection(db store.DB, in model.Intent, h model.Handoff, auth handoffA
 
 		} else if len(h.Wait.Actions) > 0 {
 			fmt.Fprintf(&b, "\n### 外部动作等待\n仍在等待：%s（mode=%s，deadline=%s）。结果未知时需要核对，记录不代表执行或成功。\n", strings.Join(h.Wait.Actions, ", "), h.Wait.Mode, deadlineText(h.Wait.Deadline))
-		} else {
-			fmt.Fprintf(&b, "\n### 等待关系\n仍然在等这些子意图：%s（mode=%s，deadline=%s）。\n",
-				strings.Join(h.Wait.Children, ", "), h.Wait.Mode, deadlineText(h.Wait.Deadline))
 		}
 	}
 	fmt.Fprintf(&b, "\n消息游标：%d（用 GET /messages?after=%d 看新消息）。\n", h.MessageCursor, h.MessageCursor)

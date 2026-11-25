@@ -59,7 +59,9 @@ run:
 	go run ./cmd/tw --addr 127.0.0.1:8080 --data ./data --harness ./$(BIN)/cyber-harness$(EXE) --scan ./$(BIN)/cyber-scan$(EXE)
 
 test:
-	go test ./...
+	# Scope matches cmd/tw-gate: ./data lives inside the module and a real
+	# engagement drops target source there, which makes ./... fail.
+	go test ./cmd/... ./internal/...
 
 # 数据竞争检测：-race 需要 cgo/C 工具链（Linux gcc / Windows MinGW-w64 gcc）。
 # 缺编译器时给出可读指引，而不是一个难懂的 cgo 错误。

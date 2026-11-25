@@ -63,7 +63,7 @@ type directiveEscalation struct {
 //	persistent=false, target=intent    -> one-shot durable message to that direction
 //	persistent=false, steer=true       -> cancel that live turn and continue with the note
 //	persistent=true,  target=project   -> project-scope instruction (all future dispatches)
-//	persistent=true,  target=intent    -> instruction scoped to that direction subtree
+//	persistent=true,  target=intent    -> instruction scoped to one intent
 //
 // A one-shot hint is a message, never an instruction: it is delivered once and
 // must not be re-injected into future runs. A persistent constraint is an

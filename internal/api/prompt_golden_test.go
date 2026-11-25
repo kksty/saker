@@ -42,8 +42,8 @@ import (
 	"time"
 
 	"github.com/kksty/tianwu/internal/board"
-	"github.com/kksty/tianwu/internal/contract"
 	"github.com/kksty/tianwu/internal/collab"
+	"github.com/kksty/tianwu/internal/contract"
 	"github.com/kksty/tianwu/internal/decider"
 	"github.com/kksty/tianwu/internal/model"
 	"github.com/kksty/tianwu/internal/store"
@@ -145,14 +145,11 @@ func normalizeGoldenPrompt(p string) string {
 	return goldenTimeLine.ReplaceAllString(p, "当前时间：<normalized-time>\n")
 }
 
-// dispatchPromptScenario is BuildPromptWithInstructions with fixed inputs. The
-// instructions string is the already-frozen operator guidance the dispatch path
-// would pass; it is literal here so the section is versioned by this golden.
+// dispatchPromptScenario is the initial executor brief with fixed inputs.
 func dispatchPromptScenario(t *testing.T) string {
 	t.Helper()
 	db := goldenDB()
-	instructions := "\n## 当前持久指令\n- 固定夹具：仅在授权范围内只读验证。\n"
-	return normalizeGoldenPrompt(BuildPromptWithInstructions(db, db.Intents[0], "10.0.0.0/24", "", "", 0, false, false, "", instructions, ""))
+	return normalizeGoldenPrompt(BuildPrompt(db, db.Intents[0], "10.0.0.0/24", "", "", 0, false))
 }
 
 // commanderPromptScenario is one deterministic commander wake: empty board, fixed
@@ -178,7 +175,6 @@ var dispatchMarkers = []struct{ ID, Marker string }{
 	{"assignment", "## 本轮指派"},
 	{"intent_doc", "## 细节与约束"},
 	{"acceptance", "## 验收标准"},
-	{"instructions", "## 当前持久指令"},
 	{"input_pointers", "## 本轮输入文件（只读）"},
 	// The injection boundary is its own versioned segment: it is the one
 	// paragraph that decides what every following section is worth, so a log
@@ -196,7 +192,7 @@ var dispatchMarkers = []struct{ ID, Marker string }{
 // commanderMarkers are the versioned anchors of one commander round prompt.
 var commanderMarkers = []struct{ ID, Marker string }{
 	{"identity", "你是天吴项目的指挥官："},
-	{"priority", "操作员下发的指令优先级最高"},
+	{"priority", strings.TrimSpace(contract.OperatorPriority)},
 	{"constraints", "## 约束"},
 	{"start", "## 起点"},
 	{"round", "## 本轮"},
@@ -218,8 +214,6 @@ var commanderMarkers = []struct{ ID, Marker string }{
 // producer marker.
 func logAnchorRegistry() []goldenLogAnchor {
 	return []goldenLogAnchor{
-		{JournalEvent: "injected", PromptSection: "instructions", Marker: "## 当前持久指令", Scenario: "dispatch", AnchorID: "instructions",
-			Note: "派发/指挥官轮冻结的持久指令集合；日志 injected.source=instruction。"},
 		{JournalEvent: "injected", PromptSection: "state", Marker: decider.StateFullHeader, Scenario: "commander", AnchorID: "state",
 			Note: "指挥官整份笔记注入段；日志 injected.source=state，定位到版本化的笔记全文段。"},
 		{JournalEvent: "injected", PromptSection: "untrusted_input", Marker: untrustedInputHeading, Scenario: "dispatch", AnchorID: "untrusted_input",
@@ -256,7 +250,7 @@ func goldenBudgets() map[string]int {
 func buildGolden(t *testing.T) goldenDoc {
 	t.Helper()
 	scenarios := []goldenScenario{
-		{ID: "dispatch", Fixture: "BuildPromptWithInstructions: 固定意图（CreatedBy=commander，任务来源=指挥官全局派发）/事实/授权范围/持久指令；预算=0，graph/focus 关闭", Prompt: dispatchPromptScenario(t)},
+		{ID: "dispatch", Fixture: "BuildPrompt: 固定意图（来源为指挥官）及项目约束与事实。预算为 0，关闭 graph 和 focus。", Prompt: dispatchPromptScenario(t)},
 		{ID: "commander", Fixture: "decider.CommanderRoundPrompt: 空 board、固定笔记、固定授权范围、零上下文压力、新会话", Prompt: commanderPromptScenario(t)},
 	}
 	markers := map[string][]struct{ ID, Marker string }{
@@ -449,12 +443,12 @@ func TestPromptGoldenSectionsExist(t *testing.T) {
 	if !strings.Contains(dispatch.Prompt, untrustedInputHeading) {
 		t.Fatal("dispatch golden lost the untrusted-input boundary")
 	}
-	if !strings.Contains(dispatch.Prompt, "决定「做什么」的只有操作员的持久指令与文档") {
-		t.Fatal("dispatch golden lost the instruction-sources rule of the boundary")
+	if strings.Contains(dispatch.Prompt, "持续指令") || strings.Contains(dispatch.Prompt, "持久指令") {
+		t.Fatal("the executor brief describes commander-only messages")
 	}
 	// The task source, intent and source-facts anchors must be real, non-empty
 	// versioned segments in the frozen prompt.
-	for _, want := range []string{"task_source", "constraints", "assignment", "untrusted_input", "source_facts", "instructions", "handoff"} {
+	for _, want := range []string{"task_source", "constraints", "assignment", "untrusted_input", "source_facts", "handoff"} {
 		a := anchorByID(t, dispatch, want)
 		if a.Runes <= 0 || a.SectionSHA256 == "" {
 			t.Fatalf("anchor %s is empty: %+v", want, a)

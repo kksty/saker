@@ -62,30 +62,22 @@ test('the prerequisite count is shown only when the direction actually has premi
   assert.deepEqual(frontierMarkers(frontier({ prerequisites: 0 })), [])
 })
 
-test('open descendants are surfaced, zero descendants stays quiet', () => {
-  const marked = frontierMarkers(frontier({ descendants: 2 }))
-  assert.deepEqual(marked.map((m) => m.key), ['descendants'])
-  assert.equal(marked[0].label, '后代 2')
-  assert.match(marked[0].detail, /未结束/)
-  assert.deepEqual(frontierMarkers(frontier({ descendants: 0 })), [])
-})
 
 test('a mixed row keeps a stable, urgency-first badge order', () => {
   const markers = frontierMarkers(
-    frontier({ prerequisites: 2, premise_changed: ['f_a'], descendants: 4 }),
+    frontier({ prerequisites: 2, premise_changed: ['f_a'] }),
   )
   assert.deepEqual(
     markers.map((m) => m.key),
-    ['premise_changed', 'prerequisites', 'descendants'],
+    ['premise_changed', 'prerequisites'],
   )
   assert.deepEqual(
     markers.map((m) => m.label),
-    ['前提已变 1', '前提 2', '后代 4'],
+    ['前提已变 1', '前提 2'],
   )
   // Tones separate urgent revision from neutral counts.
   assert.equal(markers[0].tone, 'warning')
   assert.equal(markers[1].tone, 'muted')
-  assert.equal(markers[2].tone, 'secondary')
 })
 
 test('fact lists stay compact and never print an empty separator', () => {

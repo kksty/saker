@@ -373,10 +373,11 @@ func (s *Server) appendGoalAndContinue(w http.ResponseWriter, r *http.Request) {
 		//   - commander stand-by: the commander asked to stop, and only the
 		//     operator may override it — this request is that override.
 		//   - restart pause: the machine paused itself because the control plane
-		//     restarted while the project was running. It records no intent to
-		//     stop, so there is nothing to override; leaving it out would make an
-		//     operator's "append a goal and continue" silently do half its job
-		//     for a reason nobody chose.
+		//     restarted while the project was running. The boot recovery normally
+		//     clears it already; this branch is the fallback when that recovery
+		//     did not finish. It records no intent to stop, so there is nothing to
+		//     override, and leaving it out would make an operator's "append a goal
+		//     and continue" silently do half its job for a reason nobody chose.
 		case pauseKindCompletionStandby, pauseKindManualPause, pauseKindCommanderStandby, pauseKindRestart:
 			resumedFrom = current.Kind
 		}
@@ -430,7 +431,7 @@ func (s *Server) appendGoalAndContinue(w http.ResponseWriter, r *http.Request) {
 	case resumed && resumedFrom == pauseKindCommanderStandby:
 		note = "项目此前由指挥官请求停止，已按本次显式操作追加目标并恢复派发；指挥官请求停止的原因仍在它的暂停说明里。"
 	case resumed && resumedFrom == pauseKindRestart:
-		note = "项目此前因控制面重启而暂停（不是谁主动停的），已按本次显式操作追加目标并恢复派发；旧目标的完成收据保持不变。"
+		note = "项目此前因控制面重启而暂停、自动恢复未完成，已按本次显式操作追加目标并恢复派发；旧目标的完成收据保持不变。"
 	case resumed:
 		note = "项目此前是人工暂停，已按本次显式操作恢复；旧目标的完成收据保持不变。"
 	case !created:

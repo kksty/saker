@@ -31,8 +31,8 @@ func (f *agentFixture) writeRunEvents(t *testing.T, runID string, n int) {
 	}
 }
 
-// A participant can peek at another run in its project: this is the sapper
-// `peek` equivalent (read-only, bounded, no writes).
+// A participant can peek at another run in its project: read-only, bounded,
+// no writes.
 func TestAgentPeekReturnsTailOfAnotherRunsEvents(t *testing.T) {
 	f := newAgentFixture(t)
 	run := f.makeLive(t)

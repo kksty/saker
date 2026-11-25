@@ -274,13 +274,18 @@ func TestCollaborateSkillCarriesIdentityAndBoundary(t *testing.T) {
 		}
 	}
 	// Report/verification runs and the review queue are operator-side
-	// post-processing: the executor skill must not name the harness evaluator,
-	// and the endpoint goal is the operator's — the executor only reads it.
+	// post-processing: the executor skill must not name the harness evaluator.
+	// The project's start/end text is not part of the executor's input at all —
+	// its round is judged by this intent and its acceptance criterion alone, so
+	// the skill must not promise it can read the goal document.
 	if strings.Contains(string(body), "evaluator") {
 		t.Error("collaborate skill must not expose the harness evaluator")
 	}
-	if !strings.Contains(string(body), "不创建、改写或追加目标") {
-		t.Error("collaborate skill must say executors do not create, rewrite or append goals")
+	if !strings.Contains(string(body), "本轮目标就是本意图及其验收标准") {
+		t.Error("collaborate skill must say the round's target is this intent and its acceptance criterion")
+	}
+	if strings.Contains(string(body), "执行者可读取") && strings.Contains(string(body), "终点") {
+		t.Error("collaborate skill must not tell the executor the start/end documents are readable")
 	}
 	// Like the commander skill, the executor skill must not encode context
 	// percentages: a run is not shown its own usage, so an "80%/85%" rule is
@@ -292,5 +297,3 @@ func TestCollaborateSkillCarriesIdentityAndBoundary(t *testing.T) {
 		}
 	}
 }
-
-

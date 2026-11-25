@@ -7,15 +7,8 @@ import (
 	"time"
 )
 
-func TestShutdownSealsChildDispatchAndLatePurposeAdmission(t *testing.T) {
+func TestShutdownSealsDispatchAndLatePurposeAdmission(t *testing.T) {
 	s, ex, in, _ := finishedServer(t, model.StatusDone, model.RunDone, true)
-	parent, err := s.Store.CreateIntent(model.Intent{Title: "parent"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.Store.UpdateIntent(in.ID, func(i *model.Intent) { i.ParentID = parent.ID }); err != nil {
-		t.Fatal(err)
-	}
 	if _, _, err := s.continueIntentRun(in.ID, ""); err != nil {
 		t.Fatal(err)
 	}
@@ -24,11 +17,11 @@ func TestShutdownSealsChildDispatchAndLatePurposeAdmission(t *testing.T) {
 		t.Fatalf("stopped runs=%d", n)
 	}
 	if !s.WaitIdle(2 * time.Second) {
-		t.Fatal("child redispatched during shutdown")
+		t.Fatal("intent redispatched during shutdown")
 	}
 	s.pump()
 	if len(ex.requests()) != 1 {
-		t.Fatal("shutdown allowed a fresh child")
+		t.Fatal("shutdown allowed a fresh run")
 	}
 	if _, err := s.StartRun(in.ID); err == nil {
 		t.Fatal("late explicit start was admitted")

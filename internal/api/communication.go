@@ -179,9 +179,6 @@ func (s *Server) deliverPendingNotices() {
 // an earlier pass already committed; the unfiled change survives in the journal
 // and is retried by the next pass.
 func (s *Server) routeAndDeliver() {
-	if err := s.Store.RouteTaskResults(); err != nil {
-		log.Printf("任务结果路由失败：%v", err)
-	}
 	if err := s.Store.RouteFactChanges(64); err != nil {
 		log.Printf("关联通知入队失败：%v", err)
 	}

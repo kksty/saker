@@ -550,31 +550,6 @@ func (s *Service) Start(id, prompt, continuedFrom string, resume, keepPrompt boo
 	if in.Status == model.StatusRunning || in.Status == model.StatusClaimed {
 		return "", fmt.Errorf("intent %s 已在运行", id)
 	}
-	// Alternatives from one decision run one at a time: dispatching one is the
-	// pick, and the rest keep their pending row so the decision stays visible.
-	// This is the group's own statement, not a guess from the premise set.
-	if group := strings.TrimSpace(in.CandidateGroup); group != "" {
-		if running, ok := s.o.Store.RunningInCandidateGroup(group, id); ok {
-			return "", fmt.Errorf("候选组 %s 里 %s 已在运行：同批一次只跑一条，等它收口或取消后再派这条",
-				group, running.ID)
-		}
-	}
-	// A direction that is not waiting on its descendants does not start while
-	// they run: the failed run already dropped its wait, so their results have
-	// nowhere to land, and a restart would put the top on the same ground as its
-	// own chain. A waiting direction is the intended exception — its wait is
-	// exactly "these children are mine", and a replacement session (handoff)
-	// keeps that wait, so the results still land.
-	if in.Wait == nil {
-		if kids := s.o.Store.ActiveDescendants(id); len(kids) > 0 {
-			ids := make([]string, 0, len(kids))
-			for _, k := range kids {
-				ids = append(ids, k.ID)
-			}
-			return "", fmt.Errorf("意图 %s 还有 %d 条子意图在下游运行（%s）：先等它们收口或取消，再启动父意图",
-				id, len(kids), strings.Join(ids, "、"))
-		}
-	}
 	run, nodeID, err := s.o.PlanRun(in, continuedFrom)
 	if err != nil {
 		return "", err
@@ -705,7 +680,7 @@ func (s *Service) Finish(runID, intentID, status, reason string, res executor.Re
 		return
 	}
 	go s.o.AfterSettle(intentID, runID, status)
-	if cause != model.CancelCauseActionWait && cause != model.CancelCauseChildWait && cause != model.CancelCauseOperatorWait {
+	if cause != model.CancelCauseActionWait && cause != model.CancelCauseOperatorWait {
 		s.o.WakeDecider("intent_" + status)
 	}
 }
@@ -731,15 +706,35 @@ func (s *Service) redeliverPossiblyUnread(intentID, runID string) {
 
 // ---- crash recovery and watchdog reapers ----
 
+// Zero-strategy contract (locked by discipline_test.go).
+//
+// What follows keeps the platform honest, not busy. It may converge rows a dead
+// process left behind — cancel a run whose dispatcher vanished, release a claim
+// no live run holds, settle a wait whose deadline passed — and it may tell the
+// boot path that reconciliation finished. It must never:
+//
+//   - create, approve, park or rewrite an intent or a proposal;
+//   - build or edit a task brief (it passes the prompt it was handed);
+//   - choose what runs next (its only dispatch call is Options.Dispatch, for a
+//     run the API already admitted and registered);
+//   - import the decision or rendering layers (decider, api, board).
+//
+// The reason is not style. A reaper that starts deciding is invisible: it runs
+// on a timer, has no round, no run row and no prompt, so its decisions cannot be
+// reviewed, cancelled or attributed. Keep-alive and decisions stay in separate
+// packages, and the test next to this file fails if they stop being separate.
+
 // ReconcileAfterRestart is the crash sweep's settlement half: at startup no
 // goroutine owns any run, so a run recorded as running necessarily belongs to a
 // process that is gone. It converges that row to canceled/restart, keeps the
 // stop_reason the dead process had already recorded, and returns the direction to
 // a retryable state without replaying anything.
 //
-// It never re-dispatches: the retry is the operator's/commander's decision (and
-// the boot path keeps the project paused). It is idempotent and returns the
-// number of rows it repaired; a second call returns 0.
+// It never re-dispatches by itself: it only converges rows, and the boot path
+// opens paused until it has finished. The hub's restart recovery is what clears
+// that pause and lets the interrupted directions continue; an operator pause or a
+// commander stop is left alone. It is idempotent and returns the number of rows
+// it repaired; a second call returns 0.
 func (s *Service) ReconcileAfterRestart() int {
 	now := time.Now()
 	settled := 0
@@ -835,15 +830,12 @@ func (s *Service) ReapOrphans() {
 		})
 		if in, ok := s.o.Store.GetIntent(r.IntentID); ok && in.RunID == r.ID {
 			if in.Status == model.StatusRunning || in.Status == model.StatusClaimed {
-				updated, applied, err := s.recoverInterruptedIntent(in, true)
+				_, applied, err := s.recoverInterruptedIntent(in, true)
 				if err != nil {
 					log.Printf("回收意图 %s 失败：%v", in.ID, err)
 				}
 				if !applied {
 					continue
-				}
-				if delegatedIntent(updated) && updated.Wait == nil {
-					go s.o.AfterSettle(in.ID, r.ID, model.RunCanceled)
 				}
 				s.o.WakeDecider("watchdog")
 			}
@@ -906,7 +898,7 @@ func (s *Service) ReapClaims() {
 				continue
 			}
 		}
-		updated, applied, err := s.recoverInterruptedIntent(in, false)
+		_, applied, err := s.recoverInterruptedIntent(in, false)
 		if err != nil {
 			log.Printf("回收认领意图 %s 失败：%v", in.ID, err)
 		}
@@ -914,10 +906,6 @@ func (s *Service) ReapClaims() {
 			continue
 		}
 		log.Printf("watchdog: claimed intent %s lost its dispatcher", in.ID)
-		if delegatedIntent(updated) && updated.Wait == nil {
-			go s.o.AfterSettle(in.ID, in.RunID, model.RunFailed)
-			continue
-		}
 		s.o.WakeDecider("watchdog")
 	}
 }
@@ -952,7 +940,7 @@ func (s *Service) ReapDanglingIntents() {
 			// review_failed to done without re-reviewing anything.
 			pending := unreviewedConclusionIDs(s.o.Store, in.ID)
 			failedFacts := mergeFactIDs(s.o.Store, in.ReviewFailedFacts, pending)
-			updated, applied, err := s.o.Store.UpdateIntentIfCurrent(in.ID, model.StatusReviewing, in.RunID, func(i *model.Intent) {
+			_, applied, err := s.o.Store.UpdateIntentIfCurrent(in.ID, model.StatusReviewing, in.RunID, func(i *model.Intent) {
 				i.Status = model.StatusReviewFailed
 				i.Hold = false
 				i.Wait = nil
@@ -969,7 +957,7 @@ func (s *Service) ReapDanglingIntents() {
 			}
 			if applied {
 				log.Printf("watchdog: 意图 %s 的复核阶段已中断，标记 review_failed（%d 条未核验结论待重试）", in.ID, len(failedFacts))
-				go s.o.AfterSettle(updated.ID, updated.RunID, model.RunDone)
+				go s.o.AfterSettle(in.ID, in.RunID, model.RunDone)
 				s.o.WakeDecider("review_recovered")
 				if s.o.Pump != nil {
 					s.o.Pump()
@@ -995,7 +983,7 @@ func (s *Service) ReapDanglingIntents() {
 		}
 
 		status := model.StatusFailed
-		updated, applied, err := s.o.Store.UpdateIntentIfCurrent(in.ID, in.Status, in.RunID, func(i *model.Intent) {
+		_, applied, err := s.o.Store.UpdateIntentIfCurrent(in.ID, in.Status, in.RunID, func(i *model.Intent) {
 			switch run.Status {
 			case model.RunDone:
 				status = model.StatusDone
@@ -1022,9 +1010,6 @@ func (s *Service) ReapDanglingIntents() {
 				}
 			} else if i.Wait != nil {
 				status = model.StatusWaiting
-			} else if delegatedIntent(*i) && status == model.StatusPending {
-				// Interrupted helpers return a result to their coordinator.
-				status = model.StatusFailed
 			}
 			i.Status = status
 			i.ClaimedBy = ""
@@ -1048,10 +1033,6 @@ func (s *Service) ReapDanglingIntents() {
 		// direction is done; the review phase owns the settlement wake now, and
 		// publishing done here would bypass the gate Finish enforces.
 		if status == model.StatusDone && s.o.ReviewAfterRun != nil && s.o.ReviewAfterRun(in.ID, run.ID) {
-			continue
-		}
-		if delegatedIntent(updated) && updated.Wait == nil {
-			go s.o.AfterSettle(in.ID, run.ID, run.Status)
 			continue
 		}
 		s.o.WakeDecider("watchdog")
@@ -1118,9 +1099,6 @@ func (s *Service) recoverInterruptedIntent(in model.Intent, uncount bool) (model
 		i.ClaimedBy = ""
 		if i.Wait != nil {
 			i.Status = model.StatusWaiting
-		} else if delegatedIntent(*i) {
-			i.Status = model.StatusFailed
-			i.Hold = false
 		} else {
 			i.Status = model.StatusPending
 			if uncount {
@@ -1128,11 +1106,4 @@ func (s *Service) recoverInterruptedIntent(in model.Intent, uncount bool) (model
 			}
 		}
 	})
-}
-
-// A delegated task has a local result owner even when it was spawned without
-// a parent edge. Recovery must not turn an interrupted helper into fresh work.
-func delegatedIntent(in model.Intent) bool {
-	_, created := collab.IntentIDFromParticipant(in.CreatedBy)
-	return in.ParentID != "" || created
 }

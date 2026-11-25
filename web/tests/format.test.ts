@@ -18,7 +18,6 @@ import type { FrontierItem, Intent, Run } from '../src/lib/types.ts'
 
 test('operator handoff has the same label in run detail, fleet rows and timeline', () => {
   assert.equal(runStatusLabel({status: 'canceled', cancel_cause: 'operator_wait'}), '等待人工')
-  assert.equal(runStatusLabel({status: 'canceled', cancel_cause: 'child_wait'}), '等待意图')
   assert.equal(runStatusLabel({status: 'canceled', cancel_cause: 'action_wait'}), '等待外部结果')
   // The review pause is its own switch (it cancels verifier runs only); a
   // canceled verifier run must not read as a plain operator stop, and the

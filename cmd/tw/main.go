@@ -69,7 +69,7 @@ func main() {
 	hostAddr := flag.String("host-addr", "127.0.0.1:18766", "本机 cyber-harness Hub的监听地址（被占用时自动换一个空闲端口）")
 	requireHostReady := flag.Bool("require-host-ready", false,
 		"本机宿主没就绪就退出；默认降级启动控制台（API/设置可用，不派发），在「设置 → 模型」修好后宿主自动重启")
-	allowNativeSubagent := flag.Bool("allow-native-subagent", true, "允许 harness 原生 subagent；临时助手由父会话管理，独立可续任务使用 spawn/children；设为 false 可排除")
+	allowNativeSubagent := flag.Bool("allow-native-subagent", true, "允许 harness 原生 subagent；临时助手由父会话管理")
 	timeout := flag.Duration("timeout", 0, "per-run timeout, 0 means none")
 	idleTimeout := flag.Duration("idle-timeout", 30*time.Minute, "cancel a run with no events for this long (0 disables)")
 	maxEvidence := flag.Int("max-evidence", 200, "每次 run 最多自动登记的证据文件数（交接口声明的证据不受此限）")
@@ -143,10 +143,8 @@ func main() {
 	// The native subagent tool is allowed by default (--allow-native-subagent,
 	// true): its temporary helpers are owned by the parent session and counted
 	// through the run's NativeSubagent* fields instead of being registered as
-	// ledger runs. Setting the flag false restores the old explicit exclusion
-	// for deployments that require every helper to be a spawn/child
-	// (task-19/33); an old harness that does not know CYBER_EXCLUDE_TOOLS
-	// ignores it either way.
+	// ledger runs. Setting the flag false excludes the tool on hosts that
+	// support CYBER_EXCLUDE_TOOLS.
 	excludeTools := "subagent"
 	if *allowNativeSubagent {
 		excludeTools = ""

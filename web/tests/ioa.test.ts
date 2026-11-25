@@ -224,6 +224,14 @@ test('labels and short ids stay honest', () => {
   assert.equal(eventLabel('custom.event'), 'custom.event')
   assert.equal(messageKindLabel('say'), '现场发言')
   assert.equal(messageKindLabel('question'), '提问')
+  // Proposal-chain and operator-request messages are named instead of being
+  // rendered as raw protocol tokens.
+  assert.equal(messageKindLabel('proposal'), '新意图提议')
+  assert.equal(messageKindLabel('proposal_approved'), '提议已批准')
+  assert.equal(messageKindLabel('proposal_rejected'), '提议已驳回')
+  assert.equal(messageKindLabel('proposal_dispatched'), '提议已派发')
+  assert.equal(messageKindLabel('proposal_withdrawn'), '提议已撤回')
+  assert.equal(messageKindLabel('operator_request_resolved'), '请求处理结果')
   assert.equal(messageKindLabel('weird'), 'weird')
 })
 

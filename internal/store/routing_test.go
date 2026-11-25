@@ -358,27 +358,6 @@ func TestRoutingResumesFromPersistedCheckpointAfterRestart(t *testing.T) {
 	}
 }
 
-func TestAncestorFactChangeNotifiesLiveDescendant(t *testing.T) {
-	s := openRoutingStore(t)
-	parent := mustIntent(t, s, model.Intent{Title: "父意图", Description: "d"})
-	child := mustIntent(t, s, model.Intent{Title: "子意图", Description: "d", ParentID: parent.ID})
-	stranger := mustIntent(t, s, model.Intent{Title: "无关意图", Description: "d"})
-	if err := s.RouteFactChanges(64); err != nil {
-		t.Fatal(err)
-	}
-	f := addRoutingFact(t, s, model.Fact{IntentID: parent.ID, EntityRef: "host:10.0.0.5"})
-	if err := s.RouteFactChanges(64); err != nil {
-		t.Fatal(err)
-	}
-	got := queuedNoticesFor(s, collab.ParticipantID(child.ID))
-	if len(got) != 1 || got[0].NoticeFactID != f.ID {
-		t.Fatalf("后代意图应收到祖先的事实变化：%+v", got)
-	}
-	if got := queuedNoticesFor(s, collab.ParticipantID(stranger.ID)); len(got) != 0 {
-		t.Fatalf("无关意图不应收到通知：%+v", got)
-	}
-}
-
 func TestFactRecordedBeforeDirectionCreationIsNotReplayed(t *testing.T) {
 	s := openRoutingStore(t)
 	producer := mustIntent(t, s, model.Intent{Title: "产出意图", Description: "d"})

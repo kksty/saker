@@ -337,9 +337,7 @@ export interface Intent {
   node?: string
   /** Saved model configuration; empty means the instance default. */
   profile?: string
-  parent_intent_id?: string
   created_by_participant_id?: string
-  delegated_by_run_id?: string
   /** Acceptance criterion handed to the harness's own goal evaluator (-e). */
   eval?: string
   max_turns?: number
@@ -400,7 +398,6 @@ export interface IntentWait {  actions?: string[]
   deadline?: string
   registered_at?: string
   registered_by_run?: string
-  implicit?: boolean
   wake_pending?: boolean
   wake_reason?: string
 }
@@ -923,6 +920,75 @@ export interface InstructionHistoryResponse {
   next_cursor?: string
 }
 
+export type ProposalStatus = 'proposed' | 'approved' | 'rejected' | 'dispatched' | 'withdrawn'
+
+/**
+ * One executor suggestion for a next intent. It is control state, not a fact:
+ * the proposer only asks, an approval creates a pending intent, and a separate
+ * dispatch starts the run. The console shows the queue and decides (the
+ * commander does the same through its own API).
+ */
+export interface Proposal {
+  id: string
+  status: ProposalStatus
+  version: number
+  title: string
+  description?: string
+  doc?: string
+  /** The acceptance criterion the commander judges the resulting intent by. */
+  eval?: string
+  /** Why the proposer thinks this step is worth doing now. */
+  rationale?: string
+  from_fact_ids?: string[]
+  context_fact_ids?: string[]
+  pinned_fact_ids?: string[]
+  skills?: string[]
+  node?: string
+  max_turns?: number
+  from_participant_id: string
+  from_intent_id?: string
+  from_run_id?: string
+  from_generation?: number
+  decided_by?: string
+  decision_note?: string
+  decided_at?: string
+  /** The pending intent an approval created; empty before approval. */
+  intent_id?: string
+  /** The run a dispatch started; empty before dispatch. */
+  run_id?: string
+  created_at: string
+  updated_at: string
+}
+
+/** GET /api/proposals */
+export interface ProposalPage {
+  proposals: Proposal[]
+  total?: number
+  truncated?: boolean
+}
+
+/** The delivery receipt of the one notification a proposal transition sends. */
+export interface ProposalNotification {
+  notified: boolean
+  message_id?: string
+  error?: string
+}
+
+/** POST /api/proposals/<id>/approve | reject | dispatch */
+export interface ProposalDecisionResponse {
+  proposal: Proposal
+  intent_id?: string
+  run_id?: string
+  notification?: ProposalNotification
+}
+
+/** POST /api/proposals (executor side; the console never creates one). */
+export interface ProposalCreateResponse {
+  proposal: Proposal
+  created: boolean
+  notification?: ProposalNotification
+}
+
 /** POST /api/chat: one operator sentence into the project conversation. */
 export interface ChatResult {
   to: ChatTarget
@@ -985,7 +1051,6 @@ export interface Message {
   notice_version?: number
   /** Mechanical local-result notice: task and run to inspect, not new premises. */
   notice_intent_id?: string
-  notice_run_id?: string
   /** How many later changes to the same fact this queued notice absorbed. */
   coalesced?: number
   id: string
@@ -1041,50 +1106,6 @@ export interface CommunicationStatus {
 }
 
 /** A delegated child direction as the parent's panel shows it. */
-export interface ChildIntent {
-  id: string
-  parent_intent_id: string
-  title: string
-  description?: string
-  status: IntentStatus
-  profile?: string
-  node?: string
-  attempts: number
-  run_id?: string
-  last_run_status?: string
-  stop_reason?: string
-  /** Structured stop cause of the latest run (stop_loss/operator/pause/…). */
-  cancel_cause?: string
-  /** The child direction was explicitly stopped (sticky hold), not failed. */
-  hold?: boolean
-  facts: number
-  created_at: string
-}
-
-/** Body of POST /api/intents/{id}/children. The console generates the
- *  idempotency key: retrying with the same key finds the same child instead of
- *  creating a duplicate. Empty profile = the same default chain as any intent. */
-export interface CreateChildIntentBody {
-	node?: string
-  title: string
-  description?: string
-  eval?: string
-  profile?: string
-  from_fact_ids?: string[]
-  max_turns?: number
-  idempotency_key: string
-}
-
-/** Result of POST /api/intents/{id}/children. created=false means the key
- *  already named a child; started=false with queued set means capacity was full
- *  and the child waits for a free run slot. */
-export interface CreateChildIntentResult {
-  child: ChildIntent & { run_id?: string }
-  created: boolean
-  started: boolean
-  queued?: string
-}
-
 /** Result of POST /api/intents/{id}/continue (202): the next turn on the
  *  previous run's harness session. */
 export interface ContinueIntentResult {
@@ -1288,7 +1309,6 @@ export interface FrontierItem {
    *  created. An old conclusion cannot stand in for the new assertion. */
   premise_changed?: string[]
   /** Open descendant directions below this one (the parent may be waiting). */
-  descendants?: number
 }
 
 export interface OperatorFrontierItem extends FrontierItem {
@@ -2081,9 +2101,7 @@ export interface WorkerView {
   participant_id: string
   title: string
   status: string
-  parent_intent_id?: string
   created_by_participant_id?: string
-  delegated_by_run_id?: string
   node?: string
   /** Historical run metadata only: new runs no longer resolve a profile. */
   profile?: string

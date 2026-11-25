@@ -270,23 +270,25 @@ func TestAppendGoalAndContinueResumesManualPauseWithAcknowledgment(t *testing.T)
 }
 
 // A restart pause is the machine parking a project that was running when the
-// control plane restarted: it records no intent to stop, so there is nothing for
-// the operator's "append a goal and continue" to override. Leaving it out of the
-// resumable set made one request half-work — the goal landed, the project stayed
-// parked, and the console printed "项目仍在暂停" next to an enabled 继续 button
-// that would have resumed the very same pause.
+// control plane restarted. The boot watchdog recovery normally clears it on its
+// own; this path is the fallback when that recovery did not finish (for example
+// the manifest write failed). It records no intent to stop, so there is nothing
+// for the operator's "append a goal and continue" to override. Leaving it out of
+// the resumable set made one request half-work — the goal landed, the project
+// stayed parked, and the console printed "项目仍在暂停" next to an enabled 继续
+// button that would have resumed the very same pause.
 func TestAppendGoalAndContinueResumesRestartPause(t *testing.T) {
 	s, p := newBindingServer(t)
 	dec, commander := startAppendGoalDecider(t, s.Store)
 	s.Decider = dec
-	// The same shape the boot path produces (cmd/tw: persist the cause, restore
-	// it into the runtime, park the decider).
+	// The shape a failed boot recovery leaves behind (cmd/tw: persist the cause,
+	// restore it into the runtime, park the decider).
 	if err := p.SetPausedWithKind(true, project.PauseKindRestart); err != nil {
 		t.Fatal(err)
 	}
 	s.RestorePauseKind(project.PauseKindRestart)
 	s.SetPaused(true)
-	dec.PauseFor("控制面重启后项目默认暂停")
+	dec.PauseFor("控制面重启后自动恢复未完成")
 	if got := s.projectState().Kind; got != pauseKindRestart {
 		t.Fatalf("fixture kind = %q, want %q", got, pauseKindRestart)
 	}
@@ -302,8 +304,8 @@ func TestAppendGoalAndContinueResumesRestartPause(t *testing.T) {
 		out.PauseKindBefore != pauseKindRestart || out.PauseKindAfter != pauseKindRunning || out.PausedAfter {
 		t.Fatalf("outcome = %+v, want the restart pause cleared", out)
 	}
-	if !strings.Contains(out.Note, "控制面重启") || !strings.Contains(out.Note, "不是谁主动停的") {
-		t.Fatalf("resume note = %q, want it to name the restart and that nobody chose it", out.Note)
+	if !strings.Contains(out.Note, "控制面重启") || !strings.Contains(out.Note, "自动恢复未完成") {
+		t.Fatalf("resume note = %q, want it to name the restart and its failed automatic recovery", out.Note)
 	}
 	if s.paused.Load() || dec.Paused() || p.IsPaused() {
 		t.Fatal("restart pause was not cleared")

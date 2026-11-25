@@ -55,10 +55,8 @@ type Memory struct {
 	// AttentionThrough is a delivery checkpoint for global decision events, not
 	// a fact/read ACK. Local events remain in History after routing past them.
 	AttentionThrough uint64 `json:"attention_through,omitempty"`
-	TaskRouteThrough uint64 `json:"task_route_through,omitempty"`
 	// Deferred journal identities survive backpressure independently of the
 	// scan cursor, so one full recipient cannot stop other task results.
-	TaskRoutePending []uint64 `json:"task_route_pending,omitempty"`
 	// Native mailbox contents remain in harness; only its scheduling signal lives here.
 	NativeMailID      string `json:"native_mail_id,omitempty"`
 	NativeMailSeq     uint64 `json:"native_mail_seq,omitempty"`
@@ -92,7 +90,12 @@ func newsKind(kind string) bool {
 }
 
 // Private note history is preserved without becoming shared context or news.
-func historyKind(kind string) bool { return newsKind(kind) || kind == "notebook" || kind == "document" }
+// Proposals are control state: their decisions must stay auditable across
+// restarts, but a new suggestion is not a fact/intent change and must not
+// enter the content fingerprint or the shared "news" window.
+func historyKind(kind string) bool {
+	return newsKind(kind) || kind == "notebook" || kind == "document" || kind == "proposal"
+}
 func reportKind(kind string) bool {
 	return newsKind(kind) && kind != "playbook" && kind != "instruction"
 }
@@ -171,6 +174,11 @@ func visitKinds(db *DB, kinds map[string]bool, visit func(string, string, int, a
 	if allowed("action") {
 		for i, v := range db.Actions {
 			visit("action", v.ID, i, v)
+		}
+	}
+	if allowed("proposal") {
+		for i, v := range db.Proposals {
+			visit("proposal", v.ID, i, v)
 		}
 	}
 }

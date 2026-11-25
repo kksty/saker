@@ -83,11 +83,6 @@ function edgeBadge(kind: GraphEdge['kind']): { label: string; variant: 'primary'
       return { label: edgeKindLabel(kind), variant: 'info' }
     case 'supports':
       return { label: edgeKindLabel(kind), variant: 'warning' }
-    case 'spawn':
-      return { label: edgeKindLabel(kind), variant: 'secondary' }
-    // A derived provenance line: name it, but never dress it up as a work relation.
-    case 'origin':
-      return { label: edgeKindLabel(kind), variant: 'muted' }
     case 'brief':
       return { label: edgeKindLabel(kind), variant: 'muted' }
     case 'host':
@@ -326,27 +321,11 @@ export function GraphInspector({
                     value={resolvedModel}
                   />
                 ) : null}
-                {intent.parent_intent_id && <Meta label="上游意图" value={intent.parent_intent_id} />}
-                {intent.delegated_by_run_id && (
-                  <Meta label="委派 run" value={intent.delegated_by_run_id} />
-                )}
                 <Meta
                   label="发起"
-                  value={
-                    intentOrigin(intent) === 'executor'
-                      ? node?.originIntent?.title
-                        ? `执行者「${node.originIntent.title}」`
-                        : '执行者'
-                      : originLabel(intentOrigin(intent))
-                  }
+                  value={originLabel(intentOrigin(intent))}
                   mono={false}
                 />
-                {edge?.kind === 'spawn' && edge.parentIntent && (
-                  <Meta label="血缘" value={`${edge.parentIntent} → ${intent.id}`} />
-                )}
-                {edge?.kind === 'origin' && edge.parentIntent && (
-                  <Meta label="发起方" value={`${edge.parentIntent} → ${intent.id}`} />
-                )}
                 {intent.run_id && <Meta label="run" value={intent.run_id} />}
                 {intent.updated_at && <Meta label="更新" value={fmtTime(intent.updated_at)} />}
                 {intent.steer_count ? <Meta label="续话" value={`${intent.steer_count}`} /> : null}

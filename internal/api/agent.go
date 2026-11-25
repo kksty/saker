@@ -210,14 +210,16 @@ const (
 // the face, which is hub.serveAgent in cmd/tw/hub.go.
 //
 // Maintenance: when adding or removing a route here, check that allowlist too,
-// and the reverse. The two sets are not copies of each other: POST /api/spawn
-// exists only here, while board is allowed only there.
+// and the reverse. The project board is only on the project surface.
 func (s *Server) registerAgent(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/intents/{id}/context", s.updateTaskContext)
-	mux.HandleFunc("GET /api/instructions", s.listInstructions)
-	mux.HandleFunc("GET /api/instructions/{id}", s.getInstruction)
-	mux.HandleFunc("GET /api/instructions/{id}/history", s.instructionHistory)
-	mux.HandleFunc("POST /api/instructions/{id}/ack", s.acknowledgeInstruction)
+	// Proposals are the participant-side request for a next direction: an
+	// executor may file, list, read and withdraw its own; the decision routes
+	// stay on the project face (proposal.go).
+	mux.HandleFunc("POST /api/proposals", s.createProposal)
+	mux.HandleFunc("GET /api/proposals", s.listProposals)
+	mux.HandleFunc("GET /api/proposals/{id}", s.getProposal)
+	mux.HandleFunc("POST /api/proposals/{id}/withdraw", s.withdrawProposal)
 	mux.HandleFunc("GET /api/traffic/flows", s.listHTTPFlows)
 	mux.HandleFunc("GET /api/traffic/flow", s.httpFlow)
 	mux.HandleFunc("GET /api/kb", s.worldKB)
@@ -247,12 +249,8 @@ func (s *Server) registerAgent(mux *http.ServeMux) {
 	// choose a profile it can actually start instead of guessing an id.
 	// Read-only tail of any run in this project: the participant-side "peek".
 	mux.HandleFunc("GET /api/runs/{id}/events/tail", s.agentRunEventsTail)
-	// Spawn/workers/kill: one call creates a ledger worker and reports whether
-	// it started; ownership (not project membership) gates kill.
-	mux.HandleFunc("POST /api/spawn", s.agentSpawn)
+	// Ownership gates controls for recorded workers.
 	mux.HandleFunc("GET /api/workers", s.agentWorkers)
-	mux.HandleFunc("POST /api/workers/{id}/kill", s.agentKillWorker)
-	mux.HandleFunc("POST /api/workers/{id}/restart", s.agentRestartWorker)
 	mux.HandleFunc("GET /api/messages", s.agentMessages)
 	mux.HandleFunc("POST /api/messages", s.agentSendMessage)
 	mux.HandleFunc("POST /api/messages/{id}/ack", s.agentAckMessage)
@@ -275,19 +273,11 @@ func (s *Server) registerAgent(mux *http.ServeMux) {
 	// is refused, and the operator keeps the verified override. The handler
 	// enforces both the authorship and the state.
 	mux.HandleFunc("POST /api/facts/{id}/withdraw", s.withdrawFact)
-	// Delegation and waits are the same handlers as the console; the caller is
-	// derived from the context identity, and a participant may only act for its
-	// own intent.
-	mux.HandleFunc("POST /api/intents/{id}/children", s.createChildIntent)
-	mux.HandleFunc("GET /api/intents/{id}/children", s.listChildIntents)
+	// Participants can inspect recorded children and wait for their own external actions.
 	mux.HandleFunc("POST /api/intents/{id}/wait", s.waitIntent)
 	mux.HandleFunc("POST /api/intents/{id}/handoff", s.handoffIntent)
 	mux.HandleFunc("GET /api/intents/{id}/usage", s.intentUsage)
-	// An executor may stop what it created: it can spawn a child intent, so a
-	// mis-planned one must not keep burning the direction's budget. The scope is
-	// exactly its own children; reopening, retrying and every other direction
-	// stay with the commander.
-	mux.HandleFunc("POST /api/intents/{id}/cancel", s.agentCancelChild)
+	// A participant can cancel its own historical children.
 }
 
 // agentCancelChild is the one lifecycle action a worker owns. It is deliberately
@@ -295,39 +285,6 @@ func (s *Server) registerAgent(mux *http.ServeMux) {
 // own intent, so a worker cannot stop a peer, its parent, or anything it did not
 // create. The hold records the caller's participant id (pt_<intent>) so the
 // console can say which executor stopped it.
-func (s *Server) agentCancelChild(w http.ResponseWriter, r *http.Request) {
-	caller, ok := identityOf(r)
-	if !ok {
-		writeErr(w, http.StatusUnauthorized, "缺少协作身份")
-		return
-	}
-	id := r.PathValue("id")
-	in, ok := s.Store.GetIntent(id)
-	if !ok {
-		writeErr(w, http.StatusNotFound, "意图不存在："+id)
-		return
-	}
-	if in.ParentID == "" || in.ParentID != caller.IntentID {
-		writeErr(w, http.StatusForbidden, "只能取消自己派出的子意图：其他意图的生命周期归指挥官，把请求 handoff 给指挥官")
-		return
-	}
-	var req struct {
-		Reason string `json:"reason"`
-	}
-	if !decodeOptionalJSON(w, r.Body, &req) {
-		return
-	}
-	runID, err := s.CancelIntentBy(id, req.Reason, string(caller.ParticipantID))
-	if err != nil {
-		writeErr(w, http.StatusConflict, err.Error())
-		return
-	}
-	s.recordAction("cancel", id, req.Reason)
-	writeJSON(w, http.StatusAccepted, map[string]any{
-		"intent_id": id, "run_id": runID, "held": true, "held_by": string(caller.ParticipantID),
-	})
-}
-
 // participantView is one addressable participant. contactable means "a message
 // sent now will either reach a live run or be queued for its next run"; a
 // finished direction is listed with contactable=false and must be reopened
@@ -414,10 +371,10 @@ type runTailView struct {
 }
 
 // agentRunEventsTail is the participant-side peek: the last N events of any run
-// in this project, read-only. It is the primitive behind "look at what a peer
-// or a child is doing" (sapper's `peek`, nvwabase's capture), and it is
-// deliberately not "only my own run": a run looking at its own tail is what
-// gives it a chance to check its next step, but the useful case is the peer.
+// in this project, read-only. It is the primitive behind "look at what a peer or
+// a child is doing", and it is deliberately not "only my own run": a run looking
+// at its own tail is what gives it a chance to check its next step, but the
+// useful case is the peer.
 //
 // Scope: the Store is this project's ledger, so a run from another project is
 // simply not found (404). The id is one path segment (isPlainID) because it is

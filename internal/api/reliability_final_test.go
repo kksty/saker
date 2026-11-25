@@ -75,7 +75,7 @@ func TestReliabilityChildWaitMustNotBeLabeledHumanWait(t *testing.T) {
 	in, _ := st.CreateIntent(model.Intent{Title: "parent"})
 	_, err := st.UpdateIntent(in.ID, func(i *model.Intent) {
 		i.Status = model.StatusWaiting
-		i.Wait = &model.Wait{Children: []string{"child"}}
+		i.Wait = &model.Wait{Actions: []string{"child"}}
 	})
 	if err != nil {
 		t.Fatal(err)

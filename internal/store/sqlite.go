@@ -441,11 +441,6 @@ func writeSQLiteRow(tx *sql.Tx, c Change) error {
 				return err
 			}
 		}
-		if in.ParentID != "" {
-			if err := link("intent:"+in.ParentID, owner, "delegates"); err != nil {
-				return err
-			}
-		}
 	}
 	if c.Kind == "goal" && c.Operation != "delete" {
 		var g model.Goal

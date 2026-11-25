@@ -68,10 +68,9 @@ type View struct {
 	// commander is the only one who can dedupe or promote them.
 	Playbooks PlaybookStats `json:"playbooks"`
 	// Redispatch counts starts beyond a direction's first attempt: retries,
-	// wake/steer resumes and post-handoff generations. It is the sapper
-	// watchdog's "taskbook was sent again" metric made observable, and unlike
-	// a bare run count it does not inflate on purpose runs (verifier/report),
-	// which never claim an intent.
+	// wake/steer resumes and post-handoff generations. It is "the taskbook was
+	// sent again" made observable, and unlike a bare run count it does not
+	// inflate on purpose runs (verifier/report), which never claim an intent.
 	Redispatch RedispatchStats `json:"redispatch"`
 	// Emergence is what the model organised on its own: directions it created,
 	// workers it spawned, messages it sent, handoffs and self-stops. It is an
@@ -79,7 +78,6 @@ type View struct {
 	// and it is deliberately absent from ForPrompt: a model that can read its
 	// own autonomy score treats the score as a target. Only the API/console
 	// board carries it.
-	Emergence *EmergenceStats `json:"emergence,omitempty"`
 	// PromptDigest is set only on the commander round prompt's copy of the view
 	// (ForPrompt). It labels the lists above as bounded top-N digests and gives
 	// the complete enumeration entries, so a model cannot read a 20-row list as
@@ -137,7 +135,6 @@ type FrontierItem struct {
 	PremiseChanged []string `json:"premise_changed,omitempty"`
 	// Descendants is the number of open descendant directions. It makes a
 	// parent direction's real weight visible without pulling the whole tree.
-	Descendants int `json:"descendants,omitempty"`
 	// LastStop and Declared summarise the previous attempt: what the harness
 	// said (completed / canceled / error) and how many facts it declared. They
 	// are what the evidence ladder keys on — not the attempt count.
@@ -335,8 +332,7 @@ func (v View) HasIdleRun(d time.Duration) bool {
 // commander's round prompt. The ledger's summaries are model-written and can be
 // pages long; the prompt carries the gist, and the full text stays behind the
 // fact/intent API (docs/17 §3.1: title → summary → doc, the doc never rides a
-// prompt). It mirrors sapper/nvwabase's split, where the commander sees a compact
-// board and reads details on demand.
+// prompt). The commander sees a compact board and reads details on demand.
 const PromptSummaryRunes = 240
 
 // ForPrompt returns the summary-layer copy of the view for the commander's round
@@ -367,7 +363,6 @@ func forPrompt(v View, open bool) View {
 	// workers spawned becomes a thing to optimise, not a thing to observe. The
 	// nil pointer disappears from the JSON entirely, so the prompt does not
 	// carry zeros that could be read as "the ledger shows none".
-	out.Emergence = nil
 	// The lists above are bounded top-N; label them and give the complete
 	// enumeration entries. Only the prompt copy carries this, so the API/console
 	// board shape is unchanged.
@@ -473,7 +468,6 @@ func BuildFromDB(db store.DB, limit int) View {
 		runsByID[r.ID] = r
 	}
 	now := time.Now()
-	emergence := emergenceStats(db, now)
 	v := View{
 		ContentHash:  db.ContentHash,
 		GeneratedAt:  now,
@@ -491,7 +485,6 @@ func BuildFromDB(db store.DB, limit int) View {
 		Frontier:     []FrontierItem{},
 		Ports:        []PortGroup{},
 		Coverage:     []CoverageItem{},
-		Emergence:    &emergence,
 	}
 
 	for _, in := range db.Intents {
@@ -605,14 +598,6 @@ func BuildFromDB(db store.DB, limit int) View {
 	// The frontier: open directions and whether their premise still stands. A
 	// from_fact that is gone or rejected makes the direction dead work, not
 	// queued work — dispatch refuses it, and the decider should see why.
-	childrenByID := make(map[string][]string, len(db.Intents))
-	intentStatus := make(map[string]string, len(db.Intents))
-	for _, in := range db.Intents {
-		intentStatus[in.ID] = in.Status
-		if in.ParentID != "" {
-			childrenByID[in.ParentID] = append(childrenByID[in.ParentID], in.ID)
-		}
-	}
 	for i := len(db.Intents) - 1; i >= 0 && len(v.Frontier) < limit; i-- {
 		in := db.Intents[i]
 		switch in.Status {
@@ -631,7 +616,6 @@ func BuildFromDB(db store.DB, limit int) View {
 			Prerequisites:  len(in.FromFactIDs),
 			NoPremise:      len(in.FromFactIDs) == 0,
 			PremiseChanged: store.PremiseClaimsChanged(in, factsByID),
-			Descendants:    openDescendants(in.ID, childrenByID, intentStatus),
 		}
 		for _, id := range in.FromFactIDs {
 			f, ok := factsByID[id]
@@ -968,24 +952,4 @@ func originRank(o string) int {
 	default:
 		return 2
 	}
-}
-
-// openDescendants counts descendant directions that are not a finished outcome
-// (done/parked). Failed descendants stay counted: a retryable failure is still
-// open work for the parent's chain.
-func openDescendants(id string, children map[string][]string, status map[string]string) int {
-	count := 0
-	var walk func(string)
-	walk = func(parent string) {
-		for _, child := range children[parent] {
-			switch status[child] {
-			case model.StatusDone, model.StatusParked:
-				continue
-			}
-			count++
-			walk(child)
-		}
-	}
-	walk(id)
-	return count
 }

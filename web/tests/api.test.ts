@@ -165,6 +165,38 @@ test('the review switch is project-scoped and distinct from the project pause', 
   }
 })
 
+test('editing an instruction is a versioned PUT carrying the body this page read', async () => {
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
+  const originalFetch = globalThis.fetch
+  const calls: { url: string; method: string; type: string; body: unknown }[] = []
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { location: { pathname: '/p/fixture/' } } })
+  globalThis.fetch = async (url, init) => {
+    const headers = (init?.headers ?? {}) as Record<string, string>
+    calls.push({
+      url: String(url),
+      method: init?.method ?? 'GET',
+      type: headers['Content-Type'] ?? '',
+      body: init?.body,
+    })
+    return new Response('{"id":"instr_7","text":"只读","version":5,"state":"active","created_by":"operator","created_at":"2026-11-21T00:00:00Z","updated_at":"2026-11-22T00:00:00Z"}')
+  }
+  try {
+    // Not a revoke: the same PUT path with the edited text and the state the page
+    // read, so the server's compare-and-set can refuse a stale write.
+    const updated = await api.updateInstruction('instr_7', { version: 4, text: '只读', state: 'active' })
+    assert.deepEqual(calls, [{
+      url: '/p/fixture/api/instructions/instr_7',
+      method: 'PUT',
+      type: 'application/json',
+      body: JSON.stringify({ version: 4, text: '只读', state: 'active' }),
+    }])
+    assert.equal(updated.version, 5)
+  } finally {
+    globalThis.fetch = originalFetch
+    if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow)
+    else Reflect.deleteProperty(globalThis, 'window')
+  }
+})
 test('project-scoped health and bundle download stay under the project base', async () => {
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
   const originalFetch = globalThis.fetch

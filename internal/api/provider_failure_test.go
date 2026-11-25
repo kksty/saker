@@ -60,7 +60,7 @@ func TestProviderFailurePauseBoundary(t *testing.T) {
 		{"transient", "API error (500): upstream error", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			f := newSpawnFixture(t)
+			f := newWorkerFixture(t)
 			f.srv.afterProviderFailure("", "", model.RunFailed, executor.Result{IsError: true, Output: tc.output, StopReason: "error"})
 			if got := f.srv.paused.Load(); got != tc.pauses {
 				t.Fatalf("paused = %t, want %t", got, tc.pauses)

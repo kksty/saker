@@ -96,7 +96,7 @@ func (s *Server) resolveAction(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "请求体不是 JSON")
 		return
 	}
-	out, err := s.Store.ResolveAction(a.ID, req.Version, req.State, req.Result, req.ResultRef, runID)
+	out, duplicate, err := s.Store.ResolveActionIdempotent(a.ID, req.Version, req.State, req.Result, req.ResultRef, runID)
 	if err != nil {
 		status := 400
 		if errors.Is(err, store.ErrActionConflict) {
@@ -105,7 +105,17 @@ func (s *Server) resolveAction(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, status, err.Error())
 		return
 	}
+	// A resubmission of the same outcome is a success, and saying so is the
+	// point: a closeout that treats "already recorded" as a failure reports a
+	// problem where the ledger is correct. The body stays the action so existing
+	// callers keep working; the header is for a client that wants to tell the two
+	// apart.
+	if duplicate {
+		w.Header().Set("X-Tianwu-Duplicate-Result", "1")
+	}
 	writeJSON(w, 200, out)
 	// No commander wake: only explicitly registered waits become ready.
-	go s.pump()
+	if !duplicate {
+		go s.pump()
+	}
 }

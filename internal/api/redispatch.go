@@ -78,9 +78,10 @@ func (s *Server) redispatchAfterCancel(runID, intentID string) {
 }
 
 // redispatchInterrupted restarts directions that were interrupted by the process
-// going away. It runs after an explicit project resume, never at boot: the boot
-// path deliberately keeps the project paused, and a restart must not silently
-// replay a whole night of work before anyone looks at it.
+// going away. It runs after the boot watchdog recovery cleared the restart pause,
+// or after an explicit project resume: work interrupted by a crash is not a
+// decision to abandon it, but it must never replay before the crash sweep has
+// converged the orphan rows.
 func (s *Server) redispatchInterrupted() {
 	if s.paused.Load() || s.closing.Load() || s.deleting.Load() {
 		return

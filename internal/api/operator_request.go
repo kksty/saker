@@ -1,14 +1,17 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/kksty/tianwu/internal/collab"
 	"github.com/kksty/tianwu/internal/model"
 	"github.com/kksty/tianwu/internal/store"
 )
@@ -167,10 +170,13 @@ func (s *Server) operatorInbox(w http.ResponseWriter, r *http.Request) {
 
 // createOperatorRequest is the commander's concrete authorization ask. It is a
 // request, never an authorization, and it spends no model round: the operator
-// sees it in the inbox. An executor is refused — a direction may not summon the
-// operator to expand its own scope. A pending generic fallback is filled in
-// place, so one idle episode produces one evolving request instead of a generic
-// row plus a duplicate.
+// sees it in the inbox. It never pauses the project or the decider either — the
+// ask is one todo row, and the commander keeps dispatching other directions while
+// the operator decides; the answer comes back as operator speech when the row is
+// resolved. An executor is refused — a direction may not summon the operator to
+// expand its own scope. A pending generic fallback is filled in place, so one
+// idle episode produces one evolving request instead of a generic row plus a
+// duplicate.
 func (s *Server) createOperatorRequest(w http.ResponseWriter, r *http.Request) {
 	if _, participant := identityOf(r); participant {
 		writeJSON(w, http.StatusForbidden, map[string]any{
@@ -262,7 +268,49 @@ func (s *Server) resolveOperatorRequest(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	s.recordAction("operator_request_resolve", out.ID, strings.TrimSpace(req.Resolution))
+	s.notifyCommanderOfResolvedRequest(r.Context(), out)
 	writeJSON(w, 200, map[string]any{"request": out})
+}
+
+// notifyCommanderOfResolvedRequest tells the commander that a request it filed
+// has an answer. A request is a ledger row, not a project pause: the commander
+// keeps dispatching other directions while the operator decides, so the
+// answer is news the next round must act on (use the granted scope, or decide it
+// is still insufficient) rather than something that only the 5-minute heartbeat
+// would eventually surface. It rides the message service as durable operator
+// speech, so a commander session that is between rounds reads it in its next
+// prompt and a live one gets it over IOA.
+//
+// The notification does not turn the resolution into an authorization by itself:
+// the three project documents and the current ledger still decide what may run.
+// A failed write is logged and the decider is still woken, because the request
+// row already carries the answer the round can read back.
+func (s *Server) notifyCommanderOfResolvedRequest(ctx context.Context, out model.OperatorRequest) {
+	action := strings.TrimSpace(out.Action)
+	text := "操作员已处理授权请求 " + out.ID
+	if action != "" {
+		text += "（" + action + "）"
+	}
+	text += "。处理说明：" + strings.TrimSpace(out.Resolution) + "。"
+	text += "请求只是待办，不阻塞其他方向：按项目文档与当前账本判断下一步，其它可推进方向照常派发；需要更多授权时再登记一条具体请求。"
+	msg, _, err := s.Store.AddMessage(model.Message{
+		ProjectID:         s.projectID(),
+		FromParticipantID: collab.OperatorID,
+		ToParticipantID:   collab.CommanderID,
+		Kind:              "operator_request_resolved",
+		Text:              text,
+		Durable:           true,
+		IdempotencyKey:    "operator-request:" + out.ID + ":resolved",
+		Status:            model.MessageQueued,
+	})
+	if err != nil {
+		log.Printf("操作员请求 %s 已处理，但通知指挥官失败：%v", out.ID, err)
+		if s.Decider != nil {
+			s.Decider.Wake("operator")
+		}
+		return
+	}
+	s.deliverToCommander(ctx, msg)
 }
 
 // operatorRequestDetailSection is the one-shot prompt section for a request the

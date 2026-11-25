@@ -321,10 +321,10 @@ func TestMetricDirectionStallRate(t *testing.T) {
 			{ID: "r_executor", Purpose: "", Status: model.RunDone, StartedAt: at(400), EndedAt: ptrTime(at(460))},
 		},
 		Intents: []model.Intent{
-			{ID: "in_new", CreatedBy: collab.CommanderID, CreatedAt: at(30)},                    // during r_new
-			{ID: "in_delegated", CreatedBy: "pt_x", DelegatedByRun: "r_new", CreatedAt: at(40)}, // r_new delegated child
-			{ID: "in_operator", CreatedBy: collab.OperatorID, CreatedAt: at(120)},               // not a commander direction
-			{ID: "in_outside", CreatedBy: collab.CommanderID, CreatedAt: at(1000)},              // outside every window
+			{ID: "in_new", CreatedBy: collab.CommanderID, CreatedAt: at(30)},       // during r_new
+			{ID: "in_delegated", CreatedBy: "pt_x", CreatedAt: at(40)},             // r_new delegated child
+			{ID: "in_operator", CreatedBy: collab.OperatorID, CreatedAt: at(120)},  // not a commander direction
+			{ID: "in_outside", CreatedBy: collab.CommanderID, CreatedAt: at(1000)}, // outside every window
 		},
 		Notebooks: []model.Notebook{{ID: collab.CommanderID, NoteRef: model.NoteRef{Version: 1, Writer: collab.OperatorID}, State: "s"}},
 		Memory:    &store.Memory{History: []store.Change{notebookChange(1, collab.OperatorID, "", "s", at(210))}},

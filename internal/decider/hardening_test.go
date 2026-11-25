@@ -34,14 +34,12 @@ func TestCommanderRoundPromptNamesCurrentReadEntries(t *testing.T) {
 	if strings.Contains(prompt, "POST /api/goals") {
 		t.Fatalf("commander identity still invites goal creation:\n%s", prompt)
 	}
-	// Emergent collaboration: executors may self-organize; the commander sets
-	// direction and acceptance, not a role hierarchy.
-	for _, want := range []string{"直接互发消息", "不制造层级", "不强制每个意图都先拆分"} {
+	for _, want := range []string{"直接互发消息", "记录交接", "意图写清目标与验收"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("commander identity lost collaboration autonomy %q:\n%s", want, prompt)
 		}
 	}
-	for _, forbidden := range []string{"将军", "士兵", "协调者"} {
+	for _, forbidden := range []string{"将军", "士兵", "协调者", "派子意图", "平级发布"} {
 		if strings.Contains(prompt, forbidden) {
 			t.Fatalf("commander identity reintroduced a role name %q:\n%s", forbidden, prompt)
 		}

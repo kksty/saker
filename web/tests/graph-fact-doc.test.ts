@@ -76,8 +76,6 @@ const panelProps = {
   onSelectFact() {},
   onClose() {},
   onChanged() {},
-  childRefresh: 0,
-  onChildIntent() {},
 }
 
 function factRecord(id: string, over: Record<string, unknown> = {}) {

@@ -368,6 +368,6 @@ func (s *Server) settleReviewPhase(intentID, runID, final, note string, failedID
 		// reviewing; that decision stays final and nobody else needs the wake.
 		return false
 	}
-	s.afterIntentSettled(intentID, runID, model.RunDone)
+	s.afterIntentSettled()
 	return true
 }

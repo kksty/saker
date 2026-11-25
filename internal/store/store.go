@@ -50,6 +50,12 @@ type DB struct {
 	// restart with the rest of the project, but they are not facts: board,
 	// report, review and coverage never read this field.
 	Messages []model.Message `json:"messages,omitempty"`
+	// Proposals are executors' structured suggestions for a next intent waiting
+	// for a commander/operator decision. They are control state in the same
+	// snapshot (decisions and the intent they create must commit atomically),
+	// not observations: newsKind/reportKind/ContentHash/board/report never read
+	// this field. Version history keeps every transition.
+	Proposals []model.Proposal `json:"proposals,omitempty"`
 	// MessageSeq is the read cursor's high-water mark. It is stored instead of
 	// derived from the rows because a withdrawn or swept message is deleted: a
 	// maximum over the surviving rows would rewind and a reader's `after`
@@ -125,7 +131,7 @@ func (s *Store) evidenceURIsLocked(ids []string) []string {
 }
 
 // schemaVersion identifies the current SQLite layout; older layouts are unsupported.
-const schemaVersion = 13
+const schemaVersion = 14
 
 // CurrentSchemaVersion is the layout this build writes and accepts. It is
 // exported for fixtures that build a ledger snapshot directly: a hard-coded
@@ -199,6 +205,19 @@ func (s *Store) flushNoRev(kinds ...string) error { return s.flushSQLite(kinds..
 func (s *Store) CreateIntent(in model.Intent) (model.Intent, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	created, err := s.createIntentLocked(in)
+	if err != nil {
+		return model.Intent{}, err
+	}
+	return created, s.flush("intent")
+}
+
+// createIntentLocked is the one intent-creation path, shared by CreateIntent and
+// DecideProposal. An approval must write the pending intent and the decision in
+// a single flush: a crash between two transactions would leave "approved with
+// no intent" (or an intent nobody decided). Caller holds the write lock and is
+// responsible for flushing the kinds it touched.
+func (s *Store) createIntentLocked(in model.Intent) (model.Intent, error) {
 	if err := s.applyInitialContextLocked(&in); err != nil {
 		return model.Intent{}, err
 	}
@@ -209,7 +228,7 @@ func (s *Store) CreateIntent(in model.Intent) (model.Intent, error) {
 	in.CreatedAt, in.UpdatedAt = now, now
 	in = detachIntent(in)
 	s.db.Intents = append(s.db.Intents, in)
-	return detachIntent(in), s.flush("intent")
+	return detachIntent(in), nil
 }
 
 func (s *Store) ListIntents() []model.Intent {
@@ -1600,6 +1619,10 @@ func (db DB) clone() DB {
 	}
 	out.OperatorRequests = append([]model.OperatorRequest(nil), db.OperatorRequests...)
 	out.Messages = append([]model.Message(nil), db.Messages...)
+	out.Proposals = append([]model.Proposal(nil), db.Proposals...)
+	for i := range out.Proposals {
+		out.Proposals[i] = detachProposal(out.Proposals[i])
+	}
 	out.Documents = append([]model.Document(nil), db.Documents...)
 	return out
 }

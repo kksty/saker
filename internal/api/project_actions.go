@@ -153,7 +153,10 @@ func (s *Server) resumeActionLocked(st projectState, facts ProjectFacts) Project
 	case pauseKindCommanderStandby:
 		return ProjectAction{ID: actionResume, Enabled: true, ReasonCode: reasonPausedCommander, Reason: "指挥官请求停止：只有操作员能继续"}
 	case pauseKindRestart:
-		return ProjectAction{ID: actionResume, Enabled: true, ReasonCode: reasonPausedRestart, Reason: "控制面重启后项目默认暂停：确认现场后继续"}
+		// The watchdog clears this pause on its own once the crash sweep is done;
+		// seeing it here means that recovery did not finish (for example the
+		// manifest write failed), so it is the operator's fallback.
+		return ProjectAction{ID: actionResume, Enabled: true, ReasonCode: reasonPausedRestart, Reason: "控制面重启后自动恢复未完成：确认现场后继续"}
 	case pauseKindUnrecorded:
 		return ProjectAction{ID: actionResume, Enabled: true, ReasonCode: reasonPausedUnrecorded, Reason: "暂停原因未记录：继续会重新派发待办意图"}
 	default:

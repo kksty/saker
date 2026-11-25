@@ -41,9 +41,9 @@ func focusHorizonFixture(t testing.TB, nFacts int) (*store.Store, model.Intent, 
 		for i := 0; i < perBranch; i++ {
 			id := fmt.Sprintf("in_b%02d_%02d", b, i)
 			db.Intents = append(db.Intents, model.Intent{
-				ID:        id,
-				Title:     fmt.Sprintf("branch %d step %d", b, i),
-				ParentID:  parent,
+				ID:    id,
+				Title: fmt.Sprintf("branch %d step %d", b, i),
+
 				Status:    model.StatusDone,
 				CreatedAt: at.Add(time.Duration(1+b*perBranch+i) * time.Second),
 			})
@@ -123,9 +123,9 @@ func focusHorizonFixture(t testing.TB, nFacts int) (*store.Store, model.Intent, 
 	db.Facts = facts
 
 	target := model.Intent{
-		ID:             "in_target_deep",
-		Title:          "deep target direction",
-		ParentID:       chainLast[branches-1],
+		ID:    "in_target_deep",
+		Title: "deep target direction",
+
 		Status:         model.StatusPending,
 		CreatedAt:      at.Add(time.Duration(nFacts+1000) * time.Minute),
 		FromFactIDs:    []string{early.ID},

@@ -25,7 +25,7 @@ func TestAutoResumeRefusalDoesNotSpendTheBudget(t *testing.T) {
 	// The instance is full: the retry cannot start.
 	s.MaxWorkers = 1
 	s.GlobalRunning = func() int { return 1 }
-	s.autoResumeFire("run_transport", in.ID)
+	s.autoResumeFire("run_transport", in.ID, nil)
 	if used := autoResumeUsed(in.ID); used != 0 {
 		t.Fatalf("a refused start spent %d of the resume budget, want 0", used)
 	}
@@ -35,7 +35,7 @@ func TestAutoResumeRefusalDoesNotSpendTheBudget(t *testing.T) {
 
 	// Control: with a slot free the timer does start a run and does charge one.
 	s.GlobalRunning = func() int { return 0 }
-	s.autoResumeFire("run_transport", in.ID)
+	s.autoResumeFire("run_transport", in.ID, nil)
 	if used := autoResumeUsed(in.ID); used != 1 {
 		t.Fatalf("a started resume charged %d, want 1", used)
 	}

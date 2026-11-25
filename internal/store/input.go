@@ -152,7 +152,6 @@ func (s *Store) PrepareRunInput(runID string, task model.Intent, policy string, 
 	s.db.Runs[index].ReviewSkipped = off
 	s.db.Runs[index].PremiseClaimVersions = claims
 	s.db.Runs[index].ContextFactVersions = contextVersions
-	s.db.Runs[index].InstructionVersions = instructionVersions(ApplicableInstructions(s.db, task.ID, false))
 	if err := s.flush("run"); err != nil {
 		return DB{}, nil, err
 	}
@@ -203,45 +202,9 @@ func (s *Store) PremiseOwnerStillLive(f model.Fact, selfIntent string) string {
 			continue
 		}
 		switch i.Status {
-		case model.StatusRunning:
+		case model.StatusRunning, model.StatusWaiting:
 			return "意图 " + i.ID
-		case model.StatusWaiting:
-			// A direction that is waiting on this work cannot correct its own
-			// facts until the work reports back. Treating it as live would
-			// deadlock exactly the case it is waiting for: the child could never
-			// cite the fact its waiting parent just produced.
-			if !s.waitsOnLocked(i, selfIntent) {
-				return "意图 " + i.ID
-			}
 		}
 	}
 	return ""
-}
-
-// waitsOnLocked reports whether source is blocked on target's work: source's
-// wait names target, or names a child whose own subtree contains it. Caller
-// holds the lock.
-func (s *Store) waitsOnLocked(source model.Intent, targetID string) bool {
-	if targetID == "" || source.Wait == nil || len(source.Wait.Children) == 0 {
-		return false
-	}
-	byParent := map[string][]string{}
-	for _, in := range s.db.Intents {
-		byParent[in.ParentID] = append(byParent[in.ParentID], in.ID)
-	}
-	queue := append([]string(nil), source.Wait.Children...)
-	seen := make(map[string]bool, len(queue))
-	for len(queue) > 0 {
-		id := queue[0]
-		queue = queue[1:]
-		if seen[id] {
-			continue
-		}
-		seen[id] = true
-		if id == targetID {
-			return true
-		}
-		queue = append(queue, byParent[id]...)
-	}
-	return false
 }

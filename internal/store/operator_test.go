@@ -126,7 +126,7 @@ func TestOperatorWaitCannotReplaceChildWaitAndCannotBeReplaced(t *testing.T) {
 	if _, err := s.RegisterOperatorWait(in.ID, in.RunID, model.OperatorWait{Request: "换一个请求"}); err == nil {
 		t.Fatal("overwrote pending request")
 	}
-	if _, err := s.RegisterWait(in.ID, in.RunID, model.Wait{Children: []string{"child"}}); err == nil {
+	if _, err := s.RegisterWait(in.ID, in.RunID, model.Wait{Actions: []string{"child"}}); err == nil {
 		t.Fatal("child wait replaced operator")
 	}
 	got, _ := s.GetIntent(in.ID)

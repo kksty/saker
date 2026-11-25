@@ -82,7 +82,7 @@ func buildStructuralFixture(t *testing.T, s *store.Store) structuralFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	child, err := s.CreateIntent(model.Intent{Title: "child", ParentID: producer.ID})
+	child, err := s.CreateIntent(model.Intent{Title: "child"})
 	if err != nil {
 		t.Fatal(err)
 	}

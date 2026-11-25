@@ -90,3 +90,44 @@ export function openCamera(
   const cy = (b.minY + b.maxY) / 2
   return { k: zoom, x: width / 2 - cx * zoom, y: height / 2 - cy * zoom }
 }
+
+/** CSS px the floating cards cover on each side of the canvas. */
+export interface ViewportInsets {
+  left?: number
+  right?: number
+  bottom?: number
+}
+
+/**
+ * Camera for one located node (a search hit, a deep link).
+ *
+ * The node lands in the middle of the band the cards leave visible, not in the
+ * middle of the canvas: the filter card owns the left edge and the node panel
+ * owns the right, so centring under either would hide the thing just found.
+ * The zoom never drops below `minZoom` — a hit found while the map is zoomed out
+ * must not stay a dot — and keeps a closer view the operator already chose.
+ */
+export function focusCamera(
+  target: { x: number; y: number },
+  width: number,
+  height: number,
+  currentZoom: number,
+  insets: ViewportInsets = {},
+  minZoom = 1,
+): Camera | null {
+  if (!(width > 0) || !(height > 0)) return null
+  if (!Number.isFinite(target.x) || !Number.isFinite(target.y)) return null
+  // A card may not eat the whole axis: the 60% cap is the same one `fit()` uses.
+  const inset = (value: number | undefined, axis: number) => Math.min(Math.max(value ?? 0, 0), axis * 0.6)
+  const left = inset(insets.left, width)
+  const right = inset(insets.right, width)
+  const bottom = inset(insets.bottom, height)
+  const bandW = Math.max(1, width - left - right)
+  const bandH = Math.max(1, height - bottom)
+  const k = Math.min(4, Math.max(0.08, Math.max(minZoom, currentZoom)))
+  return {
+    k,
+    x: left + bandW / 2 - target.x * k,
+    y: bandH / 2 - target.y * k,
+  }
+}

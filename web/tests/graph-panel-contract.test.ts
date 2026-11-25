@@ -20,10 +20,8 @@ test('readiness is not polled for a direction that cannot run', () => {
   assert.match(panel, /readinessNotice\(intent\.status, intent\.hold\)/)
 })
 
-test('the header and child rows use operator words, not graph enums', () => {
+test('the header uses operator words', () => {
   assert.match(panel, /nodeTypeLabel\(node\.type, fact\?\.kind\)/)
-  assert.match(panel, /runStatusLabel\(\{ status: child\.last_run_status, cancel_cause: child\.cancel_cause \}\)/)
-  assert.doesNotMatch(panel, /\{child\.stop_reason\}/, 'the raw run enum is not printed')
 })
 
 test('the latest run line and the collapsible warnings are wired', () => {

@@ -82,10 +82,6 @@ test('the second channel is shape, and unknown/legacy draws nothing', () => {
   assert.equal(originMarker(undefined), null)
 })
 
-test('delegation copy says 委托（等待） and the derived origin line is named 发起', () => {
-  assert.equal(edgeKindLabel('spawn'), '委托（等待）')
-  assert.equal(edgeKindLabel('origin'), '发起')
-})
 
 // ---- 发起边（派生，非账本） -------------------------------------------------
 
@@ -93,118 +89,9 @@ function originEdges(model: ReturnType<typeof buildGraph>) {
   return model.edges.filter((e) => e.kind === 'origin')
 }
 
-test('an executor-launched parentless direction points back at its initiator', () => {
-  const graph = buildGraph(
-    [],
-    [
-      intent({ id: 'in_cmd', title: '指挥官意图', created_by_participant_id: 'commander', status: 'done' }),
-      intent({ id: 'in_peer', title: '平级意图', created_by_participant_id: 'pt_in_cmd' }),
-    ],
-    [],
-  )
-  const edges = originEdges(graph)
-  assert.equal(edges.length, 1)
-  assert.equal(edges[0].source, stepID('in_cmd'))
-  assert.equal(edges[0].target, stepID('in_peer'))
-  assert.equal(edges[0].intent?.id, 'in_peer', 'the edge opens the launched direction')
-  assert.equal(edges[0].parentIntent, 'in_cmd')
-  assert.equal(edges[0].label, '发起')
-  // Provenance marks and origin lineage depth ride on step AND ghost.
-  assert.equal(graph.byId.get(stepID('in_cmd'))?.origin, 'commander')
-  assert.equal(graph.byId.get(stepID('in_cmd'))?.lineageDepth, 0)
-  assert.equal(graph.byId.get(stepID('in_peer'))?.origin, 'executor')
-  assert.equal(graph.byId.get(stepID('in_peer'))?.originIntent?.title, '指挥官意图')
-  assert.equal(graph.byId.get(stepID('in_peer'))?.lineageDepth, 1)
-  assert.equal(graph.byId.get(ghostID('in_peer'))?.origin, 'executor')
-  assert.equal(graph.byId.get(ghostID('in_peer'))?.lineageDepth, 1)
-})
 
-test('the origin line is excluded from degree, depth and both layouts', () => {
-  const intents = [
-    intent({ id: 'in_cmd', title: '指挥官意图', created_by_participant_id: 'commander' }),
-    intent({ id: 'in_peer', title: '平级意图', created_by_participant_id: 'pt_in_cmd' }),
-    intent({
-      id: 'in_peer2',
-      title: '二级平级',
-      created_by_participant_id: 'pt_in_peer',
-      // No premise: a parentless direction starts from the brief.
-    }),
-  ]
-  const withOrigin = buildGraph([], intents, [])
-  // Same directions without the provenance fields: no origin edge may exist.
-  const baseline = buildGraph(
-    [],
-    intents.map((it) => ({ ...it, created_by_participant_id: undefined })),
-    [],
-  )
-  assert.equal(originEdges(baseline).length, 0)
-  assert.equal(originEdges(withOrigin).length, 2)
-  // Lineage is a separate scale from structural depth.
-  assert.equal(withOrigin.byId.get(stepID('in_peer2'))?.lineageDepth, 2)
-  // degree counts every edge except the derived origin line.
-  for (const n of withOrigin.nodes) {
-    const incident = withOrigin.edges.filter(
-      (e) => e.kind !== 'origin' && (e.source === n.id || e.target === n.id),
-    ).length
-    assert.equal(n.degree, incident, `${n.id} degree must ignore the origin line`)
-  }
-  // Structural depth is identical with and without the derived edge.
-  assert.equal(laidOut(withOrigin), laidOut(baseline))
-  // Neither layout moves when the derived edge exists: the layered tree ignores
-  // it and the force tick skips its spring.
-  const layeredA = new ForceSim(withOrigin, { mode: 'layered' })
-  const layeredB = new ForceSim(baseline, { mode: 'layered' })
-  const posOf = (sim: ForceSim) => sim.nodes.map((n) => [n.id, n.x, n.y])
-  assert.deepEqual(posOf(layeredA), posOf(layeredB))
-  const forceA = new ForceSim(withOrigin, { mode: 'force' })
-  const forceB = new ForceSim(baseline, { mode: 'force' })
-  forceA.tick()
-  forceB.tick()
-  assert.deepEqual(posOf(forceA), posOf(forceB))
-  // But the drawn/hit-tested edge list still carries it.
-  assert.equal(forceA.edges.filter((e) => e.kind === 'origin').length, 2)
-})
 
-test('delegated children and commander/operator roots do not get origin lines', () => {
-  const graph = buildGraph(
-    [],
-    [
-      intent({ id: 'in_cmd', created_by_participant_id: 'commander' }),
-      intent({ id: 'in_oper', created_by_participant_id: 'operator' }),
-      intent({ id: 'in_child', parent_intent_id: 'in_cmd', created_by_participant_id: 'pt_in_cmd' }),
-    ],
-    [],
-  )
-  assert.equal(originEdges(graph).length, 0, 'a delegated child hangs off its parent, not an origin line')
-  assert.equal(graph.byId.get(stepID('in_cmd'))?.lineageDepth, 0)
-  assert.equal(graph.byId.get(stepID('in_oper'))?.lineageDepth, 0)
-  assert.equal(graph.byId.get(stepID('in_child'))?.lineageDepth, undefined)
-})
 
-test('an unresolvable initiator is skipped; delegated_by_run_id is the fallback', () => {
-  const intents = [
-    intent({ id: 'in_cmd', title: '指挥官意图', created_by_participant_id: 'commander' }),
-    intent({
-      id: 'in_lost',
-      created_by_participant_id: 'pt_in_not_loaded',
-      delegated_by_run_id: 'r_missing',
-    }),
-    intent({
-      id: 'in_via_run',
-      created_by_participant_id: 'pt_in_not_loaded',
-      delegated_by_run_id: 'r_cmd',
-    }),
-  ]
-  const runs = [run({ id: 'r_cmd', intent_id: 'in_cmd', purpose: '' })]
-  const graph = buildGraph([], intents, [], undefined, runs)
-  const edges = originEdges(graph)
-  assert.equal(edges.length, 1, 'only the resolvable creator line is drawn')
-  assert.equal(edges[0].target, stepID('in_via_run'))
-  assert.equal(edges[0].source, stepID('in_cmd'))
-  assert.equal(graph.byId.get(stepID('in_lost'))?.origin, 'executor', 'the mark still says executor')
-  assert.equal(graph.byId.get(stepID('in_lost'))?.originIntent, undefined)
-  assert.equal(graph.byId.get(stepID('in_lost'))?.lineageDepth, undefined)
-})
 
 // ---- 原生助手聚合（后端字段，无 journal 解码） -----------------------------
 

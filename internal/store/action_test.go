@@ -68,8 +68,8 @@ func TestActionWaitModesDeadlineAndRestart(t *testing.T) {
 	if err != nil || !state.Ready || state.Reason != model.WaitReasonTimeout {
 		t.Fatalf("deadline=%+v %v", state, err)
 	}
-	if _, err = s.RegisterWait(in.ID, run.ID, model.Wait{Actions: []string{a.ID}, Children: []string{in.ID}}); err == nil {
-		t.Fatal("mixed waits accepted")
+	if _, err = s.RegisterWait(in.ID, run.ID, model.Wait{Actions: []string{a.ID, "missing-action"}}); err == nil {
+		t.Fatal("missing action accepted")
 	}
 	if _, err = s.ResolveAction(a.ID, 1, model.ActionCompleted, "late", "", "old-run"); !errors.Is(err, ErrActionConflict) {
 		t.Fatalf("stale owner=%v", err)

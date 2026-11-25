@@ -57,6 +57,8 @@ export interface PaintOptions {
   selected: string | null
   hovered: string | null
   matches: Set<string> | null
+  /** The search row the list is on: a doubled ring, distinct from a plain match. */
+  activeMatch?: string | null
   focus: Set<string> | null
   /**
    * 一跳旁支：主干之外留在图上、但次一档亮的节点（渗透链路，graph/chain.ts）。
@@ -245,6 +247,8 @@ export function focusColdAlpha(mix: number): number {
 export const KEYBOARD_FOCUS_RING = 'rgba(108,182,255,0.95)'
 export const REVIEW_RING = 'rgba(229,181,60,0.9)'
 export const MATCH_RING = 'rgba(242,85,77,0.7)'
+/** The active search hit: full-alpha, doubled, so ↑↓ has a visible target. */
+export const ACTIVE_MATCH_RING = 'rgba(242,85,77,0.95)'
 export const HOVER_RING = 'rgba(231,234,240,0.42)'
 /** The standing marker on the selected node. Full alpha, drawn last: the panel
  *  says what is selected, but the map has to keep showing *where* it is after
@@ -300,7 +304,6 @@ export const EDGE_COLORS = {
   brief: 'rgba(120,130,148,0.65)',
   host: 'rgba(120,130,148,0.5)',
   goal: 'rgba(229,181,60,0.62)',
-  spawn: 'rgba(179,136,255,0.9)',
   // A hard prerequisite is context, not the subject: faded (and drawn before
   // the intent chain) so its blue reads as scaffolding instead of covering the
   // other lines. A blocked gate keeps its stronger red on purpose.
@@ -312,10 +315,6 @@ export const EDGE_COLORS = {
   reference: REFERENCE_COLOR,
   pin: PIN_COLOR,
   supports: 'rgba(229,181,60,0.7)',
-  /** 发起边: a derived provenance line, not a ledger relation. Deliberately the
-   *  quietest stroke on the canvas (low alpha, 1px) and visually close to the
-   *  spawn family it sits beside, distinguished by the open arrow + dashes. */
-  origin: 'rgba(179,136,255,0.55)',
 } as const
 
 /** Boundary leaves keep a glyph per reason they are not on the map. */
@@ -384,8 +383,6 @@ function edgeColor(e: GraphEdge): string {
       return EDGE_COLORS.host
     case 'goal':
       return EDGE_COLORS.goal
-    case 'spawn':
-      return EDGE_COLORS.spawn
     // Solid blue = a hard prerequisite; a reference must never borrow that
     // colour. A blocked gate (unreviewable/unverified/missing source) is dotted
     // red — never the live-execution red.
@@ -399,10 +396,8 @@ function edgeColor(e: GraphEdge): string {
     // Gold = a fact that backs an achieved goal's evidence.
     case 'supports':
       return EDGE_COLORS.supports
-    // Violet, but far quieter than the spawn lineage: provenance is a reading
-    // aid, not a work relation.
-    case 'origin':
-      return EDGE_COLORS.origin
+    // Unknown/legacy relation kind: keep the historical quiet produced stroke.
+    // The console never invents a new relation colour for a kind it does not know.
     default:
       return EDGE_COLORS.produced
   }
@@ -425,7 +420,7 @@ export interface EdgeStyle {
  *     waiting for review draws a dashed produced edge;
  *   - a reviewing direction's produced-fact edge is dashed and teal, never the
  *     premise blue, so a colour never has to be decoded from the shape;
- *   - references, spawns and goal support are dashed families of their own.
+ *   - references and goal support are dashed families of their own.
  */
 export function edgeStyle(e: GraphEdge): EdgeStyle {
   const intentEdge = e.kind === 'intent'
@@ -437,8 +432,6 @@ export function edgeStyle(e: GraphEdge): EdgeStyle {
         e.status === 'parked' ||
         e.status === 'reviewing')) ||
     (e.kind === 'premise' && Boolean(e.blocked)) ||
-    e.kind === 'spawn' ||
-    e.kind === 'origin' ||
     e.kind === 'reference' ||
     e.kind === 'supports'
   return { color: edgeColor(e), dashed }
@@ -520,7 +513,7 @@ export function edgeCurve(
   const sy = s.y + uy * r1
   const tx = t.x - ux * r2
   const ty = t.y - uy * r2
-  const bend = kind === 'brief' ? 0.05 : kind === 'spawn' || kind === 'origin' ? 0.18 : 0.08
+  const bend = kind === 'brief' ? 0.05 : 0.08
   const mx = (sx + tx) / 2
   const my = (sy + ty) / 2
   const ctrlX = mx - (ty - sy) * bend
@@ -965,6 +958,26 @@ function screenPad(camK: number, pixels: number): number {
   return pixels / Math.max(camK, 0.35)
 }
 
+/** A rejected/withdrawn fact keeps its kind colour but gets a true × cut-out.
+ *  It must be both diagonals: the older single slash read as a rendering
+ *  artifact and did not match the legend's ×. */
+function drawStatusCross(
+  ctx: CanvasRenderingContext2D,
+  n: GraphNode,
+  radius: number,
+  camK: number,
+): void {
+  const d = radius * 0.6
+  ctx.beginPath()
+  ctx.moveTo(n.x - d, n.y - d)
+  ctx.lineTo(n.x + d, n.y + d)
+  ctx.moveTo(n.x + d, n.y - d)
+  ctx.lineTo(n.x - d, n.y + d)
+  ctx.strokeStyle = CANVAS.background
+  ctx.lineWidth = 1.6 / Math.max(camK, 0.5)
+  ctx.stroke()
+}
+
 /** A ring around a node's drawn shape, following the pill for boxed nodes. */
 function nodeRing(ctx: CanvasRenderingContext2D, n: GraphNode, layered: boolean, pad: number): void {
   ctx.beginPath()
@@ -1347,12 +1360,7 @@ export function paint(o: PaintOptions) {
         ? (isSel ? 3.4 : fan ? 1.6 : 2.2)
         : kind === 'premise'
           ? (isSel ? 3 : 1.55)
-          : kind === 'spawn'
-            ? (isSel ? 2.4 : 1.5)
-            : kind === 'origin'
-              ? // Provenance is a hint, not a hop: thin until the operator points at it.
-                (isSel || isHover ? 2.2 : 1.35)
-              : kind === 'brief'
+          : kind === 'brief'
                 ? 1.5
                 : kind === 'reference'
                   ? (isSel ? 2.5 : 1.65)
@@ -1372,7 +1380,7 @@ export function paint(o: PaintOptions) {
     // Chain edges get a dark separation stroke first: where a dozen faint
     // relations cross, the halo clears a little gutter underneath the structural
     // line so the chain stays readable without making every relation loud.
-    if (intentEdge || kind === 'spawn' || kind === 'brief') {
+    if (intentEdge || kind === 'brief') {
       ctx.save()
       ctx.globalAlpha = alpha * 0.85
       ctx.strokeStyle = 'rgba(5,7,10,0.85)'
@@ -1388,9 +1396,7 @@ export function paint(o: PaintOptions) {
     const reviewingEdge = intentEdge && e.status === 'reviewing' && o.motion
     const dashed = style.dashed
     ctx.setLineDash(
-      kind === 'spawn'
-        ? [9 / cam.k, 5 / cam.k]
-        : kind === 'reference'
+      kind === 'reference'
           ? [8 / cam.k, 4 / cam.k]
           : kind === 'supports'
             ? [3 / cam.k, 4 / cam.k]
@@ -1403,7 +1409,7 @@ export function paint(o: PaintOptions) {
                 : running
                   ? [10 / cam.k, 5 / cam.k]
                   : kind === 'host'
-                    ? [4 / cam.k, 4 / cam.k]
+                    ? [2 / cam.k, 3 / cam.k]
                     : [],
     )
     ctx.lineDashOffset = running
@@ -1435,7 +1441,6 @@ export function paint(o: PaintOptions) {
     if (
       (intentEdge && (!fan || emphasized)) ||
       kind === 'brief' ||
-      kind === 'spawn' ||
       kind === 'premise' ||
       kind === 'reference' ||
       kind === 'pin' ||
@@ -1453,21 +1458,6 @@ export function paint(o: PaintOptions) {
       ctx.fill()
     }
 
-    // 发起边 ends in an *open* arrowhead: a V drawn with strokes, not the solid
-    // triangle every proven relation uses. Shape, not colour, says "derived
-    // provenance line"; hover/selection widen it like the other relations.
-    if (kind === 'origin') {
-      const ang = Math.atan2(curve.ty - curve.c2y, curve.tx - curve.c2x)
-      const size = 6.5 / Math.max(cam.k, 0.5)
-      ctx.beginPath()
-      ctx.moveTo(curve.tx - Math.cos(ang - 0.5) * size, curve.ty - Math.sin(ang - 0.5) * size)
-      ctx.lineTo(curve.tx, curve.ty)
-      ctx.lineTo(curve.tx - Math.cos(ang + 0.5) * size, curve.ty - Math.sin(ang + 0.5) * size)
-      ctx.strokeStyle = style.color
-      ctx.lineWidth = (isSel || isHover ? 1.8 : 1.2) / Math.max(cam.k, 0.5)
-      ctx.stroke()
-    }
-
     // Travelling comet: the live work visibly moves from context to output.
     if (running && o.motion) {
       const phase = (o.time / 1100 + hashString(e.id) * 0.7) % 1
@@ -1477,7 +1467,7 @@ export function paint(o: PaintOptions) {
   ctx.setLineDash([])
   ctx.lineDashOffset = 0
 
-  // ---- floating labels (spawn lineage + intent steps + emphasised names) ----
+  // ---- floating labels (intent steps + emphasised names) ----
   type Floating = {
     lx: number
     ly: number
@@ -1491,30 +1481,6 @@ export function paint(o: PaintOptions) {
   }
   const floaters: Floating[] = []
   ctx.font = `600 11px "Inter","PingFang SC","Microsoft YaHei",sans-serif`
-  for (const e of edges) {
-    if (e.kind !== 'spawn' || !e.label) continue
-    const s = byId.get(e.source)
-    const t = byId.get(e.target)
-    if (!s || !t) continue
-    const isSel = e.id === o.selected
-    const isHover = e.id === o.hovered
-    if (!isSel && !isHover && !o.showLabels && cam.k < 1.8) continue
-    const curve = cachedEdgeCurve(curveCache, e, s, t, o.layered, reuse)
-    if (!curveInViewport(curve, vp)) continue
-    const mid = pointOnCurve(curve, 0.5)
-    if (!pointInViewport(mid.x, mid.y, vp)) continue
-    const text = fitText(ctx, e.label, 90)
-    floaters.push({
-      lx: mid.x,
-      ly: mid.y,
-      text,
-      width: ctx.measureText(text).width + 10,
-      alpha: Math.min(dim(s.id), dim(t.id)),
-      priority: isSel ? 0 : isHover ? 1 : 4,
-      color: edgeStyle(e).color,
-      exempt: isSel || isHover,
-    })
-  }
   // Hover/selection names the relation it is on: a reference/pin must read as
   // "引用"/"固定" and a hard prerequisite as "必要前提", because the same line
   // used to mean both. Labels stay off the resting picture; the pointer asks.
@@ -1525,8 +1491,7 @@ export function paint(o: PaintOptions) {
       kind !== 'reference' &&
       kind !== 'supports' &&
       kind !== 'goal' &&
-      kind !== 'pin' &&
-      kind !== 'origin'
+      kind !== 'pin'
     )
       continue
     const isSel = e.id === o.selected
@@ -1642,6 +1607,7 @@ export function paint(o: PaintOptions) {
     const isSel = n.id === o.selected
     const isHover = n.id === o.hovered
     const isMatch = o.matches?.has(n.id) === true
+    const isActiveMatch = o.activeMatch === n.id
     const keyboard = n.id === o.keyboardFocus
     const born = o.appear.get(n.id)
     const age = o.motion && born !== undefined ? o.time - born : 9999
@@ -1672,13 +1638,32 @@ export function paint(o: PaintOptions) {
         ctx.arc(n.x, n.y, r + screenPad(cam.k, 3), 0, TAU)
         ctx.strokeStyle = keyboard
           ? KEYBOARD_FOCUS_RING
-          : isMatch
-            ? 'rgba(242,85,77,0.9)'
-            : 'rgba(231,234,240,0.7)'
-        ctx.lineWidth = 1.4 / Math.max(cam.k, 0.5)
+          : isSel
+            ? 'rgba(231,234,240,0.95)'
+            : isActiveMatch
+              ? ACTIVE_MATCH_RING
+              : isMatch
+                ? MATCH_RING
+                : 'rgba(231,234,240,0.7)'
+        ctx.lineWidth = (isSel ? 1.8 : isActiveMatch ? 2.2 : 1.4) / Math.max(cam.k, 0.5)
         ctx.stroke()
+        if (isActiveMatch && !isSel) {
+          // A soft outer ring makes the active hit read as one subject rather
+          // than a louder version of the other matches.
+          ctx.beginPath()
+          ctx.arc(n.x, n.y, r + screenPad(cam.k, 7), 0, TAU)
+          ctx.globalAlpha = alpha * 0.35
+          ctx.lineWidth = 5 / Math.max(cam.k, 0.5)
+          ctx.stroke()
+          ctx.globalAlpha = alpha * fadeIn(n.id)
+        }
       }
       if (n.type === 'fact' && (isSel || isHover || isMatch)) drawFactLabel(n, alpha, 'always')
+      // Status stays legible even at dot zoom: a rejected/withdrawn fact keeps
+      // its fact colour but is crossed out.
+      if (n.type === 'fact' && (n.status === 'rejected' || n.status === 'withdrawn')) {
+        drawStatusCross(ctx, n, r, cam.k)
+      }
       ctx.globalAlpha = alpha
       continue
     }
@@ -1957,12 +1942,7 @@ export function paint(o: PaintOptions) {
         ctx.globalAlpha = alpha
       }
       if (n.status === 'rejected' || n.status === 'withdrawn') {
-        ctx.beginPath()
-        ctx.moveTo(n.x - r * 0.6, n.y - r * 0.6)
-        ctx.lineTo(n.x + r * 0.6, n.y + r * 0.6)
-        ctx.strokeStyle = CANVAS.background
-        ctx.lineWidth = 1.6 / cam.k
-        ctx.stroke()
+        drawStatusCross(ctx, n, r, cam.k)
       }
     }
 
@@ -2027,39 +2007,48 @@ export function paint(o: PaintOptions) {
     // units read as a loud "big ring", and non-layered steps used to get a
     // Math.hypot-sized circle around their diamond.
     if ((isHover || isMatch) && !isSel) {
-      const pad = screenPad(cam.k, 2.5)
-      ctx.beginPath()
-      if (n.type === 'step' && !o.layered) {
-        // Force-map steps are diamonds: trace the same rounded box rotated onto
-        // the diamond, so the ring sits just outside the glyph's real outline.
-        const rr = 7 * entry * 0.72 + pad
-        ctx.save()
-        ctx.translate(n.x, n.y)
-        ctx.rotate(Math.PI / 4)
-        roundRect(ctx, -rr, -rr, 2 * rr, 2 * rr, 3)
-        ctx.restore()
-      } else if (
-        n.type === 'intent' ||
-        n.type === 'goal' ||
-        n.type === 'project' ||
-        (o.layered && n.type === 'step')
-      ) {
-        // Pill nodes: follow the box (radius 7) at a 2.5px offset.
-        roundRect(
-          ctx,
-          n.x - n.w - pad,
-          n.y - n.h - pad,
-          2 * n.w + 2 * pad,
-          2 * n.h + 2 * pad,
-          7 + pad,
-        )
-      } else {
-        // Facts, ghosts and boundary leaves: a thin ring one pad outside the dot.
-        ctx.arc(n.x, n.y, radiusOf(n) + pad, 0, TAU)
+      const ringPath = (pad: number) => {
+        ctx.beginPath()
+        if (n.type === 'step' && !o.layered) {
+          // Force-map steps are diamonds: trace the same rounded box rotated onto
+          // the diamond, so the ring sits just outside the glyph's real outline.
+          const rr = 7 * entry * 0.72 + pad
+          ctx.save()
+          ctx.translate(n.x, n.y)
+          ctx.rotate(Math.PI / 4)
+          roundRect(ctx, -rr, -rr, 2 * rr, 2 * rr, 3)
+          ctx.restore()
+        } else if (
+          n.type === 'intent' ||
+          n.type === 'goal' ||
+          n.type === 'project' ||
+          (o.layered && n.type === 'step')
+        ) {
+          // Pill nodes: follow the box (radius 7) at a 2.5px offset.
+          roundRect(
+            ctx,
+            n.x - n.w - pad,
+            n.y - n.h - pad,
+            2 * n.w + 2 * pad,
+            2 * n.h + 2 * pad,
+            7 + pad,
+          )
+        } else {
+          // Facts, ghosts and boundary leaves: a thin ring one pad outside the dot.
+          ctx.arc(n.x, n.y, radiusOf(n) + pad, 0, TAU)
+        }
       }
-      ctx.strokeStyle = isMatch ? MATCH_RING : HOVER_RING
-      ctx.lineWidth = 1 / Math.max(cam.k, 0.5)
+      ringPath(screenPad(cam.k, 2.5))
+      ctx.strokeStyle = isActiveMatch ? ACTIVE_MATCH_RING : isMatch ? MATCH_RING : HOVER_RING
+      ctx.lineWidth = (isActiveMatch ? 2.2 : 1) / Math.max(cam.k, 0.5)
       ctx.stroke()
+      if (isActiveMatch) {
+        ringPath(screenPad(cam.k, 7))
+        ctx.globalAlpha = alpha * 0.35
+        ctx.lineWidth = 5 / Math.max(cam.k, 0.5)
+        ctx.stroke()
+        ctx.globalAlpha = alpha
+      }
     }
 
     // A selected node keeps a standing marker on the canvas. The panel carries

@@ -59,7 +59,7 @@ func TestUnsuccessfulRunCannotSupplyPassReceipt(t *testing.T) {
 	}
 }
 
-func TestReviewReceivesAndRecordsPersistentInstructions(t *testing.T) {
+func TestReviewDoesNotReceiveCommanderMessages(t *testing.T) {
 	st, f, root := setup(t)
 	const constraint = "only inspect local evidence; no outbound requests"
 	in, _, err := st.CreateInstruction(model.Instruction{Text: constraint, CreatedBy: "operator", IdempotencyKey: "review-policy"})
@@ -72,7 +72,7 @@ func TestReviewReceivesAndRecordsPersistentInstructions(t *testing.T) {
 		t.Fatal(err)
 	}
 	run, _ := st.GetRun(review.VerifierRun)
-	if !strings.Contains(ex.lastReq.Prompt, constraint) || run.InstructionVersions[in.ID] != in.Version {
+	if strings.Contains(ex.lastReq.Prompt, constraint) || run.InstructionVersions[in.ID] != 0 {
 		t.Fatal("missing frozen constraints")
 	}
 }

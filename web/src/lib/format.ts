@@ -78,7 +78,6 @@ export function statusLabel(status?: string): string {
  */
 export function intentWaitText(
   wait?: IntentWait,
-  childOf?: (id: string) => { status?: string; hold?: boolean } | undefined,
 ): string {
   if (!wait) return ''
   if (wait.actions?.length) {
@@ -88,16 +87,7 @@ export function intentWaitText(
     const state = wait.operator.resolution === 'unavailable' ? '（无法完成）' : ''
     return `等待人工：${wait.operator.request}${state}`
   }
-  const ids = wait.children ?? []
-  const parts = ids.map((id) => {
-    const child = childOf?.(id)
-    if (!child) return `${id}（不在账本）`
-    return `${id} ${child.hold ? '已停止' : statusLabel(child.status)}`
-  })
-  const mode = wait.mode === 'any' ? '任一即可' : '全部完成'
-  const implicit = wait.implicit ? '（控制面补的等待：还有意图未收口）' : ''
-  // 不写「下游意图」：层级叫法另有口径，这里只说是哪几条、各自到哪一步。
-  return `等待 ${ids.length} 条意图（${mode}）${implicit}：${parts.join(' · ')}`
+  return ""
 }
 
 /**
@@ -147,8 +137,7 @@ export function runStatusLabel(run?: { status?: string; cancel_cause?: string })
         return '等待人工'
       case 'action_wait':
         return '等待外部结果'
-      case 'child_wait':
-        return '等待意图'
+
       case 'pause':
         return '项目暂停'
       case 'review_pause':
@@ -191,8 +180,6 @@ export function cancelCauseText(cause?: string): string {
       return '人工交接：保留现场并释放执行槽，操作员完成后继续'
     case 'action_wait':
       return '等待外部动作：保留会话并释放执行槽，只在匹配结果或超时后继续'
-    case 'child_wait':
-      return '等待意图：保留会话并释放执行槽，条件满足后携带结果继续'
     case 'pause':
       return '项目暂停：停止指挥官与所有执行者'
     case 'review_pause':
@@ -504,7 +491,7 @@ export function hasBrokenPremise(frontier?: FrontierItem): boolean {
 
 /** One badge-sized marker on a frontier row; `detail` is the full tooltip. */
 export interface FrontierMarker {
-  key: 'premise_changed' | 'no_premise' | 'descendants' | 'prerequisites'
+  key: 'premise_changed' | 'no_premise' | 'prerequisites'
   label: string
   detail: string
   tone: 'warning' | 'info' | 'muted' | 'secondary'
@@ -552,14 +539,6 @@ export function frontierMarkers(frontier?: FrontierItem): FrontierMarker[] {
       detail:
         '该意图没有登记硬前提（from_fact_ids 为空）。引用/固定只是阅读上下文，不是前提。',
       tone: 'info',
-    })
-  }
-  if (typeof frontier.descendants === 'number' && frontier.descendants > 0) {
-    out.push({
-      key: 'descendants',
-      label: `后代 ${frontier.descendants}`,
-      detail: `该意图下还有 ${frontier.descendants} 个未结束的后代意图；上游意图可能在等待它们，先看下游意图再决定是否重派。`,
-      tone: 'secondary',
     })
   }
   return out

@@ -72,11 +72,8 @@ func TestCommanderPromptBudget(t *testing.T) {
 
 // The revocation rule lives once, in the shared instruction section, not in the
 // commander identity or SKILL. This keeps one source of truth for every role.
-func TestRevocationRuleLivesInInstructionSectionOnly(t *testing.T) {
-	if strings.Contains(commanderIdentityBase, "旧正文不再生效") {
-		t.Fatal("commander identity duplicated the instruction revocation rule")
-	}
-	if !strings.Contains(executor.InstructionSection(nil), "撤销或替换后") {
-		t.Fatal("the shared instruction section lost the revocation rule")
+func TestSavedMessagesRenderOnlyWhenPresent(t *testing.T) {
+	if executor.InstructionSection(nil) != "" {
+		t.Fatal("empty saved messages added a prompt section")
 	}
 }

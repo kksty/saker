@@ -1,8 +1,11 @@
-// The bottom-left stack is one scroll container with three complete cards. A
-// layout regression here is what made an expanded 指挥官 card squeeze the legend
-// into a ~50px strip: the legend was the only flexible child, so flex shrank it
-// instead of the stack scrolling. The cards are read as source contracts because
-// the map is a canvas + lazy React tree that node tests cannot lay out.
+// The bottom-left stack layout: three cards with an explicit size budget.
+//
+// The old column was 12.5–17rem wide and let the legend and commander grow at
+// each other's expense: opening the legend squeezed the commander to a strip,
+// and the 52% height budget could not hold all three cards. The contract now is:
+// the target and the commander stay whole, the legend between them takes only
+// the leftover height with a self-scrolling body, and the commander is pinned
+// last at the bottom of the column.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
@@ -14,25 +17,36 @@ const legend = await read('../src/components/graph/GraphLegend.tsx')
 const commander = await read('../src/components/CommanderCard.tsx')
 const css = await read('../src/app.css')
 
-test('the stack scrolls, so each card inside it keeps its height', () => {
-  // The wrapper is the bounded scroll container; its cards must not shrink.
+test('the stack is one bounded column with room for all three cards', () => {
   assert.match(panel, /tw-graph-corner-bl tw-graph-dock tw-graph-stack absolute flex flex-col/)
   assert.match(panel, /tw-scroll flex min-h-0 flex-1 flex-col gap-1\.5 overflow-y-auto/)
-  assert.match(css, /\.tw-graph-stack \{[\s\S]*?max-block-size:/)
-  assert.match(css, /\.tw-graph-stack > \.tw-scroll/)
+  assert.match(css, /\.tw-graph-stack \{[\s\S]*?inline-size: clamp\(16rem, 18cqi, 20rem\)/)
+  assert.match(css, /\.tw-graph-stack \{[\s\S]*?max-block-size: max\(3\.5rem, calc\(var\(--graph-overlay-height\) \* 0\.72\)\)/)
 })
 
-test('the legend cannot be the child that gives up its height', () => {
-  // 指挥官 and the goal card were already shrink-0; the legend was not, which is
-  // exactly why it collapsed while the others stayed whole.
-  assert.match(legend, /tw-graph-dock flex min-h-10 w-full shrink-0 flex-col/)
+test('the commander card sits at the bottom, below the target and legend', () => {
+  const goal = panel.indexOf('终点</span>')
+  const legendAt = panel.indexOf('<GraphLegend />')
+  const commanderAt = panel.indexOf('<CommanderCard board={board}')
+  assert.ok(goal >= 0 && legendAt > goal && commanderAt > legendAt, 'goal → legend → commander')
   assert.match(commander, /w-full shrink-0 overflow-hidden rounded-xl/)
-  assert.match(panel, /w-full shrink-0 rounded-xl border border-hairline bg-card\/95/)
+  // Two compact one-line goals with a 管理 action each; a third and beyond is
+  // summed into a link to the state page instead of growing the card.
+  assert.match(panel, /openGoals\.slice\(0, 2\)\.map\(\(g\) =>/)
+  assert.match(panel, /onClick=\{\(\) => setEditingGoal\(g\)\}/)
+  assert.match(panel, /另有 \{openGoals\.length - 2\} 个未达成目标/)
 })
 
-test('an expanded legend is bounded and scrolls its own body', () => {
-  // Complete card, bounded content: the body scrolls instead of growing the
-  // stack by its full ~2000px list or being clipped by a neighbour.
-  assert.match(legend, /tw-scroll max-h-64 min-h-0 flex-1 overflow-y-auto/)
-  assert.match(legend, /aria-expanded=\{open\}/)
+test('a narrow map hides the stack under an open node panel, like the filter card', () => {
+  assert.match(
+    css,
+    /\.tw-graph-stage:has\(\.tw-graph-panel, \[data-graph-chat\]\) \.tw-graph-filter,\s*\.tw-graph-stage:has\(\.tw-graph-panel, \[data-graph-chat\]\) \.tw-graph-stack \{[\s\S]*?display: none;/,
+  )
+})
+
+test('an expanded legend takes the column remainder and scrolls its own body', () => {
+  assert.match(legend, /tw-graph-dock flex min-h-10 w-full flex-col/)
+  assert.match(legend, /open \? 'min-h-40 flex-1' : 'shrink-0'/)
+  assert.match(legend, /tw-scroll tw-graph-legend-body min-h-0 flex-1 overflow-y-auto/)
+  assert.match(css, /\.tw-graph-legend-body \{[\s\S]*?overscroll-behavior: contain/)
 })

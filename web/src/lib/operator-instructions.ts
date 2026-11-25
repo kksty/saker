@@ -1,6 +1,4 @@
-// 操作员指令: versioned operator guidance that is injected into every later
-// dispatch. This file owns the wording and the request/response mapping; the
-// component only draws it.
+// Versioned messages from the operator to the commander.
 //
 // The surface exists because the one-shot 下发 composer must stay one-shot: a
 // hint once sent there was silently turned into a standing rule and polluted
@@ -10,7 +8,6 @@
 // project documents alone.
 import { ApiError } from './api.ts'
 import { directiveKeyFor, randomRequestKey, type DirectiveKeyState } from './directive.ts'
-import { fmtTime } from './format.ts'
 import type {
   DirectiveRequest,
   DirectiveResponse,
@@ -23,12 +20,11 @@ import type {
  *  and the server refusal cannot disagree. */
 export const MAX_INSTRUCTION_RUNES = 4000
 
-/** The whole surface says this on every render: guidance, not a boundary. */
 export const INSTRUCTION_GUIDANCE =
-  '持续注入指挥官与执行者的每一轮任务书。它是指导，不是授权边界；授权、范围与停手线只在项目三份文档里。'
+  '保存给指挥官的偏好、待办和提醒，可修改、可撤销。'
 
 export const INSTRUCTION_EMPTY =
-  '还没有操作员指令。想影响下一轮用通信页的「下发」；要以后每轮都生效，才建指令。'
+  '单次沟通可用通信页的「下发」。'
 
 export type InstructionScope = 'project' | 'intent'
 
@@ -57,13 +53,27 @@ export function instructionKeyFor(
   return directiveKeyFor(state, fingerprint, generate)
 }
 
+/** What both the create form and the inline edit refuse locally, before the
+ *  server sees the body. */
+function instructionTextError(text: string): string | undefined {
+  const trimmed = text.trim()
+  if (!trimmed) return '写一条消息再提交。'
+  if ([...trimmed].length > MAX_INSTRUCTION_RUNES) return `消息最多 ${MAX_INSTRUCTION_RUNES} 字。`
+  return undefined
+}
+
 /** What the create form must refuse locally, before the server sees it. */
 export function instructionDraftError(draft: InstructionDraft): string | undefined {
-  const text = draft.text.trim()
-  if (!text) return '写一条指令再提交。'
-  if ([...text].length > MAX_INSTRUCTION_RUNES) return `指令最多 ${MAX_INSTRUCTION_RUNES} 字。`
-  if (draft.scope === 'intent' && !draft.intentID.trim()) return '选一个意图，或把作用范围改成整个项目。'
+  const textError = instructionTextError(draft.text)
+  if (textError) return textError
+  if (draft.scope === 'intent' && !draft.intentID.trim()) return '选一个关联意图，或选择整个项目。'
   return undefined
+}
+
+/** The same body rules for an edit: empty or overlong text never reaches the
+ *  wire, so the counter and the save button cannot disagree with the server. */
+export function instructionUpdateDraftError(text: string): string | undefined {
+  return instructionTextError(text)
 }
 
 /** POST /api/directives: persistent=true is what makes this an instruction
@@ -84,29 +94,69 @@ export function instructionCreateError(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.code === 'directive_invalid') return error.message
     if (error.code === 'directive_target_missing') return '这个意图不在了：刷新后再选。'
-    if (error.status === 403) return '只有操作员能下发指令。'
+    if (error.status === 403) return '只有操作员能保存持续指令。'
     return error.message
   }
   return error instanceof Error ? error.message : String(error)
 }
 
-/** Revoking is an update: the version and text this page read travel back, so a
- *  row changed in another tab is refused instead of silently overwritten. */
-export function instructionRevokeBody(instruction: Instruction): {
+/** Editing and revoking are both versioned updates: the version this page read
+ *  travels back, so a row changed in another window is refused instead of
+ *  silently overwritten. */
+export interface InstructionWriteBody {
   version: number
   text: string
-  state: 'revoked'
-} {
-  return { version: instruction.version, text: instruction.text, state: 'revoked' }
+  state: Instruction['state']
+}
+
+function instructionWriteBody<S extends Instruction['state']>(
+  instruction: Instruction,
+  text: string,
+  state: S,
+): InstructionWriteBody & { state: S } {
+  return { version: instruction.version, text: text.trim(), state }
+}
+
+/** The edited body keeps the row's own state; an edit never revives or revokes. */
+export function instructionUpdateBody(instruction: Instruction, text: string): InstructionWriteBody {
+  return instructionWriteBody(instruction, text, instruction.state)
+}
+
+/** Revoking keeps the text this page read, so the server can tell "same row" from
+ *  "stale row". */
+export function instructionRevokeBody(instruction: Instruction): InstructionWriteBody & { state: 'revoked' } {
+  return instructionWriteBody(instruction, instruction.text, 'revoked')
+}
+
+/** Edit and revoke fail the same way; only the copy names the action. */
+function instructionWriteError(
+  error: unknown,
+  copy: { conflict: string; missing: string; forbidden?: string },
+): string {
+  if (error instanceof ApiError) {
+    if (error.status === 409) return copy.conflict
+    if (error.status === 404) return copy.missing
+    if (copy.forbidden && error.status === 403) return copy.forbidden
+    return error.message
+  }
+  return error instanceof Error ? error.message : String(error)
+}
+
+export function instructionUpdateError(error: unknown): string {
+  // Anything other than a conflict or a vanished row keeps the server's own
+  // reason: a 400 (capacity/body) is more specific than any local copy.
+  return instructionWriteError(error, {
+    conflict: '正文已被其他窗口改过（版本冲突）：刷新后再改。',
+    missing: '这条指令不在了：刷新后再试。',
+  })
 }
 
 export function instructionRevokeError(error: unknown): string {
-  if (error instanceof ApiError) {
-    if (error.status === 409) return '这条指令已被改过（版本冲突）：刷新后再撤销。'
-    if (error.status === 403) return '只有操作员能撤销指令。'
-    return error.message
-  }
-  return error instanceof Error ? error.message : String(error)
+  return instructionWriteError(error, {
+    conflict: '消息版本冲突。刷新后再撤销。',
+    missing: '这条指令不在了：刷新后再试。',
+    forbidden: '只有操作员能撤销持续指令。',
+  })
 }
 
 export function instructionStateLabel(state: Instruction['state']): string {
@@ -124,11 +174,6 @@ export function instructionScopeLabel(
     ? titles.get(instruction.intent_id)
     : (titles as Record<string, string>)[instruction.intent_id]
   return title ? `意图「${title}」` : `意图 ${instruction.intent_id}`
-}
-
-/** When the row last changed, in the one format the console uses everywhere. */
-export function instructionTimeLine(instruction: Instruction): string {
-  return `v${instruction.version} · ${fmtTime(instruction.updated_at || instruction.created_at)}`
 }
 
 /** Active first, newest first inside each group: revoked rows are history and
@@ -184,17 +229,19 @@ export function instructionRevisions(
 }
 
 export function instructionCreatedReceipt(result: DirectiveResponse): string {
-  const scope = result.instruction?.intent_id ? '该意图及其后代' : '整个项目'
-  const dedupe = result.created === false ? '（重复提交，已复用同一条指令）' : ''
-  return `已生效：${scope}，之后每轮注入。${dedupe}`
+  if (result.created === false) return '重复提交，已复用同一条持续指令。'
+  return '已保存，指挥官后续可见。'
 }
 
 export function instructionRevokedReceipt(instruction: Instruction): string {
-  return `已撤销 v${instruction.version}：之后不再注入，历史保留。`
+  return `已撤销 v${instruction.version}，可查阅历史版本。`
 }
 
-/** The direction picker shows every intent: a persistent instruction may scope
- *  to a finished direction too (it applies to the retry/continue descendants). */
+export function instructionUpdatedReceipt(instruction: Instruction): string {
+  return `已修订至 v${instruction.version}，指挥官下一轮可见。`
+}
+
+/** A message may refer to any existing intent, including completed intents. */
 export function instructionIntentOptions(
   intents: readonly Pick<Intent, 'id' | 'title' | 'status'>[],
 ): Pick<Intent, 'id' | 'title' | 'status'>[] {

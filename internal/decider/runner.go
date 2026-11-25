@@ -743,8 +743,17 @@ func (r *Runner) escalateIdleReplan() {
 // the note alone even when the board says nothing changed.
 const wakeHandoffContinue = "handoff"
 
+// wakeRestart is the boot watchdog's automatic recovery wake: the control plane
+// restarted while the project was running, the crash sweep converged the dead
+// runs, and the project must continue without an operator click. It is forced
+// for the same reason an operator resume is: the board may look unchanged (the
+// interrupted directions returned to their old pending state), so the attention
+// gate would otherwise skip the round that re-plans after the crash.
+const wakeRestart = "restart"
+
 func isForced(reason string) bool {
-	return reason == "operator" || reason == "manual" || reason == "hint" || reason == "idle" || reason == wakeHandoffContinue
+	return reason == "operator" || reason == "manual" || reason == "hint" || reason == "idle" ||
+		reason == wakeHandoffContinue || reason == wakeRestart
 }
 
 // idleReplanSection asks for a next step or a specific blocker when a goal is
@@ -913,20 +922,9 @@ func (r *Runner) idleGoalNeedsOperator() bool {
 }
 
 func (r *Runner) supervisionWorthwhile(b board.View) bool {
-	// A live coordinator handles its own descendants. Root supervision remains
-	// available for silence/failures the execution mechanism cannot resolve.
-	coordinated := map[string]bool{}
-	for _, p := range b.Supervision {
-		if run, ok := r.Store.GetRun(p.Run); ok {
-			coordinated[p.Run] = r.Store.IntentCoordinator(run.IntentID) != ""
-		}
-	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for id, m := range supervisionMarks(b) {
-		if coordinated[id] {
-			continue
-		}
 		seen := r.lastSupervision[id]
 		if m.failures > seen.failures || (!m.silentSince.IsZero() && !m.silentSince.Equal(seen.silentSince)) {
 			return true
@@ -1147,8 +1145,11 @@ func (r *Runner) Run(ctx context.Context, wake string, force bool) *Decision {
 		code, detail := "supervision", "需要检查未被局部承接的运行状态"
 		if force {
 			code, detail = "explicit_wake", "操作员明确请求一次全局判断"
-			if wake == wakeHandoffContinue {
+			switch wake {
+			case wakeHandoffContinue:
 				code, detail = "handoff_continue", "交接轮已写回笔记，下一轮会核对笔记与当前账本"
+			case wakeRestart:
+				code, detail = "restart_recovery", "控制面重启后自动恢复：核对断点与当前账本后继续"
 			}
 		}
 		d.Attention = []store.AttentionReason{{Code: code, Kind: "control", Detail: detail}}

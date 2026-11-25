@@ -16,11 +16,9 @@ import (
 // or premise later).
 var ErrIntentGraphCycle = errors.New("图谱会出现环：事实—意图边只能沿已记录意图前进")
 
-// ErrIntentParentFrozen means a running direction cannot be moved to another
 // parent. The delegation is part of the graph shape the run was admitted under;
 // re-parenting mid-flight would let one direction sit under two parents over its
 // lifetime and makes "who is waiting for whom" unanswerable after the fact.
-var ErrIntentParentFrozen = errors.New("意图已在运行：不能再改父意图")
 
 // snapshotPremiseClaimsLocked records the claim version of every premise that
 // exists now. The board compares it later and reports "premise_changed" without
@@ -86,9 +84,6 @@ func (s *Store) intentGraphCycleLocked() (string, bool) {
 		for _, id := range in.FromFactIDs {
 			link("fact:"+id, owner)
 		}
-		if in.ParentID != "" {
-			link("intent:"+in.ParentID, owner)
-		}
 	}
 	for _, f := range s.db.Facts {
 		if f.IntentID != "" {
@@ -143,25 +138,8 @@ func (s *Store) intentGraphCycleLocked() (string, bool) {
 // edit and refuses it if the resulting graph has a cycle, restoring the row it
 // replaced. Caller holds the write lock. It returns the (possibly updated) row
 // to persist.
-// parentFrozen reports whether the direction's parent link is part of a live
-// arrangement right now: a run is under that parent (running/claimed), or the
-// direction is waiting on children that the link names (waiting). Failed and
-// done directions are starting points for a later retry/continue, where moving
-// the link is a legitimate setup change; freezing those broke that path.
-func parentFrozen(in model.Intent) bool {
-	switch in.Status {
-	case model.StatusRunning, model.StatusClaimed, model.StatusWaiting:
-		return true
-	}
-	return false
-}
-
 func (s *Store) validateIntentStructureLocked(row *model.Intent, previous model.Intent) error {
-	if row.ParentID != previous.ParentID && parentFrozen(previous) {
-		*row = previous
-		return ErrIntentParentFrozen
-	}
-	structural := !slices.Equal(row.FromFactIDs, previous.FromFactIDs) || row.ParentID != previous.ParentID
+	structural := !slices.Equal(row.FromFactIDs, previous.FromFactIDs)
 	if !structural {
 		return nil
 	}

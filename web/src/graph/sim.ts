@@ -277,7 +277,7 @@ export class ForceSim {
    * The tree edges are the ones the ledger already implies: a step produces its
    * facts, a fact is context for the next step, an achieved goal is anchored to
    * the fact that carries its evidence. Cross-links (extra context facts, host
-   * edges, spawn lineage) stay on the canvas but do not own a slot, so they can
+   * edges, goal support) stay on the canvas but do not own a slot, so they can
    * never bend the columns.
    */
   private placeLayered() {
@@ -325,13 +325,6 @@ export class ForceSim {
     for (const [id, parent] of stepParent) {
       const step = nodeOf(id)
       if (step) addChild(step, parent)
-    }
-    // Spawn lineage only fills in a step that has no context edge at all.
-    for (const e of this.edges) {
-      if (e.kind !== 'spawn') continue
-      const s = nodeOf(e.source)
-      const t = nodeOf(e.target)
-      if (s && t && t.type === 'step') addChild(t, s)
     }
     // An achieved goal is a leaf of the fact that carries its evidence. Unmet
     // goals are not map nodes at all, so there is nothing to attach.
@@ -594,7 +587,6 @@ export class ForceSim {
       // 发起边 is derived provenance, not a work hop: it is drawn and hit-tested
       // but never pulls two directions together (its length is the creator's
       // arbitrary position, and it would drag the force map around).
-      if (e.kind === 'origin') continue
       const s = this.index.get(e.source)
       const t = this.index.get(e.target)
       if (!s || !t) continue

@@ -9,6 +9,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { ApiError } from '../src/lib/api.ts'
+import * as instructionLib from '../src/lib/operator-instructions.ts'
 import {
   MAX_INSTRUCTION_RUNES,
   INSTRUCTION_EMPTY,
@@ -28,6 +29,10 @@ import {
   instructionRevisions,
   instructionScopeLabel,
   instructionStateLabel,
+  instructionUpdateBody,
+  instructionUpdateDraftError,
+  instructionUpdateError,
+  instructionUpdatedReceipt,
   orderInstructions,
   type InstructionDraft,
 } from '../src/lib/operator-instructions.ts'
@@ -79,7 +84,7 @@ test('a persistent instruction is the same directive endpoint with its own lifet
 })
 
 test('the form refuses what the server would refuse, before the request', () => {
-  assert.match(instructionDraftError(draft({ text: '   ' })) ?? '', /写一条指令/)
+  assert.match(instructionDraftError(draft({ text: '   ' })) ?? '', /写一条消息/)
   assert.equal(instructionDraftError(draft({ text: 'x'.repeat(MAX_INSTRUCTION_RUNES) })), undefined)
   assert.match(
     instructionDraftError(draft({ text: 'x'.repeat(MAX_INSTRUCTION_RUNES + 1) })) ?? '',
@@ -87,7 +92,7 @@ test('the form refuses what the server would refuse, before the request', () => 
   )
   assert.match(
     instructionDraftError(draft({ scope: 'intent', intentID: '' })) ?? '',
-    /选一个意图/,
+    /选一个关联意图/,
   )
   assert.equal(instructionDraftError(draft()), undefined)
   assert.deepEqual(instructionCreateBody(draft({ scope: 'intent', intentID: ' in_x ' }), 'k').intent_id, 'in_x')
@@ -110,9 +115,10 @@ test('a retried save reuses the key; an edited instruction gets a new one', () =
   assert.equal(regenerated.key, 'new-key')
 })
 
-test('the copy never lets a guidance sentence read as authorization', () => {
-  assert.match(INSTRUCTION_GUIDANCE, /指导/)
-  assert.match(INSTRUCTION_GUIDANCE, /不是授权边界/)
+test('the copy describes permanent messages to the commander', () => {
+  assert.match(INSTRUCTION_GUIDANCE, /保存给指挥官的偏好、待办和提醒/)
+  // Editing is part of the surface, not a hidden API: the same card says so.
+  assert.match(INSTRUCTION_GUIDANCE, /可修改/)
   assert.match(INSTRUCTION_EMPTY, /下发/)
   // The one-shot composer must not grow a lifetime switch back: persistent
   // instructions are created only by the dedicated surface.
@@ -128,10 +134,22 @@ test('the copy never lets a guidance sentence read as authorization', () => {
   assert.match(surface, /api\.instructions\('all'\)/)
   assert.match(surface, /api\.instructionHistory/)
   assert.match(surface, /api\.revokeInstruction/)
+  // Editing lives in the management dialog's rows, and only there: the inline
+  // body editor is the one labelled control.
+  assert.match(surface, /api\.updateInstruction/)
+  assert.match(surface, /aria-label="修改持续指令正文"/)
+  assert.match(surface, /保存修改/)
+  assert.match(surface, /export function OperatorInstructionsDialog/)
   // The surface is reachable from the 通信 sidebar, not buried in a settings card.
   const messages = readFileSync(fileURLToPath(new URL('../src/views/Messages.tsx', import.meta.url)), 'utf8')
   assert.match(messages, /import \{ OperatorInstructionsCard \}/)
   assert.match(messages, /<OperatorInstructionsCard \/>/)
+  // The sidebar card stays read-only: it opens the dialog and never draws an
+  // editor of its own.
+  const card = /export function OperatorInstructionsCard\(\) \{([\s\S]*?)\n\}\n/.exec(surface)
+  assert.ok(card, 'the sidebar card must stay its own component')
+  assert.doesNotMatch(card[1], /<Textarea/)
+  assert.doesNotMatch(card[1], /api\.updateInstruction/)
 })
 
 test('the standing list keeps active rows visible and revoked rows as history', () => {
@@ -166,7 +184,69 @@ test('revoking carries the version and text this page read, so a stale revocatio
   assert.deepEqual(instructionRevokeBody(target), { version: 4, text: '只读优先', state: 'revoked' })
   assert.match(instructionRevokeError(new ApiError(409, '冲突', 'instruction_conflict')), /版本冲突/)
   assert.match(instructionRevokeError(new ApiError(403, '禁止', 'forbidden')), /只有操作员/)
+  assert.match(instructionRevokeError(new ApiError(404, '不存在', 'not_found')), /不在了/)
   assert.equal(instructionRevokeError(new Error('网络错误')), '网络错误')
+})
+
+test('an edit carries the clicked row version and its state, not the new text', () => {
+  const target = row({ id: 'instr_7', version: 4, text: '只读优先', state: 'active' })
+  // The CAS travels back as the version the operator read: saving a second time
+  // after a background reload must still name that row version.
+  assert.deepEqual(instructionUpdateBody(target, '  只读与最小改动  '), {
+    version: 4,
+    text: '只读与最小改动',
+    state: 'active',
+  })
+  // An edit is not a revoke and never changes the state; a revoked row reaching
+  // this helper would keep its state instead of being silently revived.
+  assert.equal(instructionUpdateBody(row({ version: 9, state: 'revoked' }), 'x').state, 'revoked')
+})
+
+test('an edit refuses an empty or overlong body before the server sees it', () => {
+  assert.match(instructionUpdateDraftError('   ') ?? '', /写一条消息/)
+  assert.equal(instructionUpdateDraftError(`  ${'x'.repeat(MAX_INSTRUCTION_RUNES)}  `), undefined)
+  assert.match(
+    instructionUpdateDraftError('x'.repeat(MAX_INSTRUCTION_RUNES + 1)) ?? '',
+    new RegExp(String(MAX_INSTRUCTION_RUNES)),
+  )
+  assert.equal(instructionUpdateDraftError('新的正文'), undefined)
+})
+
+test('edit failures say what to do: conflict, missing row, or the server reason', () => {
+  assert.match(
+    instructionUpdateError(new ApiError(409, '指令版本或幂等键冲突', 'instruction_conflict')),
+    /正文已被其他窗口改过（版本冲突）/,
+  )
+  assert.match(
+    instructionUpdateError(new ApiError(409, '冲突')),
+    /刷新后再改/,
+  )
+  assert.match(
+    instructionUpdateError(new ApiError(404, '指令不存在', 'not_found')),
+    /这条指令不在了：刷新后再试/,
+  )
+  // Anything else keeps the server's wording instead of inventing local copy.
+  assert.equal(
+    instructionUpdateError(new ApiError(403, '只有操作员能写持续指令', 'forbidden')),
+    '只有操作员能写持续指令',
+  )
+  // A 400 keeps the server's own reason (the capacity body is not generic).
+  assert.equal(
+    instructionUpdateError(new ApiError(400, '有效指令上下文合计超过 64 KiB，请先整理或撤销旧指令')),
+    '有效指令上下文合计超过 64 KiB，请先整理或撤销旧指令',
+  )
+  assert.equal(instructionUpdateError(new Error('网络错误')), '网络错误')
+})
+
+test('the edit receipt names the new version and when it takes effect', () => {
+  assert.equal(
+    instructionUpdatedReceipt(row({ version: 5 })),
+    '已修订至 v5，指挥官下一轮可见。',
+  )
+})
+
+test('the unused time-line formatter is gone, so nobody renders a second time format', () => {
+  assert.equal('instructionTimeLine' in instructionLib, false)
 })
 
 test('create errors say what to do instead of echoing a status code', () => {
@@ -208,12 +288,11 @@ test('receipts say what became standing and what was withdrawn', () => {
     created: true,
     instruction: row(),
   }
-  assert.match(instructionCreatedReceipt(created), /已生效/)
-  assert.match(instructionCreatedReceipt(created), /每轮注入/)
+  assert.match(instructionCreatedReceipt(created), /已保存，指挥官后续可见/)
   assert.match(
     instructionCreatedReceipt({ ...created, created: false }),
     /重复提交/,
   )
   assert.match(instructionRevokedReceipt(row({ version: 3 })), /已撤销 v3/)
-  assert.match(instructionRevokedReceipt(row({ version: 3 })), /不再注入/)
+  assert.match(instructionRevokedReceipt(row({ version: 3 })), /可查阅历史版本/)
 })

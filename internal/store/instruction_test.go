@@ -20,20 +20,20 @@ func instructionFixture(t *testing.T, s *Store, target, key string) model.Instru
 	return in
 }
 
-func TestInstructionsSurviveRestartAndApplyToFutureDescendants(t *testing.T) {
+func TestInstructionsSurviveRestartAndRespectScope(t *testing.T) {
 	s := open(t)
 	parent, _ := s.CreateIntent(model.Intent{Title: "parent"})
 	global := instructionFixture(t, s, "", "global")
 	local := instructionFixture(t, s, parent.ID, "local")
-	child, _, err := s.CreateSpawnIntent(model.Intent{Title: "child", ParentID: parent.ID, CreatedBy: "commander", IdempotencyKey: "child"}, "")
+	child, err := s.CreateIntent(model.Intent{Title: "child", CreatedBy: "commander"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	other, _ := s.CreateIntent(model.Intent{Title: "other"})
-	if got := ApplicableInstructions(s.Snapshot(), child.ID, false); len(got) != 2 {
+	if got := ApplicableInstructions(s.Snapshot(), parent.ID, true); len(got) != 2 {
 		t.Fatalf("child=%+v", got)
 	}
-	if got := ApplicableInstructions(s.Snapshot(), other.ID, false); len(got) != 1 || got[0].ID != global.ID {
+	if got := ApplicableInstructions(s.Snapshot(), other.ID, false); len(got) != 0 {
 		t.Fatalf("other=%+v", got)
 	}
 	if _, err := s.UpdateInstruction(local.ID, 1, "更新的约束", model.InstructionActive); err != nil {
@@ -53,7 +53,7 @@ func TestInstructionsSurviveRestartAndApplyToFutureDescendants(t *testing.T) {
 	if len(reopened.Instructions()) != 2 || len(reopened.History("instruction", local.ID)) != 3 {
 		t.Fatal("instruction revisions lost")
 	}
-	if got := ApplicableInstructions(reopened.Snapshot(), child.ID, false); len(got) != 1 {
+	if got := ApplicableInstructions(reopened.Snapshot(), child.ID, true); len(got) != 1 || got[0].ID != global.ID {
 		t.Fatalf("revoked inherited: %+v", got)
 	}
 	if len(reopened.Snapshot().Facts) != 0 {
@@ -64,8 +64,7 @@ func TestInstructionsSurviveRestartAndApplyToFutureDescendants(t *testing.T) {
 func TestInstructionAndRelevantNotificationsCommitOrRollbackTogether(t *testing.T) {
 	s := open(t)
 	parent, _ := s.CreateIntent(model.Intent{Title: "parent"})
-	child, _, _ := s.CreateSpawnIntent(model.Intent{Title: "child", ParentID: parent.ID, CreatedBy: "commander", IdempotencyKey: "c"}, "")
-	_, run, err := s.StartIntentRun(child.ID, "local", "", model.Run{})
+	_, run, err := s.StartIntentRun(parent.ID, "local", "", model.Run{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,16 +72,16 @@ func TestInstructionAndRelevantNotificationsCommitOrRollbackTogether(t *testing.
 	_, _, _ = s.StartIntentRun(other.ID, "local", "", model.Run{})
 	local := instructionFixture(t, s, parent.ID, "local")
 	notices := s.InstructionNotifications(local.ID, 1)
-	if len(notices) != 2 {
+	if len(notices) != 1 {
 		t.Fatalf("wanted commander + child: %+v", notices)
 	}
 	for _, m := range notices {
-		if !m.Durable || m.ToParticipantID == collab.ParticipantID(other.ID) {
+		if !m.Durable || m.ToParticipantID != collab.CommanderID {
 			t.Fatal("unrelated notification")
 		}
 	}
 	r, _ := s.GetRun(run.ID)
-	if r.InstructionNotices[local.ID] != 1 {
+	if len(r.InstructionNotices) != 0 {
 		t.Fatal("notice version not committed")
 	}
 	before, _ := json.Marshal(s.Snapshot())
@@ -101,9 +100,11 @@ func TestInstructionAndRelevantNotificationsCommitOrRollbackTogether(t *testing.
 func TestInstructionInputAndAcknowledgementUseSpecificRunAndVersion(t *testing.T) {
 	s := open(t)
 	in := instructionFixture(t, s, "", "g")
-	task, _ := s.CreateIntent(model.Intent{Title: "work"})
-	brief, run, _ := s.StartIntentRun(task.ID, "local", "", model.Run{})
-	if _, _, err := s.PrepareRunInput(run.ID, brief, model.PremiseVerifiedOnly, DispatchGate{}); err != nil {
+	run, err := s.AddRun(model.Run{Purpose: "commander", Status: model.RunRunning})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.PrepareCommanderInstructions(run.ID); err != nil {
 		t.Fatal(err)
 	}
 	r, _ := s.GetRun(run.ID)

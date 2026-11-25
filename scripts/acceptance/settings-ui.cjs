@@ -1,7 +1,8 @@
 // Offline settings acceptance for the single model gateway console.
 // All page HTTP responses are synthetic; no Tianwu service, model provider,
-// project data or saved credential is used. README screenshots use the sibling
-// console-gallery.cjs; this script is the behavioral regression for 设置.
+// project data or saved credential is used. The sibling console-gallery.cjs
+// renders screenshots (not committed); this script is the behavioral regression
+// for 设置.
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');

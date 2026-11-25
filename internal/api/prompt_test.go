@@ -366,10 +366,10 @@ func TestPromptCarriesNoToolCommandLines(t *testing.T) {
 		name   string
 		prompt string
 	}{
-		{"full dispatch", BuildPromptWithInstructions(db, in, "10.0.0.0/24", "/data/pocs", "/data/kb",
-			time.Minute, true, true, "上一轮接班笔记：先核 /admin 的读权限。", "\n## 当前持久指令\n- 只读。\n", "")},
+		{"full dispatch", BuildPromptWithFocus(db, in, "10.0.0.0/24", "/data/pocs", "/data/kb",
+			time.Minute, true, true, "上一轮接班笔记：先核 /admin 的读权限。")},
 		{"no optional summaries", buildPromptWithoutOptionalSummaries(db, in, "10.0.0.0/24", "/data/pocs", "/data/kb",
-			time.Minute, true, true, "\n## 当前持久指令\n- 只读。\n", "", false)},
+			time.Minute, true, true, "", false)},
 		{"bare dispatch", BuildPrompt(db, in, "", "/data/pocs", "", 0, false)},
 		{"commander turn input", (&Server{APIBase: "http://127.0.0.1:8080"}).CommanderHeader() + "\n\n" +
 			decider.CommanderRoundPrompt(board.View{}, "## 笔记正文\n固定夹具。\n",
@@ -827,7 +827,6 @@ func TestGraphPointerSpendsContextOnDemand(t *testing.T) {
 func TestTaskSourceLine(t *testing.T) {
 	const (
 		commanderExtra    = "该意图由指挥官基于全局前沿判定下发。"
-		peerExtra         = "你与发起者是共享账本的同级执行者。你独立核对证据，并对本轮结论负责。"
 		authorizationNote = "授权来源"
 	)
 	const sourceTitle = "发现 /admin 的独立线索"
@@ -845,9 +844,6 @@ func TestTaskSourceLine(t *testing.T) {
 		untitled bool
 	}{
 		{name: "commander", createdBy: collab.CommanderID, sourceTag: "【任务来源：指挥官全局派发】", extra: commanderExtra},
-		{name: "peer executor", createdBy: "pt_in_src", sourceTag: "【任务来源：同僚执行者「" + sourceTitle + "」平级发布】", extra: peerExtra, titled: true},
-		{name: "peer source missing from ledger", createdBy: "pt_in_missing", sourceTag: "【任务来源：同僚执行者平级发布】", extra: peerExtra, untitled: true},
-		{name: "peer source blank title", createdBy: "pt_in_blank", sourceTag: "【任务来源：同僚执行者平级发布】", extra: peerExtra, untitled: true},
 		{name: "operator", createdBy: collab.OperatorID, sourceTag: "【任务来源：操作员】"},
 		// Old rows carry no CreatedBy, and a non-collab string is not an
 		// initiator the ledger can resolve: the prompt names no source.
@@ -935,63 +931,6 @@ func TestTaskSourceLine(t *testing.T) {
 // titles may carry newlines, and a title is only a label, so it is folded to one
 // line and clipped at 40 runes. An empty title omits the「title」part instead of
 // producing empty quotes.
-func TestTaskSourceTitleFoldedAndClipped(t *testing.T) {
-	const tail = "长"
-	db := testDB()
-	db.Intents = append(db.Intents,
-		model.Intent{ID: "in_long", Title: "第一行\n  第二行 " + strings.Repeat(tail, 60)},
-		model.Intent{ID: "in_blank", Title: " \n\t "},
-	)
-
-	firstLine := func(sourceID string) string {
-		t.Helper()
-		in := model.Intent{ID: "in_target", Title: "目标", CreatedBy: "pt_" + sourceID}
-		p := BuildPrompt(db, in, "", "", "", 0, false)
-		// The task-source line is the role/identity paragraph; the operator
-		// priority sentence precedes it now, so the block is located by its
-		// marker instead of by line number.
-		for _, line := range strings.Split(p, "\n") {
-			if strings.Contains(line, "【任务来源") || line == expectedExecutorOpening {
-				return line
-			}
-		}
-		t.Fatalf("prompt lost the task-source line:\n%s", p)
-		return ""
-	}
-
-	first := firstLine("in_long")
-	start := strings.Index(first, "「")
-	end := strings.Index(first, "」")
-	if start < 0 || end < start {
-		t.Fatalf("source title missing from the opening line: %q", first)
-	}
-	title := first[start+len("「") : end]
-	if strings.Contains(title, "\n") || strings.Contains(title, "\r") {
-		t.Fatalf("source title was not folded to one line: %q", title)
-	}
-	if !strings.HasPrefix(title, "第一行 第二行 长") {
-		t.Fatalf("folded title lost its text: %q", title)
-	}
-	if !strings.HasSuffix(title, "…") {
-		t.Fatalf("over-long title was not clipped: %q", title)
-	}
-	r := []rune(title)
-	if len(r) != taskSourceTitleRunes+1 {
-		t.Fatalf("clipped title has %d runes, want %d runes + ellipsis", len(r), taskSourceTitleRunes)
-	}
-	if strings.Contains(title, strings.Repeat(tail, 60)) {
-		t.Fatalf("clipped title still carries the whole source title: %q", title)
-	}
-
-	blank := firstLine("in_blank")
-	if strings.Contains(blank, "「") || strings.Contains(blank, "」") {
-		t.Fatalf("blank source title left empty quotes: %q", blank)
-	}
-	if !strings.HasPrefix(blank, "【任务来源：同僚执行者平级发布】") {
-		t.Fatalf("blank source title lost the peer source tag: %q", blank)
-	}
-}
-
 // TestFactStatusMarkers pins the one-line status label of a fact row. The old
 // blanket "待复核假设" label treated a note, a rejected fact and an unverified
 // fact as the same thing; each now says what it may be used for.

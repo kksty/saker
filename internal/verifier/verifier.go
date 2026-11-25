@@ -216,7 +216,7 @@ func (v *Verifier) runClaimed(ctx context.Context, f model.Fact, factID string) 
 	if v.Policy != nil {
 		policy = v.Policy()
 	}
-	db, instructions, err := v.Store.PreparePurposeInput(run.ID, policy)
+	db, _, err := v.Store.PreparePurposeInput(run.ID, policy)
 	if err != nil {
 		now := time.Now()
 		_, _ = v.Store.UpdateRun(run.ID, func(r *model.Run) {
@@ -335,7 +335,7 @@ func (v *Verifier) runClaimed(ctx context.Context, f model.Fact, factID string) 
 		})
 	}
 	if runErr == nil {
-		prompt := executor.InstructionSection(instructions) + BuildPrompt(f, evidencePaths, scope, premiseRows(db, f))
+		prompt := BuildPrompt(f, evidencePaths, scope, premiseRows(db, f))
 		// The reviewer's brief is mostly the reviewed party's own transcription, so
 		// its boundary is journaled like the other two: name and size only, never
 		// the text. This is what lets a later audit say which version of the

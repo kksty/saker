@@ -159,8 +159,6 @@ function NodeWorkspace({
   onSelectFact,
   onClose,
   onChanged,
-  childRefresh,
-  onChildIntent,
   /** Cross-page link: open one run in the run ledger. */
   onOpenRun,
   treeActive = false,
@@ -178,10 +176,6 @@ function NodeWorkspace({
   onSelectFact: (factId: string) => void
   onClose: () => void
   onChanged: () => void
-  /** Changes after a child is created; re-reads the child list. */
-  childRefresh: number
-  /** Open the "hang a child under this direction" dialog for this intent. */
-  onChildIntent: (parent: { id: string; title: string }) => void
   /** Cross-page link: open one run in the run ledger (`?view=runs&run=…`). */
   onOpenRun?: (runID: string) => void
   /** 「只看这棵树」是否开着（画布上只剩这棵树）。 */
@@ -193,10 +187,6 @@ function NodeWorkspace({
   const intent = node.meta?.intent
   const factID = node.meta?.fact?.id ?? ''
   const detail = useLoad(() => (isFact && factID ? api.fact(factID) : Promise.resolve(null)), [factID])
-  const children = useLoad(
-    () => (intent ? api.children(intent.id) : Promise.resolve([])),
-    [intent?.id, childRefresh],
-  )
   const usage = useLoad(
     () => (intent ? api.intentUsage(intent.id) : Promise.resolve(null)),
     [intent?.id],
@@ -215,7 +205,7 @@ function NodeWorkspace({
   const readiness = usePoll(
     () => (showReadiness && intent ? api.intentReadiness(intent.id, { verifyBytes: true }) : Promise.resolve(null)),
     showReadiness ? 10000 : 0,
-    [intent?.id, childRefresh, showReadiness],
+    [intent?.id, showReadiness],
   )
   const [handoffOpen, setHandoffOpen] = useState(false)
   const [handoffNote, setHandoffNote] = useState('')
@@ -246,13 +236,7 @@ function NodeWorkspace({
   // 发起者: resolved by buildGraph from created_by (+ delegated_by_run fallback).
   // The panel never re-derives it from free text; an unresolvable row says so.
   const origin = node.origin ?? (intent ? intentOrigin(intent) : 'unknown')
-  const originWho =
-    origin === 'executor'
-      ? node.originIntent?.title
-        ? `执行者「${node.originIntent.title}」`
-        : '执行者（发起意图未载入）'
-      : originLabel(origin)
-  const peerOrigin = origin === 'executor' && Boolean(intent) && !intent?.parent_intent_id
+  const originWho = originLabel(origin)
   const helpers = node.helpers
 
   // The seal's provenance: the facts it cited when the server recorded them;
@@ -283,7 +267,6 @@ function NodeWorkspace({
   // instead of showing the panel's error state.
   const readinessPremises = Array.isArray(readiness.data?.premises) ? readiness.data!.premises : undefined
   const usageDirect = usage.data?.direct
-  const usageSubtree = usage.data?.subtree
   const detailFact = detail.data?.fact
   // The graph's fact record is a lightweight summary and usually has no `doc`;
   // the full text (断言 + 复现过程) comes back on the detail read. Prefer that,
@@ -695,29 +678,12 @@ function NodeWorkspace({
                   title="实际使用的模型"
                 />
               )}
-              {intent.parent_intent_id && (
-                <Prop label="上游意图" value={intent.parent_intent_id} title={`上游意图 ${intent.parent_intent_id}`} />
-              )}
-              {intent.delegated_by_run_id && <Prop label="委派 run" value={intent.delegated_by_run_id} />}
               <Prop
                 label="发起"
                 value={originWho}
                 mono={false}
                 title={intent.created_by_participant_id ? `created_by_participant_id = ${intent.created_by_participant_id}` : '旧数据没有记录发起者'}
               />
-              {node.lineageDepth !== undefined && (
-                <Prop
-                  label="谱系"
-                  value={`第 ${node.lineageDepth} 跳`}
-                  mono={false}
-                  title="沿发起线（平级发布）回溯的深度；0 = 指挥官/操作员根，不是结构性 depth"
-                />
-              )}
-              {peerOrigin && (
-                <div className="pt-0.5 text-[11px] leading-relaxed text-ink-3">
-                  平级发布：发起者与本意图都是执行者，不是上游意图关系；双方各自对结论负责。
-                </div>
-              )}
               {intent.updated_at && <Prop label="更新" value={fmtTime(intent.updated_at)} />}
             </Section>
           )}
@@ -803,17 +769,16 @@ function NodeWorkspace({
 
           {usage.data && (
             <Section title="token 用量">
-              {usageDirect && usageSubtree ? (
+              {usageDirect ? (
                 <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[12px] text-ink-2">
                   <span className="tw-nums">直接 {fmtInt(usageDirect.total_tokens)} tok</span>
-                  <span className="tw-nums">子树 {fmtInt(usageSubtree.total_tokens)} tok</span>
-                  <span className="tw-nums">{usageSubtree.runs} run</span>
-                  {usageSubtree.unknown_usage_runs > 0 && (
-                    <span className="text-ink-3">{usageSubtree.unknown_usage_runs} 个用量未知</span>
+                  <span className="tw-nums">{usageDirect.runs} run</span>
+                  {usageDirect.unknown_usage_runs > 0 && (
+                    <span className="text-ink-3">{usageDirect.unknown_usage_runs} 个用量未知</span>
                   )}
                 </div>
               ) : (
-                <EmptyLine>用量没读全：服务端没有返回直接/子树分项，这里不显示 0。</EmptyLine>
+                <EmptyLine>用量没读全：服务端没有返回意图用量，这里不显示 0。</EmptyLine>
               )}
             </Section>
           )}
@@ -823,14 +788,14 @@ function NodeWorkspace({
               <div className="flex items-center gap-1.5">
                 <span className="tw-eyebrow normal-case tracking-normal text-ink-2">新执行者接班</span>
                 <Badge size="sm" variant="muted">交接 v{intent.handoff_version ?? 0}</Badge>
-                <Button
+                {<Button
                   size="xs"
                   variant="outline"
                   className="ml-auto"
                   onClick={() => setHandoffOpen((v) => !v)}
                 >
                   换新执行者
-                </Button>
+                </Button>}
               </div>
               {handoffOpen && (
                 <div className="mt-1.5 space-y-1.5">
@@ -856,32 +821,6 @@ function NodeWorkspace({
             </div>
           )}
 
-          {(children.data?.length ?? 0) > 0 && (
-            <Section title={`下游意图（${children.data?.length}）`}>
-              {children.data?.map((child) => (
-                <div
-                  key={child.id}
-                  className="rounded-lg border border-hairline px-2.5 py-2 transition-colors hover:bg-surface-2/50"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <IntentStatusChip status={child.status} hold={child.hold} />
-                    <span className="tw-break min-w-0 flex-1 text-[12px] text-ink-2">{child.title}</span>
-                    {child.facts > 0 && (
-                      <span className="tw-nums shrink-0 font-mono text-[11px] text-ink-3">{child.facts} 事实</span>
-                    )}
-                  </div>
-                  <div className="tw-break mt-1 flex flex-wrap gap-x-1.5 font-mono text-[11px] text-ink-3">
-                    <span>{child.id}</span>
-                    {child.last_run_status ? (
-                      <span>
-                        · {runStatusLabel({ status: child.last_run_status, cancel_cause: child.cancel_cause })}
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-            </Section>
-          )}
 
           {/* 重派/续话/复核备注：给操作员和下一轮决策看的历史，不是执行者约束。
               它不在 intent.doc 里，派发提示词也不读（D72）。 */}
@@ -1035,18 +974,6 @@ function NodeWorkspace({
                 <Play className="h-3.5 w-3.5" /> 派发
               </Button>
             )}
-            {intent &&
-              (intent.status === 'pending' || intent.status === 'running' || intent.status === 'claimed') && (
-                <Button
-                  size="xs"
-                  variant="soft"
-                  disabled={busy}
-                  onClick={() => onChildIntent({ id: intent.id, title: intent.title })}
-                  title="把一块工作挂到当前意图下面（可选）：新意图有自己的 run、会自动开跑，上游意图继续"
-                >
-                  <GitBranch className="h-3.5 w-3.5" /> 派发意图
-                </Button>
-              )}
             {intent && intent.status === 'running' && intent.run_id && (
               <Button size="xs" variant="ghost" disabled={busy} onClick={() => run(() => api.cancelRun(intent.run_id!), '已取消')}>
                 <Activity className="h-3.5 w-3.5" /> 取消

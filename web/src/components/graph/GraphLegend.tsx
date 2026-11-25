@@ -6,30 +6,34 @@
 import { ChevronDown } from 'lucide-react'
 import { useSessionState } from '@/lib/session-state'
 import {
+  ACTIVE_MATCH_RING,
   BOUNDARY_COLORS,
   CANVAS,
   EDGE_COLORS,
   FACT_COLORS,
-  FOCUS_COLD_ALPHA,
   GOAL_COLORS,
   HELPER_MARKER_COLOR,
+  HOVER_RING,
   INTENT_COLORS,
   KEYBOARD_FOCUS_RING,
+  MATCH_RING,
   ORIGIN_MARKER_COLOR,
   PROJECT_COLOR,
   REVIEW_RING,
+  SELECTION_RING,
 } from '@/graph/render'
 
 const FACT_KINDS = ['vuln', 'cred', 'host', 'service', 'loot', 'artifact', 'note'] as const
 
-/** 中文状态名 → render.ts 的意图状态色键。 */
-const INTENT_STATUSES: readonly [string, string][] = [
-  ['排队 / 认领 / 等待', 'pending'],
+/** 中文状态名 → render.ts 的意图状态色键。标签尽量短：两列宽度有限，
+ *  详情放在 title 里，图例先保证「一眼扫得完」。 */
+const INTENT_STATUSES: readonly [string, string, string?][] = [
+  ['排队/认领/等待', 'pending', '排队、认领（claimed）和等待意图（waiting）都还没有执行，统一用琥珀色；等待意图不是停放，它会被唤醒。'],
   ['执行中', 'running'],
-  ['复核中', 'reviewing'],
+  ['复核中', 'reviewing', '复核中（reviewing）：复核者正在为这条结论跑一次独立复核，青色 + 缓慢呼吸框；产出边是青色虚线。必要前提仍是蓝色实线，两者不同色。'],
   ['失败', 'failed'],
-  ['已停止（显式叫停）', 'stopped'],
-  ['复核未通过（判定 / 没跑完）', 'review_failed'],
+  ['已停止', 'stopped', '账本里是 failed 或 pending 加 hold：被指挥官/操作员显式叫停，不会自动重派，要 retry 才恢复；不等于执行失败。'],
+  ['复核未通过', 'review_failed', '复核未通过（判定 / 没跑完）：工作跑完了，但至少一条结论没能被证明；可原地重试。'],
   ['完成', 'done'],
   ['停放', 'parked'],
 ]
@@ -82,6 +86,34 @@ function Ring({ color, dashed = false, width = 1 }: { color: string; dashed?: bo
       style={{ border: `${width}px ${dashed ? 'dashed' : 'solid'} ${color}` }}
       aria-hidden="true"
     />
+  )
+}
+
+/** 当前搜索项：画布上是一圈实红环 + 一圈淡红外环。 */
+function DoubleRing({ color }: { color: string }) {
+  return (
+    <span
+      className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border"
+      style={{ borderColor: color, opacity: 0.55 }}
+      aria-hidden="true"
+    >
+      <span className="h-2 w-2 rounded-full border-2" style={{ borderColor: color }} />
+    </span>
+  )
+}
+
+/** 已否定/已撤回的事实：保留事实本身的颜色，但画一到叉。 */
+function CrossedDot({ color }: { color: string }) {
+  return (
+    <span
+      className="relative flex h-3 w-3 shrink-0 items-center justify-center rounded-full"
+      style={{ background: color }}
+      aria-hidden="true"
+    >
+      <span className="text-[9px] font-bold leading-none" style={{ color: CANVAS.background }}>
+        ×
+      </span>
+    </span>
   )
 }
 
@@ -170,7 +202,9 @@ export function GraphLegend({ className }: { className?: string }) {
     // that scrolled a few pixels instead of the stack scrolling. The stack is the
     // scroll container; each card keeps its full height inside it.
     <div
-      className={`tw-graph-dock flex min-h-10 w-full shrink-0 flex-col overflow-hidden rounded-xl border border-hairline bg-card/95 text-caption shadow-lifted backdrop-blur ${className ?? ''}`}
+      className={`tw-graph-dock flex min-h-10 w-full flex-col overflow-hidden rounded-xl border border-hairline bg-card/95 text-caption shadow-lifted backdrop-blur ${
+        open ? 'min-h-40 flex-1' : 'shrink-0'
+      } ${className ?? ''}`}
       data-testid="graph-legend"
     >
       <button
@@ -187,8 +221,7 @@ export function GraphLegend({ className }: { className?: string }) {
       </button>
 
       {open && (
-        <div className="tw-scroll max-h-64 min-h-0 flex-1 overflow-y-auto border-t border-hairline px-3 py-2.5">
-          <GroupTitle>事实（节点）</GroupTitle>
+        <div className="tw-scroll tw-graph-legend-body min-h-0 flex-1 overflow-y-auto border-t border-hairline px-3 py-2.5">          <GroupTitle>事实（节点）</GroupTitle>
           <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
             {FACT_KINDS.map((name) => (
               <Row key={name}>
@@ -196,6 +229,10 @@ export function GraphLegend({ className }: { className?: string }) {
                 {name}
               </Row>
             ))}
+            <Row title="账本里出现图例之外的 fact.kind 时按中性灰绘制，不丢弃；筛选条只列上面七种常用类型">
+              <Dot color={CANVAS.ink3} />
+              其他类型
+            </Row>
             <Row title="项目简报是图的起点">
               <span
                 className="h-2 w-3.5 shrink-0 rounded-sm border"
@@ -212,23 +249,16 @@ export function GraphLegend({ className }: { className?: string }) {
               />
               目标（达成后）
             </Row>
+            <Row title="事实本身仍在账本里，但状态是 rejected（已否定）或 withdrawn（已撤回）：画布保留事实色，再画一个 ×。与「引用边界」的虚环不是同一件事">
+              <CrossedDot color={CANVAS.ink2} />
+              否定/撤回
+            </Row>
           </div>
 
           <GroupTitle>意图状态（节点 / 产出边）</GroupTitle>
           <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
-            {INTENT_STATUSES.map(([name, key]) => (
-              <Row
-                key={key}
-                title={
-                  key === 'reviewing'
-                    ? '青色 + 缓慢呼吸框：复核者正在为这条结论跑一次独立复核。产出边是青色虚线，和蓝色实线「必要前提」区分'
-                    : key === 'pending'
-                      ? '排队、认领（claimed）和等待意图（waiting）都还没有执行，统一用琥珀色；它们的产出边是琥珀虚线'
-                      : key === 'stopped'
-                        ? '账本里是 failed 或 pending 加 hold：被指挥官/操作员显式叫停，不会自动重派，要 retry 才恢复；不等于执行失败'
-                        : undefined
-                }
-              >
+            {INTENT_STATUSES.map(([name, key, hint]) => (
+              <Row key={key} title={hint}>
                 <span
                   className="h-2 w-3.5 shrink-0 rounded-sm border"
                   style={{ borderColor: INTENT_COLORS[key] ?? CANVAS.ink3 }}
@@ -237,18 +267,14 @@ export function GraphLegend({ className }: { className?: string }) {
                 {name}
               </Row>
             ))}
+            <Row title="还没有产出任何事实的意图：画布只画一个虚环（颜色仍跟随意图状态），产出事实后虚环消失">
+              <Ring color={CANVAS.ink3} dashed />
+              未产出（虚环）
+            </Row>
           </div>
           <Hint>
-            排队、认领（claimed）、等待意图（waiting）都还没有执行，统一用琥珀色；等待意图不是停放，它会被唤醒。
-          </Hint>
-          <Hint>
-            复核中（reviewing）：复核者正在为这条结论跑一次独立复核，青色 + 缓慢呼吸框；
-            它给出判定后，事实状态才变成已复核或复核未通过。它的产出边是青色虚线；
-            必要前提仍是蓝色实线，两者不再同色。
-          </Hint>
-          <Hint>
-            失败与已停止分开看：失败是执行或判定本身没过（紫）；已停止是账本里带 hold 的显式叫停（玫瑰），
-            包括派发前就被停掉的意图。已停止不会自动重派，需要显式重试才恢复。
+            排队/认领/等待同色（尚未执行）；复核中为青色呼吸框，产出边青色虚线；失败与已停止不同：
+            hold 是显式叫停，需重试恢复。
           </Hint>
 
           <GroupTitle>发起者（第二通道 · 形状）</GroupTitle>
@@ -273,8 +299,7 @@ export function GraphLegend({ className }: { className?: string }) {
             </Row>
           </div>
           <Hint>
-            状态色仍是第一通道；发起者只用形状区分（第二通道），不改变任何状态配色。形状画在
-            pill 左上角；执行者发起的平级意图会用下面的「发起线」连回发起者。
+            状态色是第一通道，发起者只用形状区分，形状画在 pill 左上角；不画连线，免得把「谁发起」误读成因果。
           </Hint>
 
           <GroupTitle>选中的链路</GroupTitle>
@@ -303,8 +328,7 @@ export function GraphLegend({ className }: { className?: string }) {
             </Row>
           </div>
           <Hint>
-            链路是 DAG，不是一条线：主干只回答「怎么走到这一步」，旁支回答「这个事实还能喂给谁」。
-            没有「只看主路径」这种隐藏节点的模式了。
+            链路是 DAG：主干回答「怎么走到这一步」，旁支回答「这个事实还能喂给谁」。
           </Hint>
 
           <GroupTitle>关系（边）</GroupTitle>
@@ -337,14 +361,7 @@ export function GraphLegend({ className }: { className?: string }) {
               <Line color={EDGE_COLORS.goal} style="solid" />
               目标证据（旧盖章）
             </Row>
-            <Row title="parent_intent_id：上游意图委派出的下游意图，上游意图要等它结束；紫色虚线">
-              <Line color={EDGE_COLORS.spawn} style="dashed" />
-              委托（等待）
-            </Row>
-            <Row title="图内派生的发起关系：执行者发起的平级意图连回发起者。1px 虚线 + 开口箭头 + 低透明度；不是账本边，不参与布局、深度或力导">
-              <Line color={EDGE_COLORS.origin} style="dashed" />
-              发起线（平级发布，派生）
-            </Row>
+
             <Row title="项目简报到初始意图：图的起点，不是事实关系；灰色细线">
               <Line color={EDGE_COLORS.brief} style="solid" />
               项目范围
@@ -359,11 +376,31 @@ export function GraphLegend({ className }: { className?: string }) {
             宿主机分组只表示「读到/属于」，不会被画成因果链。
           </Hint>
 
-          <GroupTitle>标记</GroupTitle>
+          <GroupTitle>画布状态（环，不改节点色）</GroupTitle>
           <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+            <Row title="点击选中的节点：白色实环；右侧详情面板解释内容">
+              <Ring color={SELECTION_RING} width={2} />
+              选中（白环）
+            </Row>
+            <Row title="指针停在节点或边上：灰色细环，仅作预览；点击才固定">
+              <Ring color={HOVER_RING} />
+              悬停（灰环）
+            </Row>
+            <Row title="画布方向键选中的节点：天蓝色环，可与选中/悬停同时出现">
+              <Ring color={KEYBOARD_FOCUS_RING} width={2} />
+              键盘焦点（蓝环）
+            </Row>
+            <Row title="搜索命中的节点：红色细环。命中不会被选中态的压暗藏起来">
+              <Ring color={MATCH_RING} />
+              搜索命中（红环）
+            </Row>
+            <Row title="搜索结果列表当前的这一项：实红环 + 淡红外环；↑↓ 只移动它，Enter 才定位">
+              <DoubleRing color={ACTIVE_MATCH_RING} />
+              当前搜索（双环）
+            </Row>
             <Row title="事实的 claim_version 高于最新一次复核的版本：琥珀色虚线外环表示现在复核的是旧断言">
               <Ring color={REVIEW_RING} dashed />
-              复核的是旧断言
+              旧断言复核
             </Row>
             <Row title="该意图的 run 记录了非致命告警，悬停看详情">
               <span
@@ -375,13 +412,22 @@ export function GraphLegend({ className }: { className?: string }) {
               </span>
               警告数
             </Row>
-            <Row title="画布方向键选中的节点：天蓝色环，可与选中/悬停同时出现">
-              <Ring color={KEYBOARD_FOCUS_RING} width={2} />
-              键盘焦点
+            <Row title="步骤 pill 右上角：最多 3 颗卫星点 + “助×N”。原生 subagent 是父回合内的临时助手（active>0 时慢脉冲），不单独开 run、不计独立 usage、不产生事实；结论仍由本意图声明">
+              <HelperGlyph />
+              助手（临时）
             </Row>
-            <Row title="引用边界：引用指向的记录不在当前快照（账本里仍然存在）。这不是孤立事实，也不是缺失；点开加载它的邻域">
+          </div>
+
+          <Hint>
+            选中、悬停、搜索和键盘焦点只加环，不改节点颜色；方块第二行显示实际使用的模型。
+            助手是本轮的临时调用记录，不是独立 run，也不代表产生了事实。
+          </Hint>
+
+          <GroupTitle>引用边界（虚环）</GroupTitle>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+            <Row title="引用指向的记录不在当前快照（账本里仍然存在）。这不是孤立事实，也不是缺失；点开加载它的邻域">
               <Ring color={BOUNDARY_COLORS.not_loaded} dashed />
-              未载入引用（可展开）
+              未载入（可展开）
             </Row>
             <Row title="引用指向的 id 在账本里也不存在：点开不会变出内容">
               <Ring color={BOUNDARY_COLORS.missing} dashed />
@@ -391,15 +437,14 @@ export function GraphLegend({ className }: { className?: string }) {
               <Ring color={BOUNDARY_COLORS.rejected} dashed />
               已否定引用
             </Row>
-            <Row title="步骤 pill 右上角：最多 3 颗卫星点 + “助×N”。原生 subagent 是父回合内的临时助手（active>0 时慢脉冲），不单独开 run、不计独立 usage、不产生事实；结论仍由本意图声明">
-              <HelperGlyph />
-              助手（原生 subagent，临时）
+            <Row title="引用的事实已被作者或操作员撤回：记录与证据仍在账本里，但不作为结论或前提">
+              <Ring color={BOUNDARY_COLORS.withdrawn} dashed />
+              已撤回引用
             </Row>
           </div>
-
           <Hint>
-            方块第二行显示实际使用的模型；未运行时显示统一连接的模型。执行中和复核中的环表示当前状态。
-            助手卫星点是本轮的临时调用记录，不是独立 run，也不代表产生了事实。
+            引用边界是「指向的记录不在图上」，四种状态由后端 boundary.state 给出；
+            只有「未载入」能点开加载邻域，缺失、已否定、已撤回都不会点出内容。
           </Hint>
           <Hint>悬停看详情 · 滚轮缩放 · 拖拽节点（位置保留，重新布局复位） · 右侧面板左缘可拖动调宽</Hint>
         </div>

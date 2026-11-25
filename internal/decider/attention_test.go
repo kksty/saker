@@ -10,33 +10,6 @@ import (
 	"github.com/kksty/tianwu/internal/retrieval"
 )
 
-func TestLocalProgressDoesNotOpenAnotherGlobalRound(t *testing.T) {
-	s := newStore(t)
-	_, _ = s.AddGoal(model.Goal{Statement: "goal"})
-	p, _ := s.CreateIntent(model.Intent{Title: "parent"})
-	p, _ = s.UpdateIntent(p.ID, func(i *model.Intent) { i.Status = model.StatusRunning })
-	r := NewRunner(s, nil, "")
-	r.ModelName = "fixture"
-	calls := 0
-	r.Commander = func(context.Context, string, bool) (RoundResult, error) {
-		calls++
-		d, _ := s.PendingDelivery("commander")
-		return RoundResult{}, s.AcknowledgeDelivery("commander", d.ID)
-	}
-	if r.Run(context.Background(), "operator", true) == nil {
-		t.Fatal("no initial round")
-	}
-	c, _, _ := s.CreateChildIntent(p.ID, model.Intent{Title: "child", IdempotencyKey: "child"})
-	_, _ = s.AddFact(model.Fact{IntentID: c.ID, Title: "local result"})
-	_, _ = s.UpdateIntent(c.ID, func(i *model.Intent) { i.Status = model.StatusDone })
-	if d := r.Run(context.Background(), "intent_done", false); d != nil || calls != 1 {
-		t.Fatalf("local work opened global model: %+v calls=%d", d, calls)
-	}
-	if r.heartbeatWorthwhile() {
-		t.Fatal("local context backlog bought a heartbeat round")
-	}
-}
-
 func TestFailedGlobalCallRetainsEventsAndBacksOffAutomaticCalls(t *testing.T) {
 	s := newStore(t)
 	_, _ = s.AddGoal(model.Goal{Statement: "goal"})

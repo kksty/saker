@@ -170,7 +170,6 @@ type routeIndex struct {
 	factByID      map[string]model.Fact
 	factWaiters   map[string][]string
 	entityWaiters map[string][]entityWaiter
-	descendants   map[string][]string
 	queued        map[string]int
 }
 
@@ -184,15 +183,10 @@ func (s *Store) buildRouteIndexLocked(live []model.Intent) *routeIndex {
 		factByID:      make(map[string]model.Fact, len(s.db.Facts)),
 		factWaiters:   map[string][]string{},
 		entityWaiters: map[string][]entityWaiter{},
-		descendants:   map[string][]string{},
 		queued:        map[string]int{},
 	}
 	for _, f := range s.db.Facts {
 		idx.factByID[f.ID] = f
-	}
-	parent := make(map[string]string, len(s.db.Intents))
-	for _, in := range s.db.Intents {
-		parent[in.ID] = in.ParentID
 	}
 	for _, in := range live {
 		named := map[string]bool{}
@@ -227,11 +221,6 @@ func (s *Store) buildRouteIndexLocked(live []model.Intent) *routeIndex {
 		for _, ref := range entities {
 			idx.entityWaiters[ref] = append(idx.entityWaiters[ref], entityWaiter{IntentID: in.ID, Weight: weights[ref]})
 		}
-		seen := map[string]bool{}
-		for p := parent[in.ID]; p != "" && !seen[p]; p = parent[p] {
-			seen[p] = true
-			idx.descendants[p] = append(idx.descendants[p], in.ID)
-		}
 	}
 	for i, m := range s.db.Messages {
 		if m.Status == model.MessageQueued && m.NoticeFactID != "" {
@@ -256,13 +245,6 @@ func (idx *routeIndex) relevantFact(f model.Fact, intentID string) bool {
 	if f.EntityRef != "" {
 		for _, w := range idx.entityWaiters[f.EntityRef] {
 			if w.IntentID == intentID {
-				return true
-			}
-		}
-	}
-	if f.IntentID != "" {
-		for _, id := range idx.descendants[f.IntentID] {
-			if id == intentID {
 				return true
 			}
 		}

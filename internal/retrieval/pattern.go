@@ -31,9 +31,6 @@ func newPatternContext(db store.DB, contextIDs []string) *patternContext {
 		for _, id := range in.FromFactIDs {
 			link("fact:"+id, "intent:"+in.ID, "premise")
 		}
-		if in.ParentID != "" {
-			link("intent:"+in.ParentID, "intent:"+in.ID, "delegates")
-		}
 	}
 	for _, f := range db.Facts {
 		if allowed[f.ID] {

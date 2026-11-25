@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"net/http"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -10,17 +9,6 @@ import (
 	"github.com/kksty/tianwu/internal/executor"
 	"github.com/kksty/tianwu/internal/model"
 )
-
-func TestSpawnRejectsRetiredModelSelectorsBeforeCreatingWorker(t *testing.T) {
-	f := newSpawnFixture(t)
-	before := len(f.p.Store.Snapshot().Intents)
-	for _, selector := range []string{"profile", "tier"} {
-		rec := f.call(t, f.srcID, http.MethodPost, "/api/spawn", spawnBody("retired-"+selector, map[string]any{selector: "strong"}))
-		if rec.Code != http.StatusBadRequest || len(f.p.Store.Snapshot().Intents) != before || len(f.p.Store.Runs()) != 0 {
-			t.Fatalf("%s created work: %d %s", selector, rec.Code, rec.Body.String())
-		}
-	}
-}
 
 type rejectedGateway struct{ calls atomic.Int32 }
 
@@ -31,7 +19,7 @@ func (e *rejectedGateway) Run(context.Context, executor.Request, func(executor.E
 }
 
 func TestGatewayRejectionPausesWithoutRotatingOrReplaying(t *testing.T) {
-	f := newSpawnFixture(t)
+	f := newWorkerFixture(t)
 	ex := &rejectedGateway{}
 	f.srv.Exec = ex
 	f.srv.ModelSettings = func() (string, string, int) { return "openai", "gateway", 64000 }

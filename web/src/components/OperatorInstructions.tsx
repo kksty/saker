@@ -1,13 +1,6 @@
-// 操作员指令: the standing-guidance surface.
-//
-// The one-shot 下发 composer is deliberately one-shot — a hint once became a
-// standing rule and polluted every later dispatch — so persistent guidance gets
-// its own surface: create scoped to the project or one direction, list the
-// standing set with its version, revoke it, and read the revision history. The
-// copy on every render says the one thing that matters: guidance, not a
-// boundary.
+// The operator's versioned messages to the commander.
 import { useMemo, useState } from 'react'
-import { History, Plus, RotateCcw, ScrollText } from 'lucide-react'
+import { History, Pencil, Plus, RotateCcw, ScrollText } from 'lucide-react'
 import {
   Badge,
   Button,
@@ -52,6 +45,10 @@ import {
   instructionRevisions,
   instructionScopeLabel,
   instructionStateLabel,
+  instructionUpdateBody,
+  instructionUpdateDraftError,
+  instructionUpdateError,
+  instructionUpdatedReceipt,
   orderInstructions,
   type InstructionDraft,
   type InstructionScope,
@@ -75,7 +72,7 @@ export function OperatorInstructionsCard() {
     <>
       <Panel
         data-testid="operator-instructions"
-        title={`操作员指令（${count}）`}
+        title={`持续指令（${count}）`}
         extra={
           <Button size="xs" variant="outline" onClick={() => setOpen(true)}>
             <Plus className="h-3.5 w-3.5" /> 管理
@@ -86,7 +83,7 @@ export function OperatorInstructionsCard() {
         <p className="text-[10.5px] leading-4 text-ink-3">{INSTRUCTION_GUIDANCE}</p>
         {active.error && (
           <p role="alert" className="mt-2 text-[11px] leading-4 text-destructive">
-            读指令失败：{active.error}
+            读取消息失败（{active.error}）
           </p>
         )}
         {active.loading && !active.data && <SkeletonList count={2} />}
@@ -94,7 +91,7 @@ export function OperatorInstructionsCard() {
           <p className="mt-2 text-[11px] leading-4 text-ink-3">{INSTRUCTION_EMPTY}</p>
         )}
         {rows.length > 0 && (
-          <ul role="list" aria-label="生效中的操作员指令" className="mt-2 space-y-1.5">
+          <ul role="list" aria-label="当前持续指令" className="mt-2 space-y-1.5">
             {rows.slice(0, 3).map((row) => (
               <li key={row.id} className="rounded-md border border-hairline bg-surface-2/40 px-2 py-1.5">
                 <div className="flex items-center gap-1.5 text-[10.5px] text-ink-3">
@@ -125,9 +122,9 @@ export function OperatorInstructionsCard() {
   )
 }
 
-/** Create + standing list + per-instruction revision history. One dialog so the
- *  three operations read against the same current set. */
-function OperatorInstructionsDialog({ onClose, onChanged }: { onClose: () => void; onChanged: () => void }) {
+/** Create + standing list + inline body edit + per-instruction revision history.
+ *  One dialog so the four operations read against the same current set. */
+export function OperatorInstructionsDialog({ onClose, onChanged }: { onClose: () => void; onChanged: () => void }) {
   const rows = useLoad(() => api.instructions('all'), [])
   const intents = useLoad(api.intents, [])
   const titles = useMemo(
@@ -143,6 +140,13 @@ function OperatorInstructionsDialog({ onClose, onChanged }: { onClose: () => voi
   const [showRevoked, setShowRevoked] = useState(false)
   const [busy, setBusy] = useState(false)
   const [revoking, setRevoking] = useState('')
+  // The row being edited: the snapshot is taken when 编辑 is clicked, so saving
+  // always carries the version the operator actually read (a background reload
+  // that lands mid-edit must not borrow a newer version).
+  const [editingID, setEditingID] = useState('')
+  const [editDraft, setEditDraft] = useState('')
+  const [editSnapshot, setEditSnapshot] = useState<Instruction | null>(null)
+  const [updating, setUpdating] = useState(false)
   const [error, setError] = useState('')
   const [receipt, setReceipt] = useState('')
   const [keyState, setKeyState] = useState<DirectiveKeyState>({ fingerprint: '', key: '' })
@@ -151,6 +155,49 @@ function OperatorInstructionsDialog({ onClose, onChanged }: { onClose: () => voi
   const draft: InstructionDraft = { text, scope, intentID }
   const tooLong = [...text.trim()].length > MAX_INSTRUCTION_RUNES
   const canSend = !busy && !instructionDraftError(draft)
+  const editError = editingID ? instructionUpdateDraftError(editDraft) : undefined
+  const editUnchanged = editDraft.trim() === (editSnapshot?.text ?? '')
+  const canSaveEdit = Boolean(editingID) && !updating && !editError && !editUnchanged
+  const locked = busy || updating
+
+  function startEdit(instruction: Instruction) {
+    if (updating) return
+    setEditingID(instruction.id)
+    setEditDraft(instruction.text)
+    setEditSnapshot(instruction)
+    setError('')
+    setReceipt('')
+  }
+
+  function cancelEdit() {
+    if (updating) return
+    setEditingID('')
+    setEditDraft('')
+    setEditSnapshot(null)
+  }
+
+  async function saveEdit() {
+    const snapshot = editSnapshot
+    if (!snapshot || updating || !canSaveEdit) return
+    setUpdating(true)
+    setError('')
+    setReceipt('')
+    try {
+      const updated = await api.updateInstruction(snapshot.id, instructionUpdateBody(snapshot, editDraft))
+      setReceipt(instructionUpdatedReceipt(updated))
+      setEditingID('')
+      setEditDraft('')
+      setEditSnapshot(null)
+      rows.reload()
+      onChanged()
+    } catch (e) {
+      // Keep the editor and the typed draft: the operator fixes or retries
+      // without losing what the server just refused.
+      setError(instructionUpdateError(e))
+    } finally {
+      setUpdating(false)
+    }
+  }
 
   async function submit() {
     if (busy) return
@@ -198,20 +245,20 @@ function OperatorInstructionsDialog({ onClose, onChanged }: { onClose: () => voi
   }
 
   return (
-    <Dialog open onOpenChange={(next) => { if (!next && !busy) onClose() }}>
+    <Dialog open onOpenChange={(next) => { if (!next && !locked) onClose() }}>
       <DialogContent
         className="max-h-[90dvh] max-w-2xl overflow-y-auto overscroll-contain"
-        aria-busy={busy}
+        aria-busy={locked}
         data-testid="operator-instructions-dialog"
       >
         <DialogHeader>
-          <DialogTitle>操作员指令</DialogTitle>
+          <DialogTitle>持续指令</DialogTitle>
           <DialogDescription>{INSTRUCTION_GUIDANCE}</DialogDescription>
         </DialogHeader>
 
-        <section aria-label="新建操作员指令" className="space-y-2.5 rounded-lg border border-hairline p-3">
+        <section aria-label="新建持续指令" className="space-y-2.5 rounded-lg border border-hairline p-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] text-ink-3">作用范围</span>
+            <span className="text-[11px] text-ink-3">关联范围</span>
             <ToggleGroup
               value={scope}
               onValueChange={(value) => {
@@ -219,16 +266,16 @@ function OperatorInstructionsDialog({ onClose, onChanged }: { onClose: () => voi
                 setError('')
               }}
               disabled={busy}
-              ariaLabel="指令作用范围"
+              ariaLabel="消息关联范围"
             >
               <ToggleGroupItem value="project">整个项目</ToggleGroupItem>
-              <ToggleGroupItem value="intent">某个意图及其后代</ToggleGroupItem>
+              <ToggleGroupItem value="intent">某个意图</ToggleGroupItem>
             </ToggleGroup>
           </div>
           {scope === 'intent' && (
             <Field label="意图">
               <Select value={intentID || undefined} onValueChange={setIntentID} disabled={busy || directions.length === 0}>
-                <SelectTrigger aria-label="选择指令作用的意图">
+                <SelectTrigger aria-label="选择消息关联的意图">
                   <SelectValue placeholder={directions.length > 0 ? '选择意图' : '没有可选意图'} />
                 </SelectTrigger>
                 <SelectContent className="max-w-[calc(100vw-2rem)]">
@@ -245,17 +292,16 @@ function OperatorInstructionsDialog({ onClose, onChanged }: { onClose: () => voi
             </Field>
           )}
           <Field
-            label="指令正文"
-            hint="注入以后每轮的指挥官与执行者任务书；1–4000 字。它是指导，不改变授权。"
-            error={tooLong ? `指令最多 ${MAX_INSTRUCTION_RUNES} 字。` : undefined}
+            label="消息正文"
+            error={tooLong ? `消息最多 ${MAX_INSTRUCTION_RUNES} 字。` : undefined}
           >
             <Textarea
               rows={4}
               value={text}
               disabled={busy}
               onChange={(event) => setText(event.target.value)}
-              placeholder="例如：新派意图的标题、说明与验收标准一律用简体中文；不要调用 hint 接口。"
-              aria-label="操作员指令正文"
+              placeholder="例如：意图标题优先使用简体中文。"
+              aria-label="持续指令正文"
               className="min-h-[88px] text-[12.5px] leading-relaxed"
             />
           </Field>
@@ -268,21 +314,24 @@ function OperatorInstructionsDialog({ onClose, onChanged }: { onClose: () => voi
               {text.trim().length}/{MAX_INSTRUCTION_RUNES}
             </span>
           </div>
-          {error && (
-            <div role="alert">
-              <Callout tone="destructive">{error}</Callout>
-            </div>
-          )}
-          {receipt && (
-            <p data-instruction-receipt className="text-[11.5px] leading-5 text-ink-2">
-              {receipt}
-            </p>
-          )}
         </section>
 
-        <section aria-label="已有操作员指令" className="space-y-2">
+        {/* Shared feedback: a create refusal and an inline-edit refusal must be
+            visible from the same place instead of only beside the create form. */}
+        {error && (
+          <div role="alert">
+            <Callout tone="destructive">{error}</Callout>
+          </div>
+        )}
+        {receipt && (
+          <p data-instruction-receipt className="text-[11.5px] leading-5 text-ink-2">
+            {receipt}
+          </p>
+        )}
+
+        <section aria-label="已保存的持续指令" className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="tw-section-title">已有指令</div>
+            <div className="tw-section-title">已保存的消息</div>
             <span className="tw-nums font-mono text-[11px] text-ink-3">
               {activeInstructionCount(sorted)} 条生效中
             </span>
@@ -303,20 +352,29 @@ function OperatorInstructionsDialog({ onClose, onChanged }: { onClose: () => voi
           {rows.loading && !rows.data && <SkeletonList count={2} />}
           {rows.error && (
             <p role="alert" className="text-[11px] leading-4 text-destructive">
-              读指令失败：{rows.error}
+              读取消息失败（{rows.error}）
             </p>
           )}
           {!rows.loading && !rows.error && visible.length === 0 && (
-            <EmptyState compact icon={ScrollText} title="还没有操作员指令" description={INSTRUCTION_EMPTY} />
+            <EmptyState compact icon={ScrollText} title="还没有持续指令" description={INSTRUCTION_EMPTY} />
           )}
-          <ul role="list" aria-label="操作员指令列表" className="space-y-2">
+          <ul role="list" aria-label="持续指令列表" className="space-y-2">
             {visible.map((instruction) => (
               <InstructionRow
                 key={instruction.id}
                 instruction={instruction}
                 titles={titles}
-                busy={Boolean(revoking)}
+                busy={Boolean(revoking) || updating}
                 revoking={revoking === instruction.id}
+                editing={editingID === instruction.id}
+                draft={editingID === instruction.id ? editDraft : ''}
+                draftError={editingID === instruction.id ? editError : undefined}
+                canSave={canSaveEdit}
+                updating={updating}
+                onEdit={() => startEdit(instruction)}
+                onDraftChange={setEditDraft}
+                onSave={() => void saveEdit()}
+                onCancel={cancelEdit}
                 onRevoke={() => void revoke(instruction)}
               />
             ))}
@@ -332,12 +390,30 @@ function InstructionRow({
   titles,
   busy,
   revoking,
+  editing,
+  draft,
+  draftError,
+  canSave,
+  updating,
+  onEdit,
+  onDraftChange,
+  onSave,
+  onCancel,
   onRevoke,
 }: {
   instruction: Instruction
   titles: ReadonlyMap<string, string>
   busy: boolean
   revoking: boolean
+  editing: boolean
+  draft: string
+  draftError?: string
+  canSave: boolean
+  updating: boolean
+  onEdit: () => void
+  onDraftChange: (value: string) => void
+  onSave: () => void
+  onCancel: () => void
   onRevoke: () => void
 }) {
   const [showHistory, setShowHistory] = useState(false)
@@ -356,23 +432,59 @@ function InstructionRow({
         <span className="tw-nums font-mono">v{instruction.version}</span>
         <span className="ml-auto">{fmtTime(instruction.updated_at || instruction.created_at)}</span>
       </div>
-      <p className="tw-break mt-1.5 whitespace-pre-wrap text-[12px] leading-relaxed text-ink-2">{instruction.text}</p>
-      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-        <Button
-          size="xs"
-          variant="ghost"
-          aria-pressed={showHistory}
-          onClick={() => setShowHistory((shown) => !shown)}
-        >
-          <History className="h-3.5 w-3.5" /> 历史
-        </Button>
-        {instruction.state !== 'revoked' && (
-          <Button size="xs" variant="ghost" onClick={onRevoke} disabled={busy}>
-            <RotateCcw className="h-3.5 w-3.5" /> {revoking ? '撤销中…' : '撤销'}
-          </Button>
-        )}
-      </div>
-      {showHistory && (
+      {editing ? (
+        // Inline edit, not a second form: the text being replaced stays in place
+        // so the operator can see the row version the save will carry.
+        <div className="mt-1.5 space-y-1.5">
+          <Textarea
+            rows={4}
+            value={draft}
+            disabled={updating}
+            onChange={(event) => onDraftChange(event.target.value)}
+            aria-label="修改持续指令正文"
+            className="min-h-[88px] text-[12.5px] leading-relaxed"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="tw-nums font-mono text-[10.5px] text-ink-3">
+              {[...draft.trim()].length}/{MAX_INSTRUCTION_RUNES}
+            </span>
+            {draftError && <span className="text-[10.5px] text-destructive">{draftError}</span>}
+            <Button size="xs" className="ml-auto" onClick={onSave} disabled={!canSave}>
+              {updating ? '保存中…' : '保存修改'}
+            </Button>
+            <Button size="xs" variant="ghost" onClick={onCancel} disabled={updating}>
+              取消
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <p className="tw-break mt-1.5 whitespace-pre-wrap text-[12px] leading-relaxed text-ink-2">{instruction.text}</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <Button
+              size="xs"
+              variant="ghost"
+              aria-pressed={showHistory}
+              onClick={() => setShowHistory((shown) => !shown)}
+            >
+              <History className="h-3.5 w-3.5" /> 历史
+            </Button>
+            {/* A revoked row offers no edit: reviving it is a create/scope
+                decision, not a body change, and must not be one click away. */}
+            {instruction.state !== 'revoked' && (
+              <>
+                <Button size="xs" variant="ghost" onClick={onEdit} disabled={busy}>
+                  <Pencil className="h-3.5 w-3.5" /> 编辑
+                </Button>
+                <Button size="xs" variant="ghost" onClick={onRevoke} disabled={busy}>
+                  <RotateCcw className="h-3.5 w-3.5" /> {revoking ? '撤销中…' : '撤销'}
+                </Button>
+              </>
+            )}
+          </div>
+        </>
+      )}
+      {!editing && showHistory && (
         <div className="mt-1.5 space-y-1.5 border-t border-hairline pt-1.5">
           {history.loading && <p className="text-[11px] text-ink-3">读历史中…</p>}
           {history.error && (

@@ -5,31 +5,25 @@ import (
 	"testing"
 
 	"github.com/kksty/tianwu/internal/collab"
+	"github.com/kksty/tianwu/internal/contract"
 	"github.com/kksty/tianwu/internal/model"
 )
 
-func TestPromptPlacesInstructionsBeforeTaskMaterial(t *testing.T) {
+func TestPromptPlacesConstraintsBeforeAssignment(t *testing.T) {
 	db := testDB()
 	in := db.Intents[0]
 	in.CreatedBy = collab.CommanderID
-	instructions := "\n## 当前持久指令\nINSTRUCTION-MARKER\n"
-	prompt := BuildPromptWithInstructions(db, in, "10.0.0.0/24", "", "", 0, true, true, "", instructions, "")
+	prompt := BuildPromptWithFocus(db, in, "10.0.0.0/24", "", "", 0, true, true, "")
 	at := func(marker string) int { return strings.Index(prompt, marker) }
-	instr, constraints, assignment, handoff := at("INSTRUCTION-MARKER"), at("## 约束"), at("## 本轮指派"), at("## 交接（必做）")
-	if instr < 0 || constraints < 0 || assignment < 0 || handoff < 0 {
+	constraints, assignment, handoff := at("## 约束"), at("## 本轮指派"), at("## 交接（必做）")
+	if constraints < 0 || assignment < 0 || handoff < 0 {
 		t.Fatalf("prompt section missing: %q", prompt)
 	}
-	// The operator priority opens the brief; the constraint document and the
-	// assignment follow it, and the frozen instructions arrive before the
-	// evidence appendix.
-	if !strings.HasPrefix(prompt, "操作员下发的指令优先级最高") {
+	if !strings.HasPrefix(prompt, contract.OperatorPriority) {
 		t.Fatalf("executor brief does not open with the operator priority: %q", prompt)
 	}
-	if !(constraints < assignment && assignment < instr && instr < handoff) {
-		t.Fatalf("section order: constraints=%d assignment=%d instr=%d handoff=%d", constraints, assignment, instr, handoff)
-	}
-	if timeLine := at("当前时间："); timeLine < 0 || timeLine > instr {
-		t.Fatalf("time line moved after the instructions: time=%d instr=%d", timeLine, instr)
+	if !(constraints < assignment && assignment < handoff) {
+		t.Fatalf("section order: constraints=%d assignment=%d handoff=%d", constraints, assignment, handoff)
 	}
 	// Both writers survive in one merged pointer section.
 	for _, want := range []string{"## 本轮输入文件（只读）", runInputFile, "premises_query", "不要把整份文件读进上下文"} {

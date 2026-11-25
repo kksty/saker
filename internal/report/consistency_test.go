@@ -163,11 +163,8 @@ func TestReportSnapshotDigestAndValidationShareOneFrozenMoment(t *testing.T) {
 	if len(s.Facts) != 1 || s.Facts[0].ID != fact.ID {
 		t.Fatalf("snapshot facts = %+v, want only the frozen conclusion", s.Facts)
 	}
-	if len(s.Instructions) != 1 || s.Instructions[0].ID != in.ID {
-		t.Fatalf("snapshot instructions = %+v, want the frozen instruction", s.Instructions)
-	}
-	if s.Instructions[0].Version != in.Version || s.Instructions[0].Text != "只检查本地证据，不发外部请求" {
-		t.Fatalf("snapshot instruction = %+v, want v%d with the frozen text", s.Instructions[0], in.Version)
+	if len(s.Instructions) != 0 {
+		t.Fatalf("commander messages leaked into report snapshot: %+v", s.Instructions)
 	}
 
 	// The run row froze the same instruction version.
@@ -175,7 +172,7 @@ func TestReportSnapshotDigestAndValidationShareOneFrozenMoment(t *testing.T) {
 	if !ok {
 		t.Fatalf("report run %s not found", meta.RunID)
 	}
-	if run.InstructionVersions[in.ID] != in.Version {
+	if len(run.InstructionVersions) != 0 {
 		t.Fatalf("run instruction versions = %v, want %s v%d", run.InstructionVersions, in.ID, in.Version)
 	}
 

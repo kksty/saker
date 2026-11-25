@@ -4,17 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net/http"
 	"path/filepath"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/kksty/tianwu/internal/aopexec"
 	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/executor"
 	"github.com/kksty/tianwu/internal/model"
 	"github.com/kksty/tianwu/internal/store"
 )
@@ -91,49 +88,6 @@ func TestCrossProjectAdmissionReservesInstanceAndProfileCapacity(t *testing.T) {
 				t.Fatalf("admitted=%d active=%d", success, count())
 			}
 		})
-	}
-}
-
-type childFinishesExec struct {
-	parent string
-	turns  atomic.Int32
-}
-
-func (*childFinishesExec) Name() string { return "child-finishes" }
-func (e *childFinishesExec) Run(ctx context.Context, req executor.Request, emit func(executor.Event)) (executor.Result, error) {
-	if filepath.Base(req.WorkDir) != e.parent {
-		return executor.Result{StopReason: "child complete"}, nil
-	}
-	e.turns.Add(1)
-	<-ctx.Done()
-	return executor.Result{ExitCode: -1}, ctx.Err()
-}
-
-func TestChildWaitYieldsOnlySlotAndResumesParent(t *testing.T) {
-	s, _ := admissionServer(t)
-	s.MaxRuns = 1
-	p, _ := s.Store.CreateIntent(model.Intent{Title: "parent"})
-	ex := &childFinishesExec{parent: p.ID}
-	s.Exec = ex
-	first, err := s.StartRun(p.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	waitFor(t, livenessWait, func() bool { return ex.turns.Load() == 1 })
-	child, _, err := s.Store.CreateChildIntent(p.ID, model.Intent{Title: "child"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	rec := call(t, s, http.MethodPost, "/api/intents/"+p.ID+"/wait", map[string]any{"children": []string{child.ID}})
-	if rec.Code != 202 {
-		t.Fatalf("wait=%d %s", rec.Code, rec.Body.String())
-	}
-	waitFor(t, livenessWait, func() bool { return ex.turns.Load() == 2 })
-	r, _ := s.Store.GetRun(first)
-	c, _ := s.Store.GetIntent(child.ID)
-	parent, _ := s.Store.GetIntent(p.ID)
-	if r.CancelCause != model.CancelCauseChildWait || c.Status != model.StatusDone || parent.Wait != nil || s.RunningIntentCount() != 1 {
-		t.Fatalf("first=%+v child=%+v parent=%+v", r, c, parent)
 	}
 }
 

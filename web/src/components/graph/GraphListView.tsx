@@ -51,17 +51,13 @@ function originText(node: GraphNode): string {
     case 'operator':
       return '操作员'
     case 'executor':
-      return node.originIntent?.title ? `执行者「${node.originIntent.title}」` : '执行者'
+      return '执行者'
     default:
       return '—'
   }
 }
 
-/** 发起谱系深度（不是结构性 depth，也不是 spawn 树）：0 = 指挥官/操作员根。 */
-function lineageText(node: GraphNode): string {
-  return node.lineageDepth === undefined ? '—' : String(node.lineageDepth)
-}
-
+/** 发起谱系深度（不是结构性 depth）：0 = 指挥官/操作员根。 */
 function rowID(index: number): string {
   return `graph-list-row-${index}`
 }
@@ -72,6 +68,7 @@ export function GraphListView({
   model,
   selected,
   matches,
+  activeMatch,
   onSelect,
   onClose,
 }: {
@@ -79,6 +76,8 @@ export function GraphListView({
   selected: string | null
   /** Optional search hits; a matched row gets the same info tint as on canvas. */
   matches?: Set<string> | null
+  /** The search row under the cursor; the list scrolls it into view on open. */
+  activeMatch?: string | null
   onSelect: (id: string | null) => void
   onClose: () => void
 }) {
@@ -103,6 +102,13 @@ export function GraphListView({
   useEffect(() => {
     setActive((current) => (ordered.length === 0 ? 0 : Math.min(current, ordered.length - 1)))
   }, [ordered.length])
+
+  // 搜索命中变化时，列表的活动行跟随搜索框当前项，免得打开列表还停在第一行。
+  useEffect(() => {
+    if (!activeMatch) return
+    const index = ordered.findIndex((node) => node.id === activeMatch)
+    if (index >= 0) setActive(index)
+  }, [activeMatch, ordered])
 
   // 打开列表就聚焦容器：键盘用户不必先 Tab 进一个 5000 行的滚动区。
   useEffect(() => {
@@ -199,7 +205,6 @@ export function GraphListView({
         <span className="min-w-0 flex-1">节点</span>
         <span className="w-[76px] shrink-0 text-right">状态</span>
         <span className="w-[104px] shrink-0 truncate">发起者</span>
-        <span className="tw-graph-list-lineage w-[52px] shrink-0 text-right">谱系</span>
         <span className="tw-graph-list-id w-[136px] shrink-0">ID</span>
       </div>
       <div
@@ -223,6 +228,7 @@ export function GraphListView({
             const isActive = index === active
             const isSelected = node.id === selected
             const isMatch = Boolean(matches?.has(node.id))
+            const isActiveMatch = node.id === activeMatch
             return (
               <div
                 key={node.id}
@@ -238,9 +244,11 @@ export function GraphListView({
                 className={`flex h-9 cursor-pointer items-center gap-2 rounded-md px-2.5 text-[12px] transition-colors [contain-intrinsic-size:2.25rem] [content-visibility:auto] ${
                   isSelected
                     ? 'bg-primary/[0.09] text-ink shadow-[inset_2px_0_0_var(--primary)]'
-                    : isActive
-                      ? 'bg-surface-2 text-ink'
-                      : 'text-ink-2 hover:bg-surface-2/70 hover:text-ink'
+                    : isActiveMatch
+                      ? 'bg-info/[0.10] text-ink shadow-[inset_2px_0_0_var(--info)]'
+                      : isActive
+                        ? 'bg-surface-2 text-ink'
+                        : 'text-ink-2 hover:bg-surface-2/70 hover:text-ink'
                 }`}
               >
                 <span className="w-[112px] shrink-0 truncate font-mono text-[11px] text-ink-3">
@@ -260,9 +268,6 @@ export function GraphListView({
                   title={originText(node)}
                 >
                   {originText(node)}
-                </span>
-                <span className="tw-graph-list-lineage w-[52px] shrink-0 text-right font-mono text-[11px] text-ink-3">
-                  {lineageText(node)}
                 </span>
                 <span
                   className="tw-graph-list-id w-[136px] shrink-0 truncate font-mono text-[11px] text-ink-3/80"

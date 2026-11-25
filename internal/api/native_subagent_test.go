@@ -73,7 +73,7 @@ func TestNativeSubagentToolCallRecordsWarningOnce(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("native subagent warning count = %d in %v", count, run.Infos)
 	}
-	for _, needle := range []string{"subagent", "账本", "取消", "usage", "spawn"} {
+	for _, needle := range []string{"subagent", "账本", "取消", "usage", "父执行者"} {
 		if !strings.Contains(nativeSubagentInfo, needle) {
 			t.Fatalf("warning text lacks %q: %s", needle, nativeSubagentInfo)
 		}

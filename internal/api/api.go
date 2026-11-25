@@ -84,7 +84,7 @@ type Server struct {
 	// MaxWorkers is the instance-wide cap on concurrent intent runs across all
 	// projects (--max-workers, 0 = uncapped). The hub supplies GlobalRunning,
 	// which sums the live runs of every project so the cap is a real instance
-	// cap, not a per-project one (sapper's MAX_WORKERS; docs/17 §3.5).
+	// cap, not a per-project one (docs/17 §3.5).
 	MaxWorkers int
 	// GlobalRunning reports how many intent runs are live across the instance.
 	// nil means the server is not attached to a hub (tests), so only MaxRuns
@@ -323,6 +323,15 @@ type Server struct {
 	reviewPumpDue     map[string]time.Time
 	reviewPumpWake    chan struct{}
 	reviewPumpCancel  context.CancelFunc
+	// reviewPassMu guards reviewPasses: one automatic review pass per direction
+	// at a time. The pump already keeps one pass per direction in flight, but the
+	// pass is reachable directly too (a wake racing the pump, a test), and its
+	// cursor is a read-modify-write. Two passes would interleave cursor updates
+	// and leave a candidate neither of them reviewed — the starvation the cursor
+	// exists to prevent. The lock makes the single-writer claim structural
+	// instead of a property of the caller (auto_verify.go).
+	reviewPassMu sync.Mutex
+	reviewPasses map[string]*sync.Mutex
 	// slimRetryMu guards slimRetryFor: the one automatic context-limit recovery
 	// hands "build the degraded brief" to the next dispatch of this direction.
 	// In-process only: the retry starts in the same process right after the
@@ -563,7 +572,7 @@ func newLifecycle(s *Server, st *store.Store) *lifecycle.Service {
 		},
 		RemoveRunIdentity: s.removeRunIdentity,
 		Redact:            s.redactSecrets,
-		AfterSettle:       s.afterIntentSettled,
+		AfterSettle:       func(string, string, string) { s.afterIntentSettled() },
 		WakeDecider: func(reason string) {
 			s.wakeCommanderIfNeeded(reason)
 		},
@@ -585,6 +594,15 @@ func newLifecycle(s *Server, st *store.Store) *lifecycle.Service {
 
 func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/intents/{id}/context", s.updateTaskContext)
+	// Proposals: executors suggest a next intent, the commander/operator decides,
+	// dispatch starts the run (proposal.go). An approved proposal is not a run.
+	mux.HandleFunc("POST /api/proposals", s.createProposal)
+	mux.HandleFunc("GET /api/proposals", s.listProposals)
+	mux.HandleFunc("GET /api/proposals/{id}", s.getProposal)
+	mux.HandleFunc("POST /api/proposals/{id}/withdraw", s.withdrawProposal)
+	mux.HandleFunc("POST /api/proposals/{id}/approve", s.approveProposal)
+	mux.HandleFunc("POST /api/proposals/{id}/reject", s.rejectProposal)
+	mux.HandleFunc("POST /api/proposals/{id}/dispatch", s.dispatchProposal)
 	mux.HandleFunc("GET /api/instructions", s.listInstructions)
 	mux.HandleFunc("POST /api/instructions", s.createInstruction)
 	mux.HandleFunc("GET /api/instructions/{id}", s.getInstruction)
@@ -629,8 +647,6 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/intents/{id}", s.getIntent)
 	mux.HandleFunc("GET /api/intents/{id}/readiness", s.getIntentReadiness)
 	mux.HandleFunc("POST /api/intents/{id}/run", s.runIntent)
-	mux.HandleFunc("POST /api/intents/{id}/children", s.createChildIntent)
-	mux.HandleFunc("GET /api/intents/{id}/children", s.listChildIntents)
 	mux.HandleFunc("POST /api/intents/{id}/wait", s.waitIntent)
 	mux.HandleFunc("POST /api/intents/{id}/handoff", s.handoffIntent)
 	mux.HandleFunc("GET /api/intents/{id}/usage", s.intentUsage)
@@ -764,7 +780,6 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/premise-policy", s.getPremisePolicy)
 	// Spawn/workers/kill for the operator. Same implementation as the participant
 	// routes (workers.go), operator identity and whole-project visibility.
-	mux.HandleFunc("POST /api/spawn", s.consoleSpawn)
 	mux.HandleFunc("GET /api/workers", s.consoleWorkers)
 	mux.HandleFunc("POST /api/workers/{id}/kill", s.consoleKillWorker)
 	mux.HandleFunc("GET /api/runs/{id}/events", s.runEvents)
@@ -799,9 +814,6 @@ type createIntentReq struct {
 	MaxTurns           int      `json:"max_turns"`
 	FromFactIDs        []string `json:"from_fact_ids"`
 	Skills             []string `json:"skills"`
-	// CandidateGroup names alternatives from one decision; at most one of the
-	// group runs at a time. Empty means the direction stands on its own.
-	CandidateGroup string `json:"candidate_group"`
 	// Node is the execution location; empty means the default node.
 	Node string `json:"node"`
 	// Profile is retired (the external gateway owns model routing). It is still
@@ -871,10 +883,9 @@ func (s *Server) createIntent(w http.ResponseWriter, r *http.Request) {
 		InterestEntityRefs: req.InterestEntityRefs,
 		Skills:             req.Skills,
 		Node:               req.Node,
-		CandidateGroup:     strings.TrimSpace(req.CandidateGroup),
 		// Who created this direction is recorded, not enforced: the operator
 		// and the commander share the console credential (D86), and ownership
-		// checks use DelegatedByRun/participant identity, never this field.
+		// checks use the authenticated participant identity.
 		CreatedBy: actorOf(r),
 	})
 	if err != nil {
@@ -1625,7 +1636,6 @@ func (s *Server) ParkIntent(id, reason string) (model.Intent, error) {
 	}
 	// A parked direction will not consume its children's results, and parking
 	// does not go through the scheduler, so settle the unstarted ones here.
-	s.failUnstartedChildren(updated)
 	return updated, nil
 }
 
@@ -1673,9 +1683,6 @@ func (s *Server) ReopenIntent(id string) (model.Intent, error) {
 	}
 	if in.Status != model.StatusParked {
 		return model.Intent{}, fmt.Errorf("意图 %s 不是停放状态（%s）", id, in.Status)
-	}
-	if err := s.activeDescendantRefusal(id); err != nil {
-		return model.Intent{}, err
 	}
 	if in.RunID != "" {
 		if r, ok := s.Store.GetRun(in.RunID); ok && r.Status == model.RunRunning {
@@ -1767,7 +1774,6 @@ func (s *Server) CancelIntentBy(id, reason, actor string) (string, error) {
 	}
 	// Canceling a direction cancels its whole subtree: a child writing into a
 	// case nobody watches is exactly the orphan this operation must not leave.
-	s.cancelDescendants(id, reason, actor)
 	if cur.Status == model.StatusRunning || cur.Status == model.StatusClaimed {
 		if cur.RunID != "" {
 			// The console labels this stop "止损取消" from the structured cause,
@@ -1901,25 +1907,6 @@ func (s *Server) RetryIntent(id, note string, resume bool) (string, error) {
 	return runID, err
 }
 
-// activeDescendantRefusal refuses a start-like write on a direction whose live
-// subtree still has work. A failed run drops the direction's wait, so the
-// descendants' results have nowhere to land; restarting the top would put it on
-// the same ground as its own chain. The dispatch gate enforces the same rule for
-// every path (pump, redispatch, auto-resume); this early copy exists so the
-// operator and the API get the reason before the row is CASed to pending.
-func (s *Server) activeDescendantRefusal(id string) error {
-	live := s.Store.ActiveDescendants(id)
-	if len(live) == 0 {
-		return nil
-	}
-	ids := make([]string, 0, len(live))
-	for _, in := range live {
-		ids = append(ids, in.ID)
-	}
-	return fmt.Errorf("意图 %s 还有 %d 条子意图在下游运行（%s）：先等它们收口或取消，再启动这个意图",
-		id, len(live), strings.Join(ids, "、"))
-}
-
 func (s *Server) retryIntentRun(id, note string, resume bool) (string, int, error) {
 
 	in, ok := s.Store.GetIntent(id)
@@ -1929,9 +1916,6 @@ func (s *Server) retryIntentRun(id, note string, resume bool) (string, int, erro
 	if in.Status != model.StatusFailed && in.Status != model.StatusPending && in.Status != model.StatusReviewFailed {
 		return "", 0, &retryError{"retry_conflict",
 			fmt.Sprintf("意图 %s 是 %s，只有 failed / review_failed / pending 的意图可以 retry", id, in.Status)}
-	}
-	if err := s.activeDescendantRefusal(id); err != nil {
-		return "", 0, &retryError{"retry_children_running", err.Error()}
 	}
 	// The note is the decider's commentary for the operator and the next
 	// decision, not an executor constraint. It goes into Intent.Notes, which
@@ -2307,16 +2291,11 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 			log.Printf("run %s: 复制知识库失败：%v", runID, err)
 		}
 	}
-	// The current instruction set is frozen with the input and rendered before
-	// the task material: operator guidance is the strongest stable constraint,
-	// and a long prompt must not bury it behind the evidence contract.
-	instructions := instructionSection(store.ApplicableInstructions(db, in.ID, false), runID)
-	s.NoteInjected(runID, "instruction", "", len(instructions), "instructions")
 	// A replacement session reads the operator's own words, not the previous
 	// model's account of them. The text comes from this task book (the same
 	// bytes the prompt already carries) and the pointer comes from the run row,
 	// which only the control plane can read.
-	handoffAuth := handoffAuthorization{Briefing: brief, Instructions: instructions}
+	handoffAuth := handoffAuthorization{Briefing: brief}
 	if s.Project != nil {
 		handoffAuth.BriefRevision = s.Project.BriefRevision()
 	}
@@ -2324,12 +2303,6 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 		handoffAuth.SourceRun = in.Handoff.FromRun
 		if src, ok := s.Store.GetRun(in.Handoff.FromRun); ok {
 			handoffAuth.SourceBrief = src.BriefPath
-			// The ids come from the replaced run's frozen set, not from a fresh
-			// query: the point is what that session actually read.
-			for id := range src.InstructionVersions {
-				handoffAuth.InstructionIDs = append(handoffAuth.InstructionIDs, id)
-			}
-			sort.Strings(handoffAuth.InstructionIDs)
 		}
 	}
 	waitSection := s.readyWaitSection(in)
@@ -2350,15 +2323,15 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 	probes := s.probeSection(in, db)
 	switch {
 	case slimPrompt:
-		prompt = buildPromptWithoutOptionalSummaries(db, in, brief, s.pocDir(), s.KBDir, s.Timeout, graphOK, focusOK, instructions, probes, s.ReviewsDisabled())
+		prompt = buildPromptWithoutOptionalSummaries(db, in, brief, s.pocDir(), s.KBDir, s.Timeout, graphOK, focusOK, probes, s.ReviewsDisabled())
 		if in.Handoff != nil {
 			prompt += handoffSection(db, in, *in.Handoff, handoffAuth) + "\n\n" + handoffIndexNote
 		}
 		s.noteContextSlimRetry(runID,
 			"harness 报告上下文超限：本次改用精简任务书（可选摘要省略，硬约束与交接契约保留；按本轮输入清单与 fact ID 读取）")
 	case !keepPrompt:
-		prompt = BuildPromptWithInstructionsVisible(db, in, brief, s.pocDir(), s.KBDir, s.Timeout, graphOK, focusOK,
-			s.readWorkerNote(workDir), instructions, probes, s.ReviewsDisabled())
+		prompt = buildDispatchPrompt(db, in, brief, s.pocDir(), s.KBDir, s.Timeout, graphOK, focusOK,
+			s.readWorkerNote(workDir), probes, s.ReviewsDisabled())
 		if in.Handoff != nil {
 			prompt += handoffSection(db, in, *in.Handoff, handoffAuth) + "\n\n" + handoffIndexNote
 		}
@@ -2370,8 +2343,8 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 		// working on the task as it was then — the one failure mode nobody can see
 		// from outside. The current brief is rebuilt and re-sent, declared
 		// authoritative over history; the continuation text follows it.
-		current := BuildPromptWithInstructionsVisible(db, in, brief, s.pocDir(), s.KBDir, s.Timeout, graphOK, focusOK,
-			s.readWorkerNote(workDir), instructions, probes, s.ReviewsDisabled())
+		current := buildDispatchPrompt(db, in, brief, s.pocDir(), s.KBDir, s.Timeout, graphOK, focusOK,
+			s.readWorkerNote(workDir), probes, s.ReviewsDisabled())
 		if in.Handoff != nil {
 			current += handoffSection(db, in, *in.Handoff, handoffAuth) + "\n\n" + handoffIndexNote
 		}
@@ -2409,8 +2382,8 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 	}
 	// Capability inventory (peers, runnable model tiers, where the collaboration
 	// contract lives) — not tool instructions. A model that never reads the skill
-	// cannot discover that it may delegate or spawn another tier; sapper puts the
-	// same affordance in its mission text (docs/17 §3.2/§3.3).
+	// cannot discover that it may delegate or spawn another tier; the mission
+	// text carries the same affordance (docs/17 §3.2/§3.3).
 	if collabSection != "" {
 		s.NoteInjected(runID, "collaboration", "", len(collabSection), "brief")
 	}
@@ -2714,6 +2687,10 @@ func (s *Server) finish(runID, intentID, status, reason string, res executor.Res
 		// The direction produced a result: a later transport failure is a new
 		// episode and starts with a fresh budget.
 		resetAutoResumeBudget(intentID)
+		// The gateway/node pair that carried this run demonstrably works, so the
+		// shared-resource gate starts over too. Without this the brake would
+		// remember a dead link long after it recovered.
+		autoResumeBrake.Reset(s.recoveryKey(runID))
 	}
 }
 
@@ -4043,6 +4020,10 @@ func (s *Server) autoVerifyWithContext(ctx context.Context, intentID string) {
 	if s.Store == nil || s.reviewsOff() || !s.automaticReviewsEnabled() || s.ReviewsPaused() || s.deleting.Load() || s.closing.Load() {
 		return
 	}
+	// One pass per direction: the cursor below is a read-modify-write, and two
+	// passes that interleave it can move it past a candidate neither reviewed.
+	unlock := s.lockReviewPass(intentID)
+	defer unlock()
 	start := s.Store.ReviewCursor(intentID)
 	facts, _ := s.Store.ReviewCandidates(intentID, start, autoVerifyBatch, s.reviewPolicy())
 	if len(facts) == 0 {
@@ -4937,9 +4918,27 @@ func (s *Server) resumeProjectRuntimeLocked() {
 	}
 	s.pauseCause = ""
 	// Resume is also the point where work interrupted by a restart may continue:
-	// the boot path keeps the project paused on purpose, so this is the first
-	// moment a replay is what the operator actually asked for.
+	// the boot path opens paused, and this is the moment the pause really ends (an
+	// operator's 继续项目, an appended goal, or the watchdog's restart recovery).
 	go s.redispatchInterrupted()
+}
+
+// resumeProjectLocked is the runtime half of every accepted resume. The caller
+// holds controlMu and has already persisted paused=false: a failed manifest write
+// must never start spending, so this half only runs after the durable write
+// succeeded.
+//
+// wake is the decider reason; an empty wake leaves the commander to the ordinary
+// event-driven rounds (used when a restart recovery finds nothing a round would
+// act on, so it clears the pause without buying an empty round).
+func (s *Server) resumeProjectLocked(wake string) {
+	s.resumeProjectRuntimeLocked()
+	if wake != "" && s.Decider != nil {
+		s.Decider.Wake(wake)
+	}
+	// Resume is where a pause's suspended children and waits continue: the
+	// scheduler was gated while paused, so it must be kicked explicitly.
+	go s.pump()
 }
 
 // projectResume re-arms the whole project after projectPause. It is explicit:
@@ -5030,13 +5029,7 @@ func (s *Server) projectResume(w http.ResponseWriter, r *http.Request) {
 	if scope != nil {
 		s.setResumeScope(*scope)
 	}
-	s.resumeProjectRuntimeLocked()
-	if s.Decider != nil {
-		s.Decider.Wake("operator")
-	}
-	// Resume is where a pause's suspended children and waits continue: the
-	// scheduler was gated while paused, so it must be kicked explicitly.
-	go s.pump()
+	s.resumeProjectLocked("operator")
 	out := map[string]any{"paused": false}
 	if scope != nil {
 		out["scope_goal_id"] = scope.GoalID
@@ -5045,6 +5038,54 @@ func (s *Server) projectResume(w http.ResponseWriter, r *http.Request) {
 		out["decider"] = s.Decider.Status()
 	}
 	writeJSON(w, 200, out)
+}
+
+// ResumeAfterRestart is the boot half of watchdog recovery. The hub attaches a
+// project that was running when the previous process died with a restart pause;
+// attachState already ran Recover (the crash sweep converged the orphan runs and
+// returned their directions to pending), and this clears that pause so the
+// project continues instead of waiting for an operator who never stopped it.
+//
+// It only clears a pause the boot path wrote for itself (pauseCauseRestart). An
+// operator pause, a commander stand-by, a completion stand-by and a cause-less
+// pause are decisions, not crash markers: each keeps its pause and waits for the
+// operator. This is the one place the rule lives, so the boot path cannot drift
+// from the resume contract the console shows.
+//
+// It runs on the hub's attach path, after Recover and before the HTTP server
+// starts serving, so no console click can race it. The decider wake is forced
+// only when the ledger has something a round would act on: a project with nothing
+// to continue gets its pause cleared without spending a round.
+func (s *Server) ResumeAfterRestart() {
+	if s == nil || s.closing.Load() || s.deleting.Load() {
+		return
+	}
+	s.controlMu.Lock()
+	defer s.controlMu.Unlock()
+	if !s.paused.Load() || s.pauseCause != pauseCauseRestart {
+		return
+	}
+	before := s.projectStateLocked()
+	verdict := s.resumeActionLocked(before, s.projectFactsLocked())
+	switch verdict.ReasonCode {
+	case reasonDeleting, reasonCloseoutInProgress:
+		// Neither is the restart's to clear: deletion owns the tree, and a
+		// closeout owns the runtime until its round settles.
+		return
+	}
+	if err := s.setProjectPausedKind(false, ""); err != nil {
+		// The runtime stays paused so it agrees with the manifest; the persisted
+		// restart cause is what tells the operator this is the machine's pause.
+		log.Printf("重启恢复：无法保存继续状态，项目保持暂停：%v", err)
+		return
+	}
+	wake := ""
+	if verdict.Enabled {
+		wake = "restart"
+	}
+	s.resumeProjectLocked(wake)
+	s.recordAction("restart_resume", "", "控制面重启：对账完成，自动恢复运行")
+	log.Printf("控制面重启：对账完成，已自动恢复项目（暂停时原因：%s）", before.Reason)
 }
 
 func (s *Server) listDecisions(w http.ResponseWriter, r *http.Request) {

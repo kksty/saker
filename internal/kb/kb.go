@@ -42,8 +42,10 @@ const (
 	OriginInstance = "instance"
 )
 
-// Entry retains sapper's base fields, with optional applicability/provenance
-// for explicit world-knowledge publication. Existing JSON remains readable.
+// Entry is one offline knowledge-base record: the searchable fields (title,
+// description, detail, commands, tags, source) plus optional applicability and
+// provenance used when an instance publishes entries explicitly. Existing JSON
+// remains readable.
 type Entry struct {
 	ID            string     `json:"id"`
 	Title         string     `json:"title"`

@@ -29,11 +29,7 @@ func TestRunsReturnsDetachedRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = st.Close() }()
-	in, err := st.CreateIntent(model.Intent{Title: "runs detach"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := st.StartIntentRun(in.ID, "local", "", model.Run{}); err != nil {
+	if _, err := st.AddRun(model.Run{Purpose: "commander", Status: model.RunRunning}); err != nil {
 		t.Fatal(err)
 	}
 	// The first durable instruction gives the live run row a notice map (the

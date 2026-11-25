@@ -64,7 +64,7 @@ func TestStateNoteIsHistoricalAdviceNotInstruction(t *testing.T) {
 			if !strings.Contains(p, "历史") {
 				t.Fatalf("note preamble does not describe the note as history:\n%s", p)
 			}
-			for _, want := range []string{"不是指令", "当前有效指令", "账本记录版本"} {
+			for _, want := range []string{"不是指令", "当前项目文档", "账本记录版本"} {
 				if !strings.Contains(p, want) {
 					t.Fatalf("note preamble missing %q:\n%s", want, p)
 				}
@@ -229,17 +229,16 @@ func TestStateInjectionBytesAudit(t *testing.T) {
 	}
 }
 
-// Delegation remains available without retired model selectors in any round.
-func TestRoundPromptPreservesDelegationWithoutModelTierRouting(t *testing.T) {
+func TestRoundPromptPreservesCollaborationWithoutRetiredDispatch(t *testing.T) {
 	ordinary := promptFor(RoundContext{Resume: true, StatePath: "/state.md"})
 	handoff := CommanderRoundPrompt(board.View{}, testNote, "", ContextStatus{Used: 110000, Window: 128000}, RoundContext{Resume: true})
 	for _, prompt := range []string{ordinary, handoff} {
-		for _, retired := range []string{"模型档位", "worker_profile", "strong_profile", "tier=", "/api/model-profiles"} {
+		for _, retired := range []string{"模型档位", "worker_profile", "strong_profile", "tier=", "/api/model-profiles", "派子意图", "平级发布"} {
 			if strings.Contains(prompt, retired) {
 				t.Fatalf("prompt advertises retired routing: %s", retired)
 			}
 		}
-		for _, kept := range []string{"互发消息", "共享事实", "派子意图"} {
+		for _, kept := range []string{"互发消息", "共享事实", "记录交接"} {
 			if !strings.Contains(prompt, kept) {
 				t.Fatalf("prompt lost collaboration: %s", kept)
 			}

@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/collab"
 	"github.com/kksty/tianwu/internal/model"
 	"github.com/kksty/tianwu/internal/store"
 )
@@ -34,111 +33,10 @@ func consoleCall(t *testing.T, s *Server, method, path, actor string, body any) 
 	return rec
 }
 
-// The operator spawns through the console token: the ledger records the actor
-// (not an executor participant) and a retry finds the same worker.
-func TestConsoleSpawnCreatesWorkerAsOperator(t *testing.T) {
-	f := newSpawnFixture(t)
-	rec := consoleCall(t, f.srv, http.MethodPost, "/api/spawn", "", spawnBody("console-1", nil))
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("spawn: %d %s", rec.Code, rec.Body.String())
-	}
-	var resp spawnResp
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatal(err)
-	}
-	if !resp.Created || !resp.Started || resp.Intent.CreatedBy != collab.OperatorID {
-		t.Fatalf("resp = %+v", resp)
-	}
-	if !strings.Contains(rec.Body.String(), `"worker_id":"`+resp.Intent.ID+`"`) {
-		t.Fatalf("response lost the flat worker aliases: %s", rec.Body.String())
-	}
-	waitRun(t, f.p, resp.RunID)
-
-	rec = consoleCall(t, f.srv, http.MethodPost, "/api/spawn", "", spawnBody("console-1", nil))
-	if rec.Code != http.StatusOK {
-		t.Fatalf("retry: %d %s", rec.Code, rec.Body.String())
-	}
-	var again spawnResp
-	if err := json.Unmarshal(rec.Body.Bytes(), &again); err != nil {
-		t.Fatal(err)
-	}
-	if again.Created || again.Intent.ID != resp.Intent.ID {
-		t.Fatalf("retry = %+v", again)
-	}
-	if n := len(f.p.Store.ListIntents()); n != 3 {
-		t.Fatalf("intents = %d, want 3", n)
-	}
-}
-
-// The commander drives the same console API with X-Tw-Actor; the ledger should
-// say commander, so operator- and commander-created workers stay distinguishable.
-func TestConsoleSpawnRecordsCommanderActor(t *testing.T) {
-	f := newSpawnFixture(t)
-	rec := consoleCall(t, f.srv, http.MethodPost, "/api/spawn", collab.CommanderID,
-		spawnBody("console-cmd", nil))
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("spawn: %d %s", rec.Code, rec.Body.String())
-	}
-	var resp spawnResp
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatal(err)
-	}
-	if resp.Intent.CreatedBy != collab.CommanderID {
-		t.Fatalf("created_by = %q, want %q", resp.Intent.CreatedBy, collab.CommanderID)
-	}
-}
-
-// The console resolves profile/tier exactly like the participant route.
-
-// Capacity is reported the same way as on the agent route: the worker exists,
-// started=false explains why, and a retry never duplicates it.
-func TestConsoleSpawnWhenCapacityIsFull(t *testing.T) {
-	f := newSpawnFixture(t)
-	blocking := &blockingExec{}
-	f.srv.Exec = blocking
-	f.srv.MaxRuns = 1
-	filler, err := f.p.Store.CreateIntent(model.Intent{Title: "占住唯一的槽"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := f.srv.StartRun(filler.ID); err != nil {
-		t.Fatal(err)
-	}
-	waitFor(t, 5*time.Second, func() bool {
-		got, ok := f.p.Store.GetIntent(filler.ID)
-		return ok && got.Status == model.StatusRunning
-	})
-	t.Cleanup(func() {
-		f.srv.CancelAll()
-		f.srv.WaitIdle(5 * time.Second)
-		time.Sleep(150 * time.Millisecond)
-	})
-
-	rec := consoleCall(t, f.srv, http.MethodPost, "/api/spawn", "", spawnBody("console-full", nil))
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("spawn full: %d %s", rec.Code, rec.Body.String())
-	}
-	var resp spawnResp
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatal(err)
-	}
-	if resp.Started || !strings.Contains(resp.Reason, "并发已满") {
-		t.Fatalf("resp = %+v", resp)
-	}
-	rec = consoleCall(t, f.srv, http.MethodPost, "/api/spawn", "", spawnBody("console-full", nil))
-	var again spawnResp
-	if err := json.Unmarshal(rec.Body.Bytes(), &again); err != nil {
-		t.Fatal(err)
-	}
-	if again.Created || again.Intent.ID != resp.Intent.ID {
-		t.Fatalf("retry duplicated the worker: %+v", again)
-	}
-}
-
 // The console roster sees the whole project and may kill any still-active
 // worker; a finished worker is not killable (kill answers 409).
 func TestConsoleWorkersAndKill(t *testing.T) {
-	f := newSpawnFixture(t)
+	f := newWorkerFixture(t)
 	blocking := &blockingExec{}
 	f.srv.Exec = blocking
 	// A worker created by an executor (so ownership would not allow the operator
@@ -223,38 +121,6 @@ func TestConsoleWorkersAndKill(t *testing.T) {
 
 // The operator may hang a spawned worker under any still-active direction; an
 // executor-created parent is fine (unlike the participant route).
-func TestConsoleSpawnUnderAnyActiveParent(t *testing.T) {
-	f := newSpawnFixture(t)
-	parent, err := f.p.Store.CreateIntent(model.Intent{Title: "指挥官的父意图", CreatedBy: collab.CommanderID})
-	if err != nil {
-		t.Fatal(err)
-	}
-	rec := consoleCall(t, f.srv, http.MethodPost, "/api/spawn", "",
-		spawnBody("console-parent", map[string]any{"parent_intent_id": parent.ID}))
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("spawn under parent: %d %s", rec.Code, rec.Body.String())
-	}
-	var resp spawnResp
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatal(err)
-	}
-	if resp.Intent.ParentID != parent.ID {
-		t.Fatalf("parent = %q", resp.Intent.ParentID)
-	}
-	// A finished parent is refused.
-	if _, err := f.p.Store.UpdateIntent(parent.ID, func(i *model.Intent) { i.Status = model.StatusDone }); err != nil {
-		t.Fatal(err)
-	}
-	rec = consoleCall(t, f.srv, http.MethodPost, "/api/spawn", "",
-		spawnBody("console-parent2", map[string]any{"parent_intent_id": parent.ID}))
-	if rec.Code != http.StatusConflict {
-		t.Fatalf("finished parent: %d %s", rec.Code, rec.Body.String())
-	}
-}
-
-// The roster must carry a parked direction's reason: the badge alone reads like
-// unfinished work, and the reason is what tells a reader "answered, do not
-// reopen" instead of "queued".
 func TestWorkerViewCarriesTheParkReason(t *testing.T) {
 	st, err := store.Open(filepath.Join(t.TempDir(), "ledger.json"))
 	if err != nil {

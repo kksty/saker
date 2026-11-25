@@ -157,7 +157,7 @@ func appendImmutableRow(db *store.DB, kind string, raw []byte) error {
 			return err
 		}
 		db.Messages = append(db.Messages, v)
-	case "evidence", "goal", "review", "playbook", "operator_request", "route", "action":
+	case "evidence", "goal", "review", "playbook", "operator_request", "route", "action", "proposal":
 		// Not used by the vertical metrics; the row is still part of the ledger
 		// contract, so its presence is accepted while its payload is left to the
 		// store-backed reader. A corrupt payload of these kinds is outside this

@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -12,8 +11,6 @@ import (
 	"github.com/kksty/tianwu/internal/model"
 	"github.com/kksty/tianwu/internal/store"
 )
-
-// ---- cancel semantics: explicit stop => failed+Hold (task-31, final-e2e E7) ----
 
 // A run-level cancel (the API's "kill this run") used to settle the intent back
 // to pending, and the pump immediately started a replacement run. An explicit
@@ -67,96 +64,6 @@ func TestCancelRunHoldsIntentAndPreventsRedispatch(t *testing.T) {
 
 // Canceling a child run while its parent waits: the child is held (not silently
 // re-dispatched) and the parent's wait still settles so the parent can decide.
-func TestCancelWaitingChildSettlesParentWait(t *testing.T) {
-	dir := t.TempDir()
-	st, err := store.Open(filepath.Join(dir, "ledger.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := New(st, &blockingExec{}, dir, filepath.Join(dir, "cases"))
-	t.Cleanup(func() {
-		s.CancelAll()
-		s.WaitIdle(5 * time.Second)
-		time.Sleep(200 * time.Millisecond)
-	})
-
-	parent, err := st.CreateIntent(model.Intent{Title: "等子意图的父意图"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	child, _, err := st.CreateChildIntent(parent.ID, model.Intent{Title: "子意图", CreatedBy: "operator"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	parentRun, err := st.AddRun(model.Run{IntentID: parent.ID, Node: "local"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := st.UpdateIntent(parent.ID, func(i *model.Intent) {
-		i.Status = model.StatusWaiting
-		i.RunID = parentRun.ID
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := st.RegisterWait(parent.ID, parentRun.ID, model.Wait{Children: []string{child.ID}}); err != nil {
-		t.Fatal(err)
-	}
-
-	childRun, err := s.StartRun(child.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	waitFor(t, 5*time.Second, func() bool {
-		return s.Lifecycle.RunActive(childRun)
-	})
-	if err := s.CancelRun(childRun); err != nil {
-		t.Fatal(err)
-	}
-	waitFor(t, 5*time.Second, func() bool {
-		got, ok := st.GetIntent(child.ID)
-		return ok && got.Status == model.StatusFailed && got.Hold
-	})
-
-	// The graph's child rows read the same flag: without it the row would say
-	// "失败" for a direction that was only stopped.
-	rec := call(t, s, http.MethodGet, "/api/intents/"+parent.ID+"/children", nil)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("children HTTP = %d %s", rec.Code, rec.Body.String())
-	}
-	var page struct {
-		Children []childIntentView `json:"children"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &page); err != nil {
-		t.Fatal(err)
-	}
-	if len(page.Children) != 1 || !page.Children[0].Hold {
-		t.Fatalf("child hold = %+v, want the held child", page.Children)
-	}
-	// The child row labels the stop through the run's structured cause; without
-	// it the row can only say "已取消" instead of "人工取消/止损取消".
-	if got := page.Children[0].CancelCause; got != model.CancelCauseOperator {
-		t.Fatalf("child cancel cause = %q, want %q", got, model.CancelCauseOperator)
-	}
-
-	// The parent's wait must not hang on a held child: a failed child counts as
-	// settled, so the scheduler wakes the parent with the result.
-	s.pump()
-	waitFor(t, 5*time.Second, func() bool {
-		got, ok := st.GetIntent(parent.ID)
-		return ok && got.Wait == nil && got.Status != model.StatusWaiting
-	})
-	// And the held child is not silently restarted by that same tick.
-	runsForChild := 0
-	for _, r := range st.Runs() {
-		if r.IntentID == child.ID {
-			runsForChild++
-		}
-	}
-	if runsForChild != 1 {
-		t.Fatalf("canceled child has %d runs, want 1 (no auto re-dispatch)", runsForChild)
-	}
-}
-
 // A stop-loss reason carries the prefix exactly once. The API adds "止损：" for
 // callers that only wrote why; a caller that already wrote it (the commander
 // does) must not produce the old "止损：止损：…" duplication in exit_reason.

@@ -1,6 +1,6 @@
 ---
 name: collaborate
-description: 与同一项目的其他执行者通信、查看谁在做什么，发布平级或委托（等待）的意图，并按需读取当前事实与证据。需要同伴的数据、想核对最新事实、要一个独立执行者或回答同伴时使用。
+description: 与同项目的执行者通信、读取账本事实并记录交接。
 ---
 
 # 协作
@@ -51,17 +51,9 @@ SELF=${TW_SELF:-$(sed -n 's/.*"intent_id": *"\([^"]*\)".*/\1/p' "$ID")}
 输出末尾的 `truncated/dropped/has_more/next_cursor` 是分页契约：未读完时换小 `--limit` 重试，不要把截断当成全集。
 变量为空时读 `.tw/auth` 与 `.tw/identity.json`。
 
-没有固定顺序：先发现，再决定是发消息、造人、等待还是自己做。每次只做当下最有信息量的一步。
+## 本轮工作
 
-## 范围与指令
-
-持续有效的指导由操作员维护为持久指令，项目级指令适用于后续新任务，意图级指令适用于该意图及其后代。每轮输入提供当前完整有效集合；同一指令以新版本替代旧版本，撤销后不再生效。普通聊天与指令变更通知不覆盖有效指令；收到通知后按 ID 核对当前版本，不把旧通知当新口径。
-
-范围规则（所有角色一致）：冲突时重读账本再判断。边界以操作员最新一条下发为准，可以补充、收窄，也可以放宽；同一处冲突后写的胜，仍无法消解时说明无法完成的部分。
-
-`GET $API/instructions` 按页读取适用于自己的指令，`GET $API/instructions/<id>` 读当前版本，`GET $API/instructions/<id>/history` 查修订。处理后可 `POST $API/instructions/<id>/ack`，正文含 `version`；服务端绑定本轮 run。确认只表示已处理该版本，不是外部动作回执或事实证明。执行者不能创建、修改或撤销人的持久指令。
-
-不要自行扩大授权；也不要因为某个资产不在初始清单里，就拒绝一个已经被操作员明确提到的资产。拿不准时先记录并给指挥官/操作员发消息确认，而不是默默跳过。
+本轮工作依据是本轮任务书给出的指派、验收标准与约束原文。项目起点与终点的原文不在执行者输入里：本轮目标就是本意图及其验收标准。工作受阻时记录具体未满足的条件，向指挥官说明影响。需要接班时交代当前结果、证据位置和未决事项。
 
 ## 先发现
 
@@ -78,10 +70,10 @@ SELF=${TW_SELF:-$(sed -n 's/.*"intent_id": *"\([^"]*\)".*/\1/p' "$ID")}
 - `GET $API/access`：操作员提供的登录材料元数据。状态/请求材料可由 `GET $API/access/<id>/material` 读取，派发时也会准备 `.tw/access/index.json` 和对应文件。浏览器绑定在领取后读取，不再无条件复制给每个执行者。
 - 使用共享浏览器现场前，`POST $API/access/<id>/lease`，正文 `{"action":"acquire","note":"本轮使用目的"}`。服务端绑定你的 run 和代次，返回 `lease.id`；重复领取同一份占用是幂等的，其他持有者占用时返回 409，不循环抢占。占用者与状态由 `GET $API/access` 查看；可与同伴协商或转做其他独立工作。
 - 领取成功后，`GET $API/access/<id>/material?lease_id=<领取返回的 id>` 获取浏览器 session 和可选 CDP 地址。现场必须与本轮的执行宿主一致；跨宿主使用状态文件。工具用法由 harness 提供，租约不验证登录有效性。
-- 浏览器操作全部完成后，`POST $API/access/<id>/lease`，正文 `{"action":"release","lease_id":"bl_x"}` 归还。lease_id 属于这一次领取，旧 run/旧代次不能归还新占用。子意图等待、人工交接或本轮结束前，若现场没有在途操作则先归还；若结果不明，保留占用并说明情况。结束、取消、重启或超时不会自动把未知现场转交别人，操作员确认空闲后才能恢复。此协作锁覆盖已注册现场与控制面操作，不是原生工具或外部 CDP 的沙箱。
+- 浏览器操作全部完成后，`POST $API/access/<id>/lease`，正文 `{"action":"release","lease_id":"bl_x"}` 归还。lease_id 属于这一次领取，旧 run/旧代次不能归还新占用。人工交接或本轮结束前，若现场没有在途操作则先归还；若结果不明，保留占用并说明情况。结束、取消、重启或超时不会自动把未知现场转交别人，操作员确认空闲后才能恢复。此协作锁覆盖已注册现场与控制面操作，不是原生工具或外部 CDP 的沙箱。
 - 状态文件只覆盖 Cookie 和 localStorage；使用后验证实际账号、角色、租户及受保护资源。一次工具返回或人工点击完成，都不是登录有效的证据。材料过期或无法迁移时交回人工，保留原现场。
 - `GET $API/artifacts?run=<run_id>&q=<关键词>&limit=50` 查原生结果元数据，`GET $API/artifacts/data?ref=<URL 编码后的 ref>` 读原件。原件不是已确认发现；确实使用它支持结论时，在 facts 声明的 evidence 中写 `{"artifact":"run_id/result_id"}`，由控制面取回对应字节。
-- 需要人工登录、扫码、验证码或设备确认时，先保存事实和交接笔记，再 `POST $API/intents/<自己的 intent_id>/operator`，正文 `{"request":"需要操作员完成什么、当前页面在哪里","access_ids":["ac_x"]}`。登记后控制面以 `operator_wait` 停止当前 turn 并保留会话，意图转为 waiting、不占执行槽，也不让控制面空转等人。已有子意图等待时不能覆盖其条件。
+- 需要人工登录、扫码、验证码或设备确认时，先保存事实和交接笔记，再 `POST $API/intents/<自己的 intent_id>/operator`，正文 `{"request":"需要操作员完成什么、当前页面在哪里","access_ids":["ac_x"]}`。登记后控制面以 `operator_wait` 停止当前 turn 并保留会话，意图转为 waiting、不占执行槽，也不让控制面空转等人。
 - 自己已打开的登录窗口尚未登记时，可在同一次申请中带 `browser`：`{"request":"请在已打开的窗口扫码；目标页面 https://app.example/login，当前使用测试账号 A","browser":{"origin":"https://app.example/login","session":"本轮真实的浏览器session","name":"站点 · 账号 A"}}`。先用 harness 原生工具打开可见（headed）的独立会话，再填写真实 session；控制面自动绑定本轮实际宿主并关联材料，操作员无需选择宿主。不要填 AOP 会话 ID 或编造浏览器 session。复用已经登记的现场时只传 access_ids，不重复登记。同一申请可关联多份现场，说明每个站点和账号分别需要什么操作，不在说明里重复密码或 Token。
 - 尚未打开窗口时可省略 `browser.session`，保留 `browser.origin`；操作员点击打开时会在你的宿主新建可见浏览器。外部调试浏览器可提供 `browser.cdp_url`，不强制填写 origin。已有真实 session 的打开按钮只检查当前页面，保留二维码、验证码及原页面，不重新导航。完成回执后读取关联材料、领取现场并验证，再继续原任务。
 - 人工回执从控制台「访问与交接」提交，参与者不能代替操作员确认。`resolution=completed` 仅表示操作员完成动作，仍须核对现场；`resolution=unavailable` 表示没有完成且前提未获得，读取原因与测试约束，按当前实际访问能力继续。需要登录才能验证的部分注明未覆盖或停放，不等于安全结论；没有新条件时不重复索要同一已明确不可用的前提。
@@ -104,7 +96,7 @@ SELF=${TW_SELF:-$(sed -n 's/.*"intent_id": *"\([^"]*\)".*/\1/p' "$ID")}
 
 `GET $API/actions` 查看记录。取得结果或核对后，`POST $API/actions/<id>/result`，提交当前 `version`、`state=completed|unknown`、`result` 与可选 `result_ref`。completed 表示已有结果，不表示成功；unknown 表示需要核对，不能据此假定外部动作未发生。版本冲突时重新读取，不覆盖更新结果。当前意图的新承接者可显式核对旧动作，旧 run 的迟到请求不能覆盖新代次。
 
-本轮等待外部结果时，使用现有等待接口 `POST $API/intents/<intent_id>/wait`，正文带 `actions:["ax_x"]`、可选 `mode=all|any` 与 `timeout_seconds`。actions、children、人工等待互斥。未就绪时当前 turn 会让出执行槽位；结果或未知状态只释放明确等待该动作的意图。暂停期间结果保留，操作员继续后才恢复。是否登记、等待以及如何使用结果由你判断；控制面不替你规定渗透步骤，也不把回执自动晋升为事实。
+本轮等待外部结果时，使用现有等待接口 `POST $API/intents/<intent_id>/wait`，正文带 `actions:["ax_x"]`、可选 `mode=all|any` 与 `timeout_seconds`。外部动作等待和人工等待各自记录。未就绪时当前 turn 会让出执行槽位；结果或未知状态只释放明确等待该动作的意图。暂停期间结果保留，操作员继续后才恢复。是否登记、等待以及如何使用结果由你判断；控制面不替你规定渗透步骤，也不把回执自动晋升为事实。
 
 ```sh
 curl -s -H "$AUTH" "$API/participants"
@@ -120,31 +112,13 @@ peer 规则限制**（那是 operator 通道）。
 `commander` 也可以直接发消息：它正在跑的一轮会立刻收到，没在跑就排队，下一轮一定读到。不要用它
 催已结束的意图。
 
-### 协作方式（先选形状）
-
-先判断需要哪一种协作者；下面的形状不要混用：
-
-- **同回合的临时视角**：借一个不同视角、并行读数、对抗性复核。用 harness 原生 subagent：它是父回合内的临时助手，不单独开 run/usage、不产生事实，结论仍由你显式声明。
-- **需要独立 run、证据归属或跨回合**：用意图（spawn 或 children），让控制面为它单独记账。再按“要不要等它”分成两种：
-  - **不必等**：发布平级意图（不挂 `parent_intent_id`，见「发布平级意图」）。发起者只记出处，不是上级，也不阻塞你。
-  - **必须等**：委托（等待）。`parent_intent_id=$SELF` 建子意图，再用 wait 等它结束；ParentID 与 Wait 是唯一的层级关系。
-
-你和指挥官、其他执行者共享同一项目账本，可以直接协作，没有固定角色或层级：
-
-- 自己能做完就直接做完；需要并行验证、独立现场或专门工具时，再把子目标拆成意图，写清要什么结果。
-- 意图也可以继续发起，但不要为了凑层级或人数而拆；没有必要求助时就独立完成。
-- 可以直接给同伴发消息、共享新事实、互相验证；同一浏览器、账号、端口等共享现场先协调占用，避免互相覆盖。
-- 跨意图的资源冲突、授权边界或目标取舍再交给指挥官；能由你与同伴直接协调的，不必层层请示。
-- 项目终点目标由操作员定义；执行者不创建、改写或追加目标，需要目标取舍时交给指挥官/操作员。
-所有执行者共用统一模型连接。分工依任务与证据需要决定，不依赖模型档位。
-
-### 看同伴/子意图在做什么
+### 看同伴在做什么
 
 ```sh
 curl -s -H "$AUTH" "$API/runs/<run_id>/events/tail?lines=40"
 ```
 
-- `run_id` 从 `/participants` 的 `run_id`（或子意图列表）拿，不是 `participant_id`。
+- `run_id` 从 `/participants` 的 `run_id`拿，不是 `participant_id`。
 - 只读、只返回本项目事件，默认 40 行、上限 200 行；想看别人的总结用 `facts`，想看它正在做什么用这里。
 - 先 peek 再决定要不要发消息问；**不要**为了等进度反复发消息或 sleep 轮询。
 
@@ -218,6 +192,33 @@ curl -s -H "$AUTH" -X POST "$API/messages/m_x/ack"
 
 发消息返回 429 且 `code=message_backpressure` 时，这条消息的字节**没有入队**：稍后用同一 `idempotency_key` 重试；队列积压与上限看 `GET $API/communication`。
 
+## 提议新意图
+
+执行者不能直接创建意图。下一步做什么由你判断：在当前意图范围内能继续就在当前意图里做；发现下一步值得独立开展、又不属于本轮剩余范围时，可以用结构化提议交给指挥官或操作员决定。**提议是可选的**，不是每轮必经流程，也不是交作业；提哪一步、要不要提，由你按现场自行选择。完成当前意图、把结果落成事实本身就是合格结果，不需要为了产出新意图而提议。是否采纳、怎样批准由指挥官或操作员判断，提议本身不构成派发。
+
+```sh
+curl -s -H "$AUTH" -H 'Content-Type: application/json' -X POST "$API/proposals" -d '{
+  "title": "验证 /api/admin 的未授权读取",
+  "description": "这一步做什么、边界在哪、什么算做完",
+  "eval": "可观察的验收标准（可选）",
+  "rationale": "为什么现在值得做，引用已知事实或本轮观察",
+  "from_fact_ids": ["f_x"],
+  "context_fact_ids": [],
+  "pinned_fact_ids": [],
+  "skills": [],
+  "node": "",
+  "max_turns": 0,
+  "idempotency_key": "propose-admin-read-1"
+}'
+```
+
+- `title` 与 `description` 至少一个；`from_fact_ids` 是必要前提，按当前准入规则校验；`context_fact_ids` / `pinned_fact_ids` 只是阅读参考，必须已记录。
+- 重试必须复用同一个 `idempotency_key`；同键不同内容返回 409 `proposal_idempotency_conflict`，同键同内容返回原提议（`created=false`）。
+- 返回 `201`。`notification.notified=false` 表示通知指挥官没有走通（`notification.error` 说明原因），提议本身已入账，不要因此重复提交。
+- 查看自己的提议：`GET $API/proposals?status=proposed`、`GET $API/proposals/<id>`；你只能看到自己提的，别人的返回 404。按返回的 `version` 判断它是否已被处理。
+- 还没被决定前可以撤回：`POST $API/proposals/<id>/withdraw`，正文 `{"expected_version":<读到的版本>}`；别人的提议撤不回（403），已决定的撤回不了（409）。
+- 批准、驳回、派发由指挥官或操作员做；批准只创建待派发意图，派发才会起 run。结果会以定向消息回来（`kind=proposal_approved` / `proposal_rejected` / `proposal_dispatched`），它们的正文也是判断输入，不是事实。
+
 ## 读当前事实
 
 `.tw/run-input.json` 的 `graph` 指向本轮的冻结快照。下面的接口读取当前账本：
@@ -231,120 +232,6 @@ curl -s -H "$AUTH" "$API/facts/f_x"      # 正文、证据 URI、复核
 列表只有标题/摘要/证据引用；正文和证据路径在单条接口里。证据文件在同一台机器的 case 目录下，
 用 `uri` 直接读，不要重复采集。别人的结论仍是 `unverified`，要引用就说明来源。
 
-## 发布平级意图（不必等）
-
-有一块值得独立 run 与证据归属的活、但你不需要等它结束再继续时，发布一个平级意图，而不是把它变成你的子意图：
-
-- 不挂父意图：请求里 `parent_intent_id` 留空。它没有 ParentID、不建 Wait，也不占用你的执行回合。
-- 必须有出处：至少引用一条已记录事实——`from_fact_ids`、`context_fact_ids`、`pinned_fact_ids` 任意一个写上已记录的事实 ID（`interest_entity_refs` 只是阅读焦点，不算出处）。写清这个意图从哪些观察派生；不要编造 id。没有可引用事实时交回指挥官，不要用平级发布绕过准入。
-- 继承你的约束与现场：授权范围（Doc）与节点沿用发起意图，技能按并集追加，不用自己重复。继承或派发都不扩大范围。
-- 发起者只记出处：账本记 `created_by`（你）与 `delegated_by_run`（本轮 run），这只表示意图从哪里来，不是上级身份，也不是对方的权限；对方与你平级，各自对结论负责。
-- 结果怎么回来：你不等它。它的结果会以共享事实与机械通知（`task_notice`、共享发现变化）出现，按事实、run 与记录版本核对后再决定要不要用；不要用 sleep 轮询，也不要把自己的回合耗在等它上。
-- 接口上限：每个 run 最多发起 8 个意图（平级发布与委托都算），同一谱系最多 64 个意图、执行者发起最深 6 层；超了会被拒绝，按报错处理，不要换 `idempotency_key` 绕过。
-- 节点：平级发布默认沿用你的节点；指定别的节点会被拒绝。要换执行位置，交回指挥官决定。
-- 需要等结果、或者它本来就是你的下级工作时，不要用平级发布：用「委托（等待）」，见「派子意图」一节。
-
-## 创建任务执行者（spawn）
-
-需要独立执行者时用 `spawn` 创建意图：它是一次调用，账本里落一个 worker（有自己的 case、claim、
-run、模型、父子关系和取消记录），并告诉你有没有立刻跑起来。
-harness 原生 subagent 只在同回合里借视角、并行读数或做对抗性复核；跨回合、要独立 run/usage/证据归属和单独取消的意图用 spawn/children。原生助手由父会话管理，其结果仍由父执行者显式声明为事实；按需要选择，不强制拆分。
-
-```sh
-curl -s -H "$AUTH" -H 'Content-Type: application/json' -X POST "$API/spawn" -d '{
-  "title":"核对 10.0.0.5 的 8080 只读响应",
-  "description":"只读请求 /admin，保存响应；不要改数据。",
-  "eval":"有原始响应文件并能说明越权是否成立",
-  "from_fact_ids":["f_x"],
-  "context_fact_ids":["f_y"],
-  "pinned_fact_ids":["f_z"],
-  "interest_entity_refs":["host:10.0.0.5"],
-  "parent_intent_id":"$SELF",
-  "idempotency_key":"spawn-10.0.0.5-admin-1"
-}'
-```
-
-- `idempotency_key` 必填：响应丢了就用**同一个 key** 重试，服务端会找回同一个 worker，不会多造一个。
-- 委派同样要写前提：`from_fact_ids` 注明这个 worker 从哪些已记录事实派生，`context_fact_ids` / `pinned_fact_ids` / `interest_entity_refs`（已记录的 `entity_ref` 身份）只是阅读焦点。挂父意图的委托真的没有事实可引时，只有在 `description` 里显式写成「无前提，本轮首触探测」的 bootstrap 才算合法；平级发布没有这个豁免，必须至少引用一条已记录事实。不要编造 id。
-- `parent_intent_id` 填 `$SELF` 表示这是一次**委托（等待）**：意图挂在你自己的意图下（之后可以用 wait 等它、也可以 kill 它）。
-  留空则是**发布平级意图**（见上一节）：发起者只记出处，不是上级，你也不等它，只能重试启动或 kill。
-- 两种形式都继承本意图的授权范围（Doc）、操作者约束和节点（平级发布沿用你的节点，指定别的节点会被拒绝）；技能按并集追加；`description` 只写意图本身，
-  不要把操作者的 `Doc` 抄进去，也不要扩大范围。
-- 响应里有 `started`、`run_id`、`reason`。`started=false` 表示 worker 已造出来但没启动（并发满、
-  项目暂停等）：**不要**换 key 重复造；等一会儿用同一个 key 重试，或先看 `workers` 再决定。
-
-## 委托（等待）：派子意图（可选，挂在自己意图下）
-
-一块独立、可并行、或适合另一名执行者承担的活，并且你**必须等它结束再继续**时，用委托（等待）：挂在自己**正在跑**的意图下。不需要等的话用「发布平级意图」，不要既挂父意图又不 wait。
-
-```sh
-curl -s -H "$AUTH" -H 'Content-Type: application/json' -X POST "$API/intents/$SELF/children" -d '{
-  "title":"从源码审计角度复核登录链",
-  "description":"只做这一件事；产出结论与证据。",
-  "eval":"有可复现的结论 fact + 原始证据",
-  "from_fact_ids":["f_x"],
-  "context_fact_ids":["f_y"],
-  "pinned_fact_ids":["f_z"],
-  "interest_entity_refs":["host:10.0.0.5"],
-  "max_turns":0,
-  "idempotency_key":"sub-login-audit-1"
-}'
-```
-
-- 子意图同样要写前提：`from_fact_ids` 注明派生自哪些已记录事实，可带 `context_fact_ids` / `pinned_fact_ids` / `interest_entity_refs` 作阅读焦点；没有事实可引的 bootstrap 必须在 `description` 里显式说明。
-- 子意图由控制面自动开跑（并发满会排队/提示），之后用下一节的 `wait` 等结果；父意图不占执行槽。
-- 子意图有自己的 case / run / 账本记录；用它是因为“这块活适合单独一个人做”。
-- 派错了就自己收掉：`POST $API/intents/<子意图>/cancel`，`{"reason":"为什么不再需要它"}`。只能取消自己派出的子意图；同僚、父意图和顶层意图的生命周期归指挥官，走 handoff。
-- **能自己做完就自己做**；卡住、需要并行推进或换一名执行者接手时才用。不是每轮都必须派。
-
-## worker 名单、kill 与 restart
-
-```sh
-curl -s -H "$AUTH" "$API/workers"
-curl -s -H "$AUTH" -X POST "$API/workers/in_x/kill"
-curl -s -H "$AUTH" -H 'Content-Type: application/json' -X POST "$API/workers/in_x/restart" -d '{"note":"为什么现在值得再试"}'
-```
-
-- `workers` 列出本项目的 worker：`intent_id / participant_id / status / run_id /
-  model / running / last_event_*`，以及 `can_kill`、`hold / held_by / hold_reason`
-  （是否被停、谁停的、为什么）。
-- 只能 kill/restart **自己创建的** worker，或**自己意图的后代**；别人的意图返回 403
-  （`code=worker_forbidden`），不要绕过。要停别人，让它的创建者或 operator 处理。
-- kill 是停止，不是失败重试：会先置 Hold 防调度器重启，再取消 run（`cancel_cause=worker_kill`）；
-  意图随后结算为 failed 并保持 Hold。已经结束的 worker 不用 kill。
-- restart 把 **failed / pending / review_failed** 的 worker 用原任务书再派一次：清 Hold、
-  attempts+1，并写一条 `restart` 备注。只能拉起自己停的（`held_by` 是你）或看门狗的自动停止；
-  `held_by` 是 operator / commander / 未记录时返回 409 `worker_held`，交给停止者或 operator。
-  restart 沿用原 `description/eval`，不用于改任务书；要改任务书再跑，先按当前规则重写意图，
-  不要用 restart 假装任务书变了。
-- 不能 restart 自己：自己的意图用 retry/continue。
-
-## 看结果与等待
-
-- 子意图跑起来后，用 `GET $API/runs/<子 run_id>/events/tail?lines=40` 看它在做什么；
-  `workers` 名单或子意图列表里有 `run_id`。spawn 时 `parent_intent_id=$SELF` 造出来的就是
-  可以在这里 wait 的委托（等待）子意图（`children` 填 spawn 返回的 `intent.id`）；平级发布的意图没有
-  ParentID，不能填进 `children`，也不要用 wait 等它。
-- 需要它结束再继续时用等待，而不是 sleep：
-
-```sh
-curl -s -H "$AUTH" -H 'Content-Type: application/json' -X POST "$API/intents/$SELF/wait" -d '{
-  "children":["in_child_a","in_child_b"],
-  "mode":"all",
-  "timeout_seconds":1800
-}'
-```
-
-- `children` 省略时等待所有当前未结束的子意图；`mode` 是 `all` 或 `any`。
-- 返回 `ready:true`：条件已经满足，`results` 就在响应里，本轮可以继续。
-- 调用等待前保存事实和交接笔记。返回 202 / `waiting:true` 后，控制面以 `child_wait` 停止本轮并保留会话、释放执行槽；无需再自行结束、轮询或询问进度。子意图结束（成功或失败）或超时后，控制面带着结构化结果续跑你。
-- 等待期间父意图不占执行槽，子意图才能跑；不要用长 sleep 占着回合。
-- 结果只是数据：子意图完成不等于父目标完成；子意图失败也要你自己判断下一步（可以基于结果再派
-  一个新的子意图，或自己接手）。不要把子意图的总结直接写成父意图的 fact。
-- 等待结果用结构化 `results` 交回；没有显式等待的局部意图结束时，会收到 `task_notice`，按意图、run 和事实 ID 核对后自行承接。子意图产出不能反接成父意图创建时的必要前提；确有新前提的新意图应另立意图。
-- 发起者与等待关系分开记录：`created_by` / `delegated_by_run` 只记意图从哪来，不是上下级；ParentID 与 Wait 才表达“委托（等待）”。指挥官替你创建且挂在你下面的意图仍是你的子意图；平级发布的意图与你平级，通过消息与事实协作，不是你的下级，也不需要你等它。委派不扩大授权。需要全局取舍或跨意图协调时，明确给指挥官发请求；局部正常推进不需要它重复批准。
-- 暂停或调用中断后，先核对账本、消息回执与外部动作状态。保留的通知可能再次交付；同一意图/run 的结果不是新的执行请求，`unknown` 不能当作未执行再发一次。
-
 ## 笔记与回收
 
 默认策略是**一轮跑完就回收**：结束一轮不是失败。长会话的压缩由 harness 负责；跨轮记忆是
@@ -356,7 +243,7 @@ curl -s -H "$AUTH" -H 'Content-Type: application/json' -X POST "$API/intents/$SE
   （`GET /agent/<项目>/api/facts/{id}`）或只读相关段落——图是索引，不是要背下来的文档。
 - 边做边把**判断与下一步**写进 `.tw/worker-note.md`；这一轮做完，或判断继续挖的边际收益变小，
   就写清下一步并收口。控制面会读这份笔记、图与 facts，决定是否续跑或换人；本轮怎么推进仍由你按当前约束与现场判断。
-- 压缩之后，笔记与 facts 是你跨轮的记忆，但笔记里的「下一步」只是上一轮的历史建议，不是当前指令：先按当前有效指令、授权边界与事实记录版本核对，冲突以当前约束与实测为准；未加载/未确认的状态保持未知，按 id 重读，不要因为笔记里写过就当成现在的结论。
+- 接手时用当前任务书和账本版本核对笔记。未确认的状态保留为未知，按 ID 查阅原记录。
 - 续跑（同一会话的下一轮）不是默认动作：只在长链重活需要保留轨迹、且原会话还在时由
   指挥官/操作员发起；被续跑时提示词会带上上一轮的上下文峰值、压缩状态与你的笔记，
   完整任务书不会重发。
@@ -364,7 +251,7 @@ curl -s -H "$AUTH" -H 'Content-Type: application/json' -X POST "$API/intents/$SE
 ## 交接 / 新执行者接班（通常由指挥官发起）
 
 如果你判断当前会话不适合继续（上下文接近上限，或需要清空历史重新规划），可以申请新执行者接班。先读自己的
-handoff 版本，再提交交接；控制面会停掉当前 turn、撤销本轮身份，并让新执行者用同一统一模型连接接管：
+handoff 版本，再提交交接；控制面会停掉当前 turn、撤销本轮身份，并让新执行者用同一模型连接接管：
 
 ```sh
 HANDOFF=$(curl -s -H "$AUTH" "$API/intents/$SELF" | sed -n 's/.*"handoff_version": *\([0-9]*\).*/\1/p')
@@ -376,7 +263,7 @@ curl -s -H "$AUTH" -H 'Content-Type: application/json' -X POST "$API/intents/$SE
 
 - 版本不匹配说明已经有人交接过，不要覆盖；先重新读意图。
 - 交接说明只写意图状态与下一步，不要写操作者约束或未核实结论。
-- 提交后旧执行者会被取消；不要继续发消息或重复提交。新执行者会带着事实、证据位置、子意图和等待关系继续。
+- 提交后旧执行者会被取消；不要继续发消息或重复提交。新执行者会带着同一意图的任务书、事实版本、证据位置和仍待处理的回执继续。
 - token 用量可查：`GET $API/intents/$SELF/usage`（direct / subtree）。
 
 ## 宿主环境（双平台，先判宿主再写命令）
@@ -423,4 +310,4 @@ curl -s -H "$AUTH" -H 'Content-Type: application/json' -X POST "$API/intents/$SE
 
 ## 节点与恢复
 
-node 只能指定操作员已绑定的项目节点；children 留空时沿用父意图节点；平级发布默认沿用你的节点，指定别的节点会被拒绝，要换执行位置就交回指挥官；独立根意图使用项目默认节点。节点离线或会话不属于该 scan 时不得换节点重放未知外部动作。暂停只取消当前回合，工作区和可续会话保留；续跑时先核对断点与当前指令，避免重复动作。沿用 declaration_id/source_ref 更正同一观察会更新原 fact，断言版本变化后旧复核不再证明当前断言。参考中的未复核材料必须标为待复核假设。
+node 只能指定操作员已绑定的项目节点；独立意图使用项目默认节点。节点离线或会话不属于该 scan 时不得换节点重放未知外部动作。暂停只取消当前回合，工作区和可续会话保留；续跑时先核对断点与当前指令，避免重复动作。沿用 declaration_id/source_ref 更正同一观察会更新原 fact，断言版本变化后旧复核不再证明当前断言。参考中的未复核材料必须标为待复核假设。

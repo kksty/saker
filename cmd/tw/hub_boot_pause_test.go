@@ -2,21 +2,24 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/kksty/tianwu/internal/model"
 	"github.com/kksty/tianwu/internal/node"
 	"github.com/kksty/tianwu/internal/project"
 )
 
-// A restart is an operator action, not permission to resume spending. Every
-// saved project must come up paused even when its manifest said running, and
-// the pause has to be persisted so a second restart cannot silently resume the
-// engagement either. The runtime gate must agree with the manifest: an
-// automatic commander round can start before an operator sees the console.
-func TestStartPausesEverySavedProject(t *testing.T) {
+// A project that was running when the control plane died is not a decision to
+// stop: boot opens it paused only long enough for the crash sweep to converge the
+// orphan runs, then the watchdog recovery clears that pause and lets the project
+// continue. The console is served after this, so the operator never has to click
+// 继续项目 for a restart they did not ask for.
+func TestBootRecoversProjectThatWasRunning(t *testing.T) {
 	dir := t.TempDir()
 	mgr, err := project.Open(dir)
 	if err != nil {
@@ -29,63 +32,199 @@ func TestStartPausesEverySavedProject(t *testing.T) {
 	if p.IsPaused() {
 		t.Fatal("precondition: a new project starts running")
 	}
+	intentID, runID := seedInterruptedRun(t, p)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	h := &hub{cfg: hubConfig{Nodes: &node.Registry{}}, mgr: mgr, ctx: ctx, kits: map[string]*kit{}}
+	h := newBootHub(ctx, mgr)
 	h.start()
+	t.Cleanup(func() { shutdownKits(h) })
 
-	// Boot paused both the persisted state and the live runtime.
-	if !p.IsPaused() {
-		t.Fatal("boot did not pause the project manifest")
+	// The manifest is running again and the boot crash marker is gone: a second
+	// restart must classify this as a normal running project, not as a pause the
+	// operator made.
+	if p.IsPaused() {
+		t.Fatal("boot left the project paused")
 	}
 	reopened, err := project.Open(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reopened.Get(p.ID).IsPaused() {
-		t.Fatal("boot pause was not persisted")
+	if reopened.Get(p.ID).IsPaused() || reopened.Get(p.ID).PauseKindOf() != "" {
+		t.Fatalf("boot recovery left manifest paused=%v kind=%q",
+			reopened.Get(p.ID).IsPaused(), reopened.Get(p.ID).PauseKindOf())
 	}
 	k := h.kits[p.ID]
 	if k == nil || k.dec == nil {
 		t.Fatal("boot did not attach a decider")
 	}
-	if !k.dec.Paused() {
-		t.Fatal("commander is not paused after restart")
+	if k.dec.Paused() {
+		t.Fatal("the decider stayed paused after the restart recovery")
 	}
-	if reason := k.dec.Status().PausedReason; !strings.Contains(reason, "重启后") {
-		t.Fatalf("paused reason = %q, want the restart explanation", reason)
+	body := boardBody(t, k)
+	if !strings.Contains(body, `"project_paused":false`) {
+		t.Fatalf("board reports a pause the recovery had cleared: %s", body)
 	}
-	// The dispatch gate is the second half of the pause: a round that somehow
-	// slips past the decider must still be refused.
-	rec := httptest.NewRecorder()
-	k.mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/decide", nil))
-	if rec.Code != http.StatusConflict {
-		t.Fatalf("paused project accepted a decision round: %d %s", rec.Code, rec.Body.String())
+	if strings.Contains(body, `"project_pause_kind":"restart_pause"`) {
+		t.Fatalf("board still reports the boot pause: %s", body)
+	}
+	if !strings.Contains(body, `"kind":"running"`) {
+		t.Fatalf("resume action/state does not classify the project as running: %s", body)
 	}
 
-	// The operator explicitly resumes. A later restart must pause again, so
-	// "paused after restart" is the start condition, not a one-time flag.
-	if err := p.SetPaused(false); err != nil {
-		t.Fatal(err)
+	// The watchdog reconciled what the dead process left behind: the orphan run is
+	// canceled with the restart cause and the direction is retryable again. The
+	// fixture has no execution host, so the automatic redispatch cannot start a
+	// new run; the direction therefore stays pending instead of running.
+	run, ok := p.Store.GetRun(runID)
+	if !ok || run.Status != model.RunCanceled || run.CancelCause != model.CancelCauseRestart {
+		t.Fatalf("orphan run after recovery = %+v, want canceled/restart", run)
 	}
-	next, err := project.Open(dir)
+	in, ok := p.Store.GetIntent(intentID)
+	if !ok || in.Status != model.StatusPending {
+		t.Fatalf("interrupted direction after recovery = %+v, want pending", in)
+	}
+}
+
+// Every explicit pause is a decision, not a crash marker. Boot must restore it,
+// keep the decider stopped and leave the manifest cause untouched so the first
+// screen can still say who stopped the project.
+func TestBootKeepsExplicitPauses(t *testing.T) {
+	cases := []struct {
+		name string
+		kind string
+	}{
+		{"operator", project.PauseKindManualPause},
+		{"commander", project.PauseKindCommanderStandby},
+		{"completion", project.PauseKindCompletionStandby},
+		{"cause-less", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			mgr, err := project.Open(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			p, err := mgr.Create("acme", "acme.example")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := p.SetPausedWithKind(true, tc.kind); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			h := newBootHub(ctx, mgr)
+			h.start()
+			t.Cleanup(func() { shutdownKits(h) })
+
+			if !p.IsPaused() {
+				t.Fatalf("boot resumed a %s pause", tc.name)
+			}
+			reopened, err := project.Open(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := reopened.Get(p.ID).PauseKindOf(); got != tc.kind {
+				t.Fatalf("boot rewrote pause kind %q to %q", tc.kind, got)
+			}
+			k := h.kits[p.ID]
+			if k == nil || k.dec == nil {
+				t.Fatal("boot did not attach a decider")
+			}
+			if !k.dec.Paused() {
+				t.Fatalf("the decider resumed a %s pause", tc.name)
+			}
+			body := boardBody(t, k)
+			if !strings.Contains(body, `"project_paused":true`) {
+				t.Fatalf("board does not report the %s pause: %s", tc.name, body)
+			}
+		})
+	}
+}
+
+// A recovery that did not finish (for example the manifest write failed) leaves
+// the restart marker behind. The next boot must recognise it as the machine's own
+// pause and retry the recovery instead of treating it as an operator decision.
+func TestBootRetriesLeftoverRestartPause(t *testing.T) {
+	dir := t.TempDir()
+	mgr, err := project.Open(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	nextCtx, nextCancel := context.WithCancel(context.Background())
-	defer nextCancel()
-	h2 := &hub{cfg: hubConfig{Nodes: &node.Registry{}}, mgr: next, ctx: nextCtx, kits: map[string]*kit{}}
-	h2.start()
-	if !next.Get(p.ID).IsPaused() {
-		t.Fatal("a second restart did not pause the project again")
+	p, err := mgr.Create("acme", "acme.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.SetPausedWithKind(true, project.PauseKindRestart); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	h := newBootHub(ctx, mgr)
+	h.start()
+	t.Cleanup(func() { shutdownKits(h) })
+
+	if p.IsPaused() || p.PauseKindOf() != "" {
+		t.Fatalf("leftover restart pause not recovered: paused=%v kind=%q", p.IsPaused(), p.PauseKindOf())
+	}
+	if k := h.kits[p.ID]; k == nil || k.dec == nil || k.dec.Paused() {
+		t.Fatal("the decider was not re-armed for the leftover restart pause")
+	}
+}
+
+// The recovery is idempotent and does not fight a console click: running it a
+// second time is a no-op, and an operator resume that arrives after the project is
+// already running is refused with the same code the button renders.
+func TestBootRecoveryIsIdempotentAndYieldsToTheOperator(t *testing.T) {
+	dir := t.TempDir()
+	mgr, err := project.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := mgr.Create("acme", "acme.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	h := newBootHub(ctx, mgr)
+	h.start()
+	t.Cleanup(func() { shutdownKits(h) })
+	k := h.kits[p.ID]
+	if k == nil {
+		t.Fatal("boot did not attach the project")
+	}
+	if k.dec.Paused() {
+		t.Fatal("fixture: project should already be recovered")
+	}
+
+	// A second call sees the pause already gone and writes nothing.
+	k.srv.ResumeAfterRestart()
+	if k.dec.Paused() {
+		t.Fatal("a repeated recovery paused the decider")
+	}
+
+	rec := httptest.NewRecorder()
+	k.mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/project/resume", nil))
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("operator resume after recovery = %d %s, want 409", rec.Code, rec.Body.String())
+	}
+	var out struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Code != "already_running" {
+		t.Fatalf("operator resume code = %q, want already_running", out.Code)
 	}
 }
 
 // A commander-requested stop is a pause with a cause. A control-plane restart
-// must not relabel it as an operator pause: the console's badge and the
-// append-and-continue contract both switch on the persisted machine code, and
-// "who stopped the engagement" is exactly the question the operator asks first.
+// must not relabel it as an operator pause, must not auto-resume it, and the
+// persisted machine code must still drive the console's badge.
 func TestCommanderStandbyPauseKindSurvivesRestart(t *testing.T) {
 	dir := t.TempDir()
 	mgr, err := project.Open(dir)
@@ -102,8 +241,9 @@ func TestCommanderStandbyPauseKindSurvivesRestart(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	h := &hub{cfg: hubConfig{Nodes: &node.Registry{}}, mgr: mgr, ctx: ctx, kits: map[string]*kit{}}
+	h := newBootHub(ctx, mgr)
 	h.start()
+	t.Cleanup(func() { shutdownKits(h) })
 
 	k := h.kits[p.ID]
 	if k == nil || k.dec == nil {
@@ -113,15 +253,11 @@ func TestCommanderStandbyPauseKindSurvivesRestart(t *testing.T) {
 		t.Fatal("commander is not paused after restart")
 	}
 	// The runtime cause must be restored from the manifest, not guessed from prose.
-	rec := httptest.NewRecorder()
-	k.mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/board", nil))
-	if rec.Code != http.StatusOK {
-		t.Fatalf("board = %d: %s", rec.Code, rec.Body.String())
+	body := boardBody(t, k)
+	if !strings.Contains(body, `"project_pause_kind":"commander_standby"`) {
+		t.Fatalf("board lost the commander pause kind: %s", body)
 	}
-	if !strings.Contains(rec.Body.String(), `"project_pause_kind":"commander_standby"`) {
-		t.Fatalf("board lost the commander pause kind: %s", rec.Body.String())
-	}
-	// The boot pause write must not overwrite the persisted cause either.
+	// The boot write must not overwrite the persisted cause either.
 	reopened, err := project.Open(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -131,69 +267,11 @@ func TestCommanderStandbyPauseKindSurvivesRestart(t *testing.T) {
 	}
 }
 
-// A restart is its own pause cause: the operator did not touch the switch, and
-// the console must not say they did. The cause has to be persisted (so the next
-// boot keeps it) and reported by the board (so the badge and the resume button
-// agree with the manifest).
-func TestBootPauseRecordsTheRestartCause(t *testing.T) {
-	dir := t.TempDir()
-	mgr, err := project.Open(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	p, err := mgr.Create("acme", "acme.example")
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	h := &hub{cfg: hubConfig{Nodes: &node.Registry{}}, mgr: mgr, ctx: ctx, kits: map[string]*kit{}}
-	h.start()
-
-	reopened, err := project.Open(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := reopened.Get(p.ID).PauseKindOf(); got != project.PauseKindRestart {
-		t.Fatalf("persisted pause kind = %q after a boot pause, want %q", got, project.PauseKindRestart)
-	}
-	k := h.kits[p.ID]
-	if k == nil || k.dec == nil {
-		t.Fatal("boot did not attach a decider")
-	}
-	body := boardBody(t, k)
-	if !strings.Contains(body, `"project_pause_kind":"restart_pause"`) {
-		t.Fatalf("board does not report the restart cause: %s", body)
-	}
-	if strings.Contains(body, `"project_pause_kind":"manual_pause"`) {
-		t.Fatalf("a restart was reported as the operator's pause: %s", body)
-	}
-	if !strings.Contains(body, `"reason_code":"paused_restart"`) {
-		t.Fatalf("resume action does not name the restart cause: %s", body)
-	}
-	// The console's first screen shows this prose, not the machine code, so it has
-	// to be the sentence for the cause that actually applies.
-	if !strings.Contains(body, `"reason":"控制面重启后项目默认暂停：确认现场后点「继续项目」"`) {
-		t.Fatalf("board does not say why the restart paused it: %s", body)
-	}
-
-	// A second restart keeps the cause instead of falling back to the default.
-	nextCtx, nextCancel := context.WithCancel(context.Background())
-	defer nextCancel()
-	h2 := &hub{cfg: hubConfig{Nodes: &node.Registry{}}, mgr: reopened, ctx: nextCtx, kits: map[string]*kit{}}
-	h2.start()
-	again, err := project.Open(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := again.Get(p.ID).PauseKindOf(); got != project.PauseKindRestart {
-		t.Fatalf("pause kind after a second restart = %q, want %q", got, project.PauseKindRestart)
-	}
-}
-
 // A manifest paused before the cause codes existed carries no cause, and code
-// cannot recover one. It must say "unrecorded" rather than claim the operator
-// paused the project: an invented author is the one answer that can be false.
+// cannot recover one. It must stay paused and say "unrecorded" rather than claim
+// the operator paused the project or that a recovery is under way: an invented
+// cause is the one answer that can be false, and auto-resuming it could undo a
+// commander's considered stop.
 func TestLegacyPauseWithoutCauseIsNotReportedAsManual(t *testing.T) {
 	dir := t.TempDir()
 	mgr, err := project.Open(dir)
@@ -209,9 +287,13 @@ func TestLegacyPauseWithoutCauseIsNotReportedAsManual(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	h := &hub{cfg: hubConfig{Nodes: &node.Registry{}}, mgr: mgr, ctx: ctx, kits: map[string]*kit{}}
+	h := newBootHub(ctx, mgr)
 	h.start()
+	t.Cleanup(func() { shutdownKits(h) })
 
+	if !p.IsPaused() {
+		t.Fatal("boot resumed a pause whose cause nobody recorded")
+	}
 	reopened, err := project.Open(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -228,7 +310,7 @@ func TestLegacyPauseWithoutCauseIsNotReportedAsManual(t *testing.T) {
 	}
 	// Same rule for the prose the first screen shows: an unknown cause must not be
 	// explained as a restart or as an operator action.
-	if strings.Contains(body, "重启后项目默认暂停") {
+	if strings.Contains(body, "重启") {
 		t.Fatalf("a cause-less pause was explained as a restart: %s", body)
 	}
 	if !strings.Contains(body, `"reason":"暂停原因未记录：确认现场后点「继续项目」"`) {
@@ -236,19 +318,9 @@ func TestLegacyPauseWithoutCauseIsNotReportedAsManual(t *testing.T) {
 	}
 }
 
-func boardBody(t *testing.T, k *kit) string {
-	t.Helper()
-	rec := httptest.NewRecorder()
-	k.mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/board", nil))
-	if rec.Code != http.StatusOK {
-		t.Fatalf("board = %d: %s", rec.Code, rec.Body.String())
-	}
-	return rec.Body.String()
-}
-
 // Runtime attachment (creating a project, re-opening it after edits) keeps the
-// manifest state: only the boot path forces a pause. Otherwise a newly created
-// project could never start without a confusing resume step.
+// manifest state: only the boot path forces the temporary pause. Otherwise a
+// newly created project could never start without a confusing resume step.
 func TestRuntimeAttachKeepsManifestPauseState(t *testing.T) {
 	mgr, err := project.Open(t.TempDir())
 	if err != nil {
@@ -260,13 +332,62 @@ func TestRuntimeAttachKeepsManifestPauseState(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	h := &hub{cfg: hubConfig{Nodes: &node.Registry{}}, mgr: mgr, ctx: ctx, kits: map[string]*kit{}}
+	h := newBootHub(ctx, mgr)
 
 	k := h.attach(p)
+	t.Cleanup(func() { shutdownKits(h) })
 	if k == nil || k.dec == nil {
 		t.Fatal("runtime attach did not build a decider")
 	}
 	if k.dec.Paused() {
 		t.Fatal("runtime attach paused a running manifest")
 	}
+}
+
+// newBootHub is the smallest hub a boot test needs: an empty node registry (so a
+// redispatch cannot reach a real host), a project manager and a cancellable ctx.
+func newBootHub(ctx context.Context, mgr *project.Manager) *hub {
+	return &hub{cfg: hubConfig{Nodes: &node.Registry{}}, mgr: mgr, ctx: ctx, kits: map[string]*kit{}}
+}
+
+// seedInterruptedRun writes the shape a killed process leaves: a run row still
+// marked running and its direction pointing at it. Recover must converge both.
+func seedInterruptedRun(t *testing.T, p *project.Project) (intentID, runID string) {
+	t.Helper()
+	in, err := p.Store.CreateIntent(model.Intent{Title: "重启前在跑"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, err := p.Store.AddRun(model.Run{IntentID: in.ID, Node: "local"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.Store.UpdateIntent(in.ID, func(i *model.Intent) {
+		i.Status = model.StatusRunning
+		i.RunID = run.ID
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return in.ID, run.ID
+}
+
+// shutdownKits seals admission after a boot test so the goroutines the recovery
+// started cannot write into a temp directory the test is about to remove.
+func shutdownKits(h *hub) {
+	for _, k := range h.kits {
+		if k != nil && k.srv != nil {
+			k.srv.BeginShutdown()
+			k.srv.WaitIdle(2 * time.Second)
+		}
+	}
+}
+
+func boardBody(t *testing.T, k *kit) string {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	k.mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/board", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("board = %d: %s", rec.Code, rec.Body.String())
+	}
+	return rec.Body.String()
 }

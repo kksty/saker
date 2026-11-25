@@ -132,19 +132,4 @@ func TestCreationValidatesAndDeduplicatesInitialContext(t *testing.T) {
 		t.Fatalf("initial context = %+v", in)
 	}
 
-	spawn := model.Intent{Title: "w", CreatedBy: "pt_x", IdempotencyKey: "same", ContextFactIDs: []string{ref.ID}}
-	if _, created, err := s.CreateSpawnIntent(spawn, ""); err != nil || !created {
-		t.Fatalf("spawn = %v %v", created, err)
-	}
-	if _, created, err := s.CreateSpawnIntent(spawn, ""); err != nil || created {
-		t.Fatalf("same-key retry = %v %v", created, err)
-	}
-	changed := spawn
-	changed.ContextFactIDs = []string{pin.ID}
-	if _, _, err := s.CreateSpawnIntent(changed, ""); !errors.Is(err, ErrSpawnIdempotencyConflict) {
-		t.Fatalf("changed context under one key = %v", err)
-	}
-	if _, created, err := s.CreateSpawnIntent(model.Intent{Title: "bad", CreatedBy: "pt_x", IdempotencyKey: "k2", ContextFactIDs: []string{"f_missing"}}, ""); err == nil || created {
-		t.Fatalf("spawn with unknown reference = %v %v", created, err)
-	}
 }

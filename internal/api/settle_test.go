@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/kksty/tianwu/internal/model"
 	"github.com/kksty/tianwu/internal/store"
@@ -236,114 +235,7 @@ func TestCommanderSettleStampsActorAndUnverified(t *testing.T) {
 // Settling a direction that still owns unstarted children must not leave them
 // queued for a parent that will never read their results: the same sweep park
 // runs applies here.
-func TestSettleFailsUnstartedChildren(t *testing.T) {
-	s, in, fact := newSettleServer(t, model.StatusFailed, true, model.HoldActorCommander)
-	child, err := s.Store.CreateIntent(model.Intent{
-		Title: "子方向", Description: "d", ParentID: in.ID,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.Store.UpdateIntent(child.ID, func(i *model.Intent) {
-		i.Status = model.StatusPending
-	}); err != nil {
-		t.Fatal(err)
-	}
-	rec := call(t, s, http.MethodPost, "/api/intents/"+in.ID+"/settle", map[string]any{
-		"note": "父方向由已记录的事实收口", "fact_ids": []string{fact.ID},
-	})
-	if rec.Code != http.StatusOK {
-		t.Fatalf("settle = %d %s", rec.Code, rec.Body.String())
-	}
-	got, _ := s.Store.GetIntent(child.ID)
-	if got.Status != model.StatusFailed || !got.Hold {
-		t.Fatalf("child after settle = %+v, want failed+hold", got)
-	}
-	last := got.Notes[len(got.Notes)-1]
-	if last.Kind != model.IntentNoteOrphan {
-		t.Fatalf("child note = %q, want orphan", last.Kind)
-	}
-}
-
 // A parent waiting on a child wakes when the commander declares that child done:
 // a declared completion is a terminal result like any other.
-func TestSettleChildWakesWaitingParent(t *testing.T) {
-	s, child, fact := newSettleServer(t, model.StatusFailed, true, model.HoldActorCommander)
-	parent, err := s.Store.CreateIntent(model.Intent{Title: "父方向", Description: "d"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.Store.UpdateIntent(child.ID, func(i *model.Intent) { i.ParentID = parent.ID }); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.Store.UpdateIntent(parent.ID, func(i *model.Intent) {
-		i.Status = model.StatusWaiting
-		i.Wait = &model.Wait{Children: []string{child.ID}, Mode: model.WaitAll}
-	}); err != nil {
-		t.Fatal(err)
-	}
-	// The wake re-dispatches the parent, so stop it and let the case directory
-	// close before the temp dir is removed (Windows keeps the run log open).
-	t.Cleanup(func() {
-		s.CancelAll()
-		s.WaitIdle(5 * time.Second)
-		time.Sleep(150 * time.Millisecond)
-	})
-	rec := call(t, s, http.MethodPost, "/api/intents/"+child.ID+"/settle", map[string]any{
-		"note": "子方向已经拿到结果", "fact_ids": []string{fact.ID},
-	})
-	if rec.Code != http.StatusOK {
-		t.Fatalf("settle = %d %s", rec.Code, rec.Body.String())
-	}
-	waitFor(t, 5*time.Second, func() bool {
-		got, ok := s.Store.GetIntent(parent.ID)
-		return ok && got.Status != model.StatusWaiting
-	})
-	got, _ := s.Store.GetIntent(parent.ID)
-	if got.Status == model.StatusWaiting {
-		t.Fatalf("parent still waiting after the child was settled: %+v", got)
-	}
-	// The wake re-dispatches the parent, which is the observable result of a
-	// settled child: a run now exists for it.
-	started := false
-	for _, run := range s.Store.Runs() {
-		if run.IntentID == parent.ID {
-			started = true
-		}
-	}
-	if !started {
-		t.Fatalf("parent %s was woken but never re-dispatched", parent.ID)
-	}
-}
-
 // A parent kill must not become a way to seize the operator's stop: the guard
 // runs in the same store transaction as the write, and the row keeps its holder.
-func TestKillWorkerKeepsOperatorHold(t *testing.T) {
-	f := newSpawnFixture(t)
-	spawned := spawnBlockingWorker(t, f)
-	if _, err := f.srv.CancelIntentBy(spawned.Intent.ID, "操作员叫停", model.HoldActorOperator); err != nil {
-		t.Fatal(err)
-	}
-	waitFor(t, 5*time.Second, func() bool {
-		got, ok := f.p.Store.GetIntent(spawned.Intent.ID)
-		return ok && got.Hold && got.HeldBy == model.HoldActorOperator
-	})
-	// The row a parent could have seized before the guard moved under the lock:
-	// stopped, not settled, still owned by the operator.
-	if _, err := f.p.Store.UpdateIntent(spawned.Intent.ID, func(i *model.Intent) {
-		i.Status = model.StatusPending
-		i.Hold = true
-		i.HeldBy = model.HoldActorOperator
-		i.HoldReason = "操作员叫停"
-	}); err != nil {
-		t.Fatal(err)
-	}
-	rec := f.call(t, f.srcID, http.MethodPost, "/api/workers/"+spawned.Intent.ID+"/kill", nil)
-	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "worker_held") {
-		t.Fatalf("kill on operator-held worker = %d %s", rec.Code, rec.Body.String())
-	}
-	got, _ := f.p.Store.GetIntent(spawned.Intent.ID)
-	if !got.Hold || got.HeldBy != model.HoldActorOperator || got.Status != model.StatusPending {
-		t.Fatalf("kill changed the operator stop: %+v", got)
-	}
-}

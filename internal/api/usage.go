@@ -59,16 +59,8 @@ func (s *Server) intentUsage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusForbidden, "只能查看自己的用量")
 		return
 	}
-	subtreeIDs := map[string]bool{id: true}
-	for _, d := range s.Store.Descendants(id) {
-		subtreeIDs[d.ID] = true
-	}
-	var direct, subtree []model.Run
+	var direct []model.Run
 	for _, run := range s.Store.Runs() {
-		if !subtreeIDs[run.IntentID] {
-			continue
-		}
-		subtree = append(subtree, run)
 		if run.IntentID == id {
 			direct = append(direct, run)
 		}
@@ -76,6 +68,5 @@ func (s *Server) intentUsage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"intent_id": in.ID,
 		"direct":    summarizeUsage(direct),
-		"subtree":   summarizeUsage(subtree),
 	})
 }

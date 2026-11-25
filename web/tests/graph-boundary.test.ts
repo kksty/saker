@@ -14,13 +14,15 @@ test('an unloaded premise stays attached to its intent instead of the project ro
 // docs/35 §6 "not_loaded、missing、rejected 分别显示": a reference this page has
 // not loaded is an expandable leaf, a reference the ledger no longer has is a
 // dangling id, and a rejected reference exists but must not read as a live
-// premise. The label and the carried state both have to keep them apart.
-test('boundary nodes say why they are not drawn: not_loaded vs missing vs rejected', () => {
+// premise. The label and the carried state both have to keep them apart. The
+// backend also emits `withdrawn` (a fact the author/operator retracted), which
+// must not fall back to the generic "展开" leaf.
+test('boundary nodes say why they are not drawn: not_loaded vs missing vs rejected vs withdrawn', () => {
  const intent = {
    id: 'in_child',
    title: 'child',
    status: 'pending',
-   from_fact_ids: ['loaded_elsewhere', 'gone', 'negated'],
+   from_fact_ids: ['loaded_elsewhere', 'gone', 'negated', 'retracted'],
  } as Intent
  const graph = buildGraph(
    [],
@@ -33,16 +35,19 @@ test('boundary nodes say why they are not drawn: not_loaded vs missing vs reject
      { id: 'fact:loaded_elsewhere', state: 'not_loaded' },
      { id: 'fact:gone', state: 'missing' },
      { id: 'fact:negated', state: 'rejected' },
+     { id: 'fact:retracted', state: 'withdrawn' },
    ],
  )
  const node = (id: string) => graph.byId.get(`f:${id}`)
  assert.equal(node('loaded_elsewhere')?.boundaryState, 'not_loaded')
  assert.match(node('loaded_elsewhere')?.label ?? '', /未载入/)
- assert.doesNotMatch(node('loaded_elsewhere')?.label ?? '', /引用缺失|已否定/)
+ assert.doesNotMatch(node('loaded_elsewhere')?.label ?? '', /引用缺失|已否定|已撤回/)
  assert.equal(node('gone')?.boundaryState, 'missing')
  assert.match(node('gone')?.label ?? '', /引用缺失/)
  assert.equal(node('negated')?.boundaryState, 'rejected')
  assert.match(node('negated')?.label ?? '', /已否定/)
+ assert.equal(node('retracted')?.boundaryState, 'withdrawn')
+ assert.match(node('retracted')?.label ?? '', /已撤回/)
  // A boundary without a state from the server stays the plain expand leaf.
  const bare = buildGraph([], [{ ...intent, from_fact_ids: ['unknown'] } as Intent], [])
  assert.equal(bare.byId.get('f:unknown')?.boundaryState, undefined)

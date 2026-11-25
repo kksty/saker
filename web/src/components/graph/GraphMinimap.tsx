@@ -188,8 +188,6 @@ function clampToBounds(value: number, min: number, max: number): number {
 function edgeAlpha(kind: EdgeKind): number {
   switch (kind) {
     case 'brief':
-    case 'spawn':
-    case 'goal':
     case 'supports':
       return 0.5
     case 'premise':
@@ -198,8 +196,6 @@ function edgeAlpha(kind: EdgeKind): number {
       return 0.4
     case 'host':
       return 0.3
-    case 'origin':
-      return 0.35
     default:
       return 0.24
   }
@@ -224,7 +220,6 @@ export function GraphMinimap({
   onFit,
   live = false,
   matches = null,
-  showOriginLinks = true,
   defaultSide = MINI_LONG,
 }: {
   model: GraphModel
@@ -236,7 +231,6 @@ export function GraphMinimap({
   live?: boolean
   /** 搜索命中的节点 id：在缩略图上圈出来，整图范围也能看到命中位置。 */
   matches?: ReadonlySet<string> | null
-  showOriginLinks?: boolean
   defaultSide?: number
 }) {
   const view = useView()
@@ -264,10 +258,10 @@ export function GraphMinimap({
   // 大图不画边：上千条产出边加上百条前提边在小地图里只会变成放射噪点，关系
   // 类型在 184px 上根本读不出来；密度和意图落点已经能说明“图长什么样”。
   const edges = useMemo(() => {
-    const visible = showOriginLinks ? model.edges : model.edges.filter((e) => e.kind !== 'origin')
+    const visible = model.edges
     const crowded = dense || visible.length > MAX_VISIBLE_EDGES
     const candidates = !crowded ? visible : layout === 'layered'
-      ? visible.filter((e) => e.kind === 'brief' || e.kind === 'spawn' || e.kind === 'goal' || e.kind === 'supports')
+      ? visible.filter((e) => e.kind === 'brief' || e.kind === 'goal' || e.kind === 'supports')
       : []
     if (candidates.length > MAX_VISIBLE_EDGES) return []
     const list: MiniEdge[] = []
@@ -283,7 +277,7 @@ export function GraphMinimap({
       })
     }
     return list
-  }, [model, dense, layout, showOriginLinks])
+  }, [model, dense, layout])
 
   // 事实是底图，意图/目标/项目是骨架：分层画，骨架永远压在密度上面。
   const { dust, marks } = useMemo(() => {

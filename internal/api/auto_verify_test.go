@@ -116,6 +116,10 @@ func newAutoVerifyServer(t *testing.T, ex executor.Executor) (*Server, *store.St
 	}
 	t.Cleanup(func() { _ = st.Close() })
 	s := New(st, ex, dir, cases)
+	// The pump a pass wakes keeps running in the background. Pausing before the
+	// store goes away is what a real shutdown does; without it a later review pass
+	// can log "database is closed" into the next test's output.
+	t.Cleanup(func() { s.SetReviewsPaused(true) })
 	s.AutoVerify = true
 	s.Verifier = verifier.New(st, ex, cases)
 	return s, st
@@ -226,6 +230,82 @@ func TestAutoVerifyReachesFindingsBeyondTheNewestFifty(t *testing.T) {
 	got, ok := st.FactByID(old.ID)
 	if !ok || got.Status != "verified" {
 		t.Fatalf("the early finding was not reviewed: %+v", got)
+	}
+	if ex.runs() != total || ex.distinctTitles() != total {
+		t.Fatalf("executor runs = %d (distinct %d), want each finding exactly once", ex.runs(), ex.distinctTitles())
+	}
+}
+
+// The per-direction pass lock is the single-writer guarantee the cursor relies
+// on. It must wait for a pass on the same direction, and must not serialize
+// independent directions (the pump reviews them concurrently by design).
+//
+// Falsification: make lockReviewPass return a no-op unlock and the second
+// same-direction pass proceeds immediately, failing the first assertion.
+func TestReviewPassLockSerializesOneDirection(t *testing.T) {
+	s, _ := newAutoVerifyServer(t, &reviewProbeExec{})
+	unlock := s.lockReviewPass("in_a")
+
+	acquired := make(chan struct{})
+	go func() {
+		s.lockReviewPass("in_a")()
+		close(acquired)
+	}()
+	select {
+	case <-acquired:
+		t.Fatal("a second pass on the same direction acquired the lock while the first held it")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	other := make(chan struct{})
+	go func() {
+		s.lockReviewPass("in_b")()
+		close(other)
+	}()
+	select {
+	case <-other:
+	case <-time.After(time.Second):
+		t.Fatal("an independent direction was serialized behind in_a")
+	}
+
+	unlock()
+	select {
+	case <-acquired:
+	case <-time.After(time.Second):
+		t.Fatal("the waiting pass did not proceed after the first released")
+	}
+}
+
+// Concurrent passes over one direction must not starve a candidate. A pass is a
+// read-modify-write of the durable cursor, so two interleaved passes can advance
+// it past facts neither of them reviewed. This is the integration-level smoke
+// check; TestReviewPassLockSerializesOneDirection pins the lock that prevents it,
+// and TestAutoVerifyReachesFindingsBeyondTheNewestFifty exercises the original
+// starvation report.
+func TestConcurrentReviewPassesDoNotStarveCandidates(t *testing.T) {
+	ex := &reviewProbeExec{}
+	s, st := newAutoVerifyServer(t, ex)
+	in, err := st.CreateIntent(model.Intent{Title: "并发长意图"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const total = 40
+	for i := 0; i < total; i++ {
+		addReviewableFact(t, st, in.ID, "cred", fmt.Sprintf("并发结论-%02d", i))
+	}
+	var wg sync.WaitGroup
+	for worker := 0; worker < 4; worker++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 25; i++ {
+				s.autoVerify(in.ID)
+			}
+		}()
+	}
+	wg.Wait()
+	if got := verifiedFindings(t, st, in.ID); got != total {
+		t.Fatalf("reviewed %d/%d findings under concurrent passes", got, total)
 	}
 	if ex.runs() != total || ex.distinctTitles() != total {
 		t.Fatalf("executor runs = %d (distinct %d), want each finding exactly once", ex.runs(), ex.distinctTitles())
@@ -443,8 +523,14 @@ func TestAutoVerifyPauseLeavesUnprocessedCandidatesForLater(t *testing.T) {
 	}
 
 	s.SetReviewsPaused(false)
-	for i := 0; i < 5 && verifiedFindings(t, st, in.ID) < 3; i++ {
+	// Resume is not "five synchronous passes": the first pass that verified
+	// anything wakes the project pump, and the pump's own review worker competes
+	// for the same two candidates. Counting passes made the test depend on which
+	// goroutine won; waiting for the outcome is the invariant that matters.
+	deadline := time.Now().Add(5 * time.Second)
+	for verifiedFindings(t, st, in.ID) < 3 && time.Now().Before(deadline) {
 		s.autoVerify(in.ID)
+		time.Sleep(10 * time.Millisecond)
 	}
 	if got := verifiedFindings(t, st, in.ID); got != 3 {
 		t.Fatalf("after resume reviewed %d/3", got)

@@ -223,7 +223,6 @@ export function Runs({
   // condition holds. Printing it as a cancel reason repeats the wait line below
   // and reads as a decision someone made.
   const yieldOnly =
-    current?.cancel_cause === 'child_wait' ||
     current?.cancel_cause === 'operator_wait' ||
     current?.cancel_cause === 'action_wait'
   const currentExecutor = current ? executorOf(current) : null
@@ -565,7 +564,7 @@ export function Runs({
                 {/* 这条 run 所属意图在等什么：下游意图带着当前状态，不必再逐条点开。 */}
                 {currentIntent?.wait && (
                   <p data-testid="run-intent-wait" className="text-[12px] leading-relaxed text-ink-2">
-                    {intentWaitText(currentIntent.wait, (id) => intentByID.get(id))}
+                    {intentWaitText(currentIntent.wait)}
                   </p>
                 )}
                 {notice && <p role="status" className="text-[12px] text-ink-2">{notice}</p>}

@@ -422,7 +422,7 @@ test('a dragged size is clamped to 88 and to a third of the canvas', () => {
 
 test('switching layouts preserves the chain spine and changes direction markers', async () => {
   setView({ camera: { x: 20, y: 20, k: 1 }, width: 800, height: 600 })
-  const spine = { ...model.edges[0], id: 'spine', kind: 'spawn' }
+  const spine = { ...model.edges[0], id: 'spine', kind: 'supports' }
   const crowded = { ...model, edges: [spine, ...Array.from({ length: 40 }, (_, id) => ({ ...model.edges[0], id }))] }
   const forLayout = (layout: 'force' | 'layered') =>
     React.createElement(GraphMinimap, { model: crowded, onCenter: () => {}, onFit: () => {}, layout })

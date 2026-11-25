@@ -380,11 +380,6 @@ function WorkerRow({
             <StatusIndicator compact className="shrink-0 whitespace-nowrap" status={statusKind(w.status)} label={statusLabel(w.status)} />
             {w.running && <StatusIndicator compact className="shrink-0 whitespace-nowrap" status="running" label="生成中" />}
             {w.hold && <Badge size="sm" variant="outline">Hold</Badge>}
-            {w.parent_intent_id && (
-              <Badge size="sm" variant="secondary" title={`上游意图 ${w.parent_intent_id}`}>
-                下游意图
-              </Badge>
-            )}
             <span className="min-w-0 truncate text-[13px] font-medium text-ink">{w.title}</span>
           </span>
           {w.status === 'parked' && w.park_reason && (
@@ -458,8 +453,6 @@ function WorkerRow({
             {w.node && <span>node {w.node}</span>}
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-ink-3">
-            {w.parent_intent_id && <span>父 {w.parent_intent_id}</span>}
-            {w.delegated_by_run_id && <span>委派 run {w.delegated_by_run_id}</span>}
             {w.created_by_participant_id && <span>创建者 {w.created_by_participant_id}</span>}
             {w.last_event_kind && <span className="uppercase tracking-wide">{w.last_event_kind}</span>}
             {w.last_event_at && <span className="ml-auto">{fmtTime(w.last_event_at)}</span>}

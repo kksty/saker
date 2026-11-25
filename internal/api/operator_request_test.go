@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kksty/tianwu/internal/collab"
 	"github.com/kksty/tianwu/internal/decider"
@@ -142,6 +143,110 @@ func requestMux(s *Server) *http.ServeMux {
 
 func jsonBody(body string) io.ReadCloser {
 	return io.NopCloser(strings.NewReader(body))
+}
+
+// Filing an authorization request is a todo, not a project stop: the dispatch
+// gate stays open, the commander keeps running, and other directions start while
+// the operator decides. The request row waits for its own answer and never turns
+// into a project pause.
+func TestOperatorRequestDoesNotPauseOrBlockDispatch(t *testing.T) {
+	s, _, st := newCommanderServer(t)
+	mux := requestMux(s)
+	req := harnessRequest("POST", "/api/operator-requests")
+	req.Body = jsonBody(`{"action":"对上传接口做受控写入","asset":"36.103.225.219","impact":"可能新增一条测试文件","authorization":"允许写并清理"}`)
+	rec := record(mux, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("create request = %d %s", rec.Code, rec.Body.String())
+	}
+	var out struct {
+		Request model.OperatorRequest `json:"request"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Request.Status != model.OperatorRequestPending {
+		t.Fatalf("created request = %+v, want pending", out.Request)
+	}
+	if s.paused.Load() {
+		t.Fatal("filing a request paused the project")
+	}
+
+	// Another direction keeps running: the request is not a dispatch gate. The
+	// paused flag and the run claim are the two places a pause would show up.
+	in, err := st.CreateIntent(model.Intent{Title: "其余方向继续"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runID, err := s.StartRun(in.ID)
+	if err != nil {
+		t.Fatalf("dispatch after filing a request: %v", err)
+	}
+	waitFor(t, 5*time.Second, func() bool {
+		run, ok := st.GetRun(runID)
+		return ok && run.Status != model.RunRunning
+	})
+	if got, _ := st.GetOperatorRequest(out.Request.ID); got.Status != model.OperatorRequestPending {
+		t.Fatalf("request changed while other work ran: %+v", got)
+	}
+}
+
+// Operator resolution is operator speech: the commander's next round starts from
+// the message, not from the next heartbeat or a project restart. The message says
+// the request was a todo rather than a pause, so the commander can use what was
+// granted and keep the other directions moving.
+func TestOperatorRequestResolutionWakesCommander(t *testing.T) {
+	s, _, st := newCommanderServer(t)
+	req, _, err := st.CreateOperatorRequest("对上传接口做受控写入", "36.103.225.219", "可能新增一条测试文件", "允许写并清理", model.OperatorRequestFromCommander)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	calls := make(chan string, 4)
+	r := decider.NewRunner(st, nil, "")
+	r.ModelName = "fixture"
+	r.Heartbeat = time.Hour
+	r.Debounce = 5 * time.Millisecond
+	r.Commander = func(_ context.Context, prompt string, _ bool) (decider.RoundResult, error) {
+		calls <- prompt
+		return decider.RoundResult{}, nil
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	r.Start(ctx)
+	s.Decider = r
+
+	// An unresolved request is not news: it must not spend a round by itself.
+	select {
+	case <-calls:
+		t.Fatal("an unresolved request started a commander round")
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	rec := call(t, s, "POST", "/api/operator-requests/"+req.ID+"/resolve", map[string]any{
+		"resolution": "允许写入，按最小验证做，完成后清理",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("resolve = %d %s", rec.Code, rec.Body.String())
+	}
+	select {
+	case <-calls:
+	case <-time.After(5 * time.Second):
+		t.Fatal("resolving a request did not wake the commander")
+	}
+
+	var notice bool
+	for _, m := range st.Messages(200) {
+		if m.ToParticipantID != collab.CommanderID || m.Kind != "operator_request_resolved" {
+			continue
+		}
+		notice = true
+		if !m.Durable || !strings.Contains(m.Text, req.ID) || !strings.Contains(m.Text, "不阻塞") {
+			t.Fatalf("resolution notice = %+v", m)
+		}
+	}
+	if !notice {
+		t.Fatal("resolution left no durable message for the commander")
+	}
 }
 
 func record(mux *http.ServeMux, req *http.Request) *httptest.ResponseRecorder {

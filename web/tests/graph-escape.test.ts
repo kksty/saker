@@ -117,8 +117,6 @@ function panelProps(onClose: () => void) {
     onSelectFact() {},
     onClose,
     onChanged() {},
-    childRefresh: 0,
-    onChildIntent() {},
   }
 }
 

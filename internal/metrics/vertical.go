@@ -459,9 +459,9 @@ func metricOperatorConsumption(s Snapshot) Metric {
 		Key:   key,
 		Order: 2,
 		Unit:  "ms",
-		Definition: "操作员指令消费延迟 = 操作员消息创建到它第一次被结构化引用（回合输入或持久指令）的平均毫秒数，分子为延迟总和、分母为可判定消费的消息数。" +
+		Definition: "操作员指令消费延迟 = 操作员消息创建到它第一次被结构化引用（回合输入或持续指令）的平均毫秒数，分子为延迟总和、分母为可判定消费的消息数。" +
 			"消费锚点只取账本/旁路结构化字段：(a) message.delivered_run_id 指向的 run（delivery_path=prompt 取该 run 执行开始时间，delivery_path=ioa 取消息投递更新时间，即消息被注入活会话的时刻）；" +
-			"(b) instruction 广播消息的 message.instruction_id 对应 instruction.created_at（持久指令生效）；(c) instruction.source_message_id 指回该操作员消息。已投递但没有上述结构化引用、或投递目标 run 不在账本的消息计为未消费。" +
+			"(b) instruction 广播消息的 message.instruction_id 对应 instruction.created_at（持续指令生效）；(c) instruction.source_message_id 指回该操作员消息。已投递但没有上述结构化引用、或投递目标 run 不在账本的消息计为未消费。" +
 			"延迟为负（时钟/顺序不一致）时按 0 计并单独计数；只记录、不设阈值。",
 	}
 	db := s.DB
@@ -595,7 +595,7 @@ func metricOperatorConsumption(s Snapshot) Metric {
 	}
 	if consumed == 0 {
 		m.Unavailable = "no_consumed_operator_messages"
-		m.Explanation = "存在操作员消息，但没有一条具有账本可判定的消费锚点（delivered_run_id 指向的 run 或持久指令引用）；旧账本可能只记录了投递状态。"
+		m.Explanation = "存在操作员消息，但没有一条具有账本可判定的消费锚点（delivered_run_id 指向的 run 或持续指令引用）；旧账本可能只记录了投递状态。"
 		m.Details = details
 		m.Breakdown = unconsumedKinds
 		return m
@@ -811,7 +811,7 @@ func metricDirectionStall(s Snapshot) Metric {
 		}
 		newDirection := false
 		for _, in := range db.Intents {
-			if in.CreatedBy != collab.CommanderID && in.DelegatedByRun != r.ID {
+			if in.CreatedBy != collab.CommanderID {
 				continue
 			}
 			if runWithin(r, in.CreatedAt) {

@@ -409,10 +409,22 @@ export function messageKindLabel(kind: string): string {
       return '进展更新'
     case 'result':
       return '结果回传'
-    case 'task_notice':
-      return '下游意图结果'
     case 'note':
       return '备注'
+    // Proposal chain and the operator-request round-trip are control-plane
+    // messages: the console shows what happened instead of the raw kind token.
+    case 'proposal':
+      return '新意图提议'
+    case 'proposal_approved':
+      return '提议已批准'
+    case 'proposal_rejected':
+      return '提议已驳回'
+    case 'proposal_dispatched':
+      return '提议已派发'
+    case 'proposal_withdrawn':
+      return '提议已撤回'
+    case 'operator_request_resolved':
+      return '请求处理结果'
     default:
       return kind
   }

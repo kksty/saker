@@ -22,6 +22,7 @@ import { WorkspaceSidebar } from '@/components/WorkspaceSidebar'
 import { ChatComposer } from '@/components/ChatComposer'
 import { DeliveryEvidence, type EvidenceContext } from '@/components/DeliveryEvidence'
 import { OperatorInstructionsCard } from '@/components/OperatorInstructions'
+import { OperatorProposalsCard } from '@/components/OperatorProposals'
 import { SenderAvatar } from '@/components/SenderAvatar'
 import { alignRecords, type Alignment } from '@/lib/alignment'
 import { buildTimeline, instructionNoticeState, type TimelineEntry } from '@/lib/conversation'
@@ -215,7 +216,7 @@ export function Messages() {
   return (
     <Page
       title="通信"
-      subtitle="查看项目对话与消息投递状态；侧栏管理持续生效的操作员指令。"
+      subtitle="查看项目对话和投递状态。侧栏管理发给指挥官的持续指令。"
       actions={
         <Button size="sm" variant="outline" className="gap-1.5" onClick={focusComposer}>
           <Send className="h-3.5 w-3.5" />
@@ -277,6 +278,7 @@ export function Messages() {
             <div className="flex shrink-0 flex-col gap-3">
               <CommunicationBacklog status={communication.data} error={communication.error} people={people} onRetry={() => communication.reload()} />
               <OperatorInstructionsCard />
+            <OperatorProposalsCard />
             </div>
           </div>
         </WorkspaceSidebar>
@@ -535,20 +537,21 @@ function DayDivider({ day }: { day: string }) {
   )
 }
 
-// Historical rows only: instructions are no longer created, but old ledgers keep
-// their notices, so the line stays as a record (no action to take on it).
+// One ledger row per instruction revision, not per recipient: the notice is a
+// current record (creating, editing and revoking each queue one), so the line
+// says the revision changed and leaves management to the sidebar card.
 function InstructionNoticeLine({ entry }: { entry: Extract<TimelineEntry, { kind: 'instruction' }> }) {
   const state = instructionNoticeState(entry.notice.text)
   return (
     <div className="my-2 flex justify-center">
       <div
         data-instruction-notice
-        title="历史条目：指令已不再创建，这里只作记录"
+        title="账本里的持续指令变更记录；编辑与撤销在通信侧栏的持续指令卡片"
         className="flex max-w-full flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 rounded-full border border-hairline bg-surface-2/40 px-3 py-1 text-[10.5px] leading-4 text-ink-3"
       >
         <FileText className="h-3 w-3 shrink-0" />
         <span className="text-ink-2">
-          历史指令{entry.notice.instruction_version ? ` v${entry.notice.instruction_version}` : ''} 已更新
+          持续指令{entry.notice.instruction_version ? ` v${entry.notice.instruction_version}` : ''} 已更新
         </span>
         {state && (
           <span className={state === 'revoked' ? 'text-warning' : 'text-success'}>
@@ -658,7 +661,6 @@ function ChatMessage({
             {message.notice_intent_id && (
               <span title="下游意图结果通知：交给承接者判断，不改写原意图的必要前提">
                 来源意图 <span className="font-mono">{message.notice_intent_id}</span>
-                {message.notice_run_id && <> · 运行 <span className="font-mono">{message.notice_run_id}</span></>}
               </span>
             )}
             {message.in_reply_to && <span>回复 <span className="font-mono">{message.in_reply_to}</span></span>}

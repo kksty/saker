@@ -252,6 +252,9 @@ func TestExecutorCredentialReadsBattlefieldOnly(t *testing.T) {
 		{http.MethodPut, "/p/prj-1/api/state"},
 		{http.MethodGet, "/p/prj-1/api/state"},
 		{http.MethodGet, "/p/prj-1/api/operator-requests"},
+		{http.MethodGet, "/p/prj-1/api/instructions"},
+		{http.MethodGet, "/p/prj-1/api/instructions/instruction_1"},
+		{http.MethodGet, "/p/prj-1/api/instructions/instruction_1/history"},
 		{http.MethodGet, "/p/prj-2/api/board"},
 	} {
 		if code := call(tc.method, tc.path); code != http.StatusNotFound {

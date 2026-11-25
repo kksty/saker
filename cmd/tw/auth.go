@@ -313,17 +313,14 @@ func pathProject(path string) string {
 	return id
 }
 
-// isOperatorInboxPath reports whether path addresses the operator's inbox. It is
-// control-plane workflow (human authorization and handoff requests), not
-// battlefield state, so it stays commander-only even though executors may read
-// the rest of the project surface.
-func isOperatorInboxPath(path string) bool {
+// isCommanderInboxPath covers the operator request inbox and saved messages.
+func isCommanderInboxPath(path string) bool {
 	i := strings.Index(path, "/api/")
 	if i < 0 {
 		return false
 	}
 	seg, _, _ := strings.Cut(path[i+len("/api/"):], "/")
-	return seg == "operator-requests"
+	return seg == "operator-requests" || seg == "instructions"
 }
 
 // isStatePath reports whether path addresses the commander note. The note sits
@@ -391,7 +388,6 @@ var sessionWriteRoutes = map[string]bool{
 	"POST /api/instructions/*/ack": true, // acknowledge an instruction
 	"POST /api/intents":            true, // open a direction
 	"POST /api/intents/*/run":      true,
-	"POST /api/intents/*/children": true, // delegate a sub-direction
 	"POST /api/intents/*/handoff":  true,
 	"POST /api/intents/*/steer":    true,
 	"POST /api/intents/*/say":      true,
@@ -414,9 +410,15 @@ var sessionWriteRoutes = map[string]bool{
 	"POST /api/messages":           true, // say / send to the operator or a peer
 	"POST /api/messages/*/retract": true,
 	"PUT /api/state":               true, // the commander's note
-	"POST /api/project/standby":    true, // the commander's own stop request
-	"POST /api/operator-requests":  true, // register a request; it is not a grant
-	"PUT /api/operator-requests/*": true,
+	// Proposals: an executor files them on /agent; the commander decides them
+	// here. Approve/reject/dispatch are named explicitly; creating and
+	// withdrawing stay participant-only routes.
+	"POST /api/proposals/*/approve":  true,
+	"POST /api/proposals/*/reject":   true,
+	"POST /api/proposals/*/dispatch": true,
+	"POST /api/project/standby":      true, // the commander's own stop request
+	"POST /api/operator-requests":    true, // register a request; it is not a grant
+	"PUT /api/operator-requests/*":   true,
 }
 
 func sessionWriteAllowed(method, path string) bool {
@@ -472,6 +474,10 @@ func normalizeSessionPath(path string) string {
 		if len(segs) == 4 && segs[3] == "retract" {
 			segs[2] = "*"
 		}
+	case "proposals":
+		if len(segs) == 4 {
+			segs[2] = "*"
+		}
 	case "operator-requests":
 		if len(segs) == 3 {
 			segs[2] = "*"
@@ -502,8 +508,7 @@ func normalizeSessionPath(path string) string {
 // the participant route table: what exists under /agent/<p>/api is
 // internal/api/agent.go registerAgent, and how that face is mounted and
 // authenticated is cmd/tw/hub.go serveAgent. The two sets differ on purpose:
-// POST /api/spawn is registered on the participant face only, while board is
-// allowed here and has no participant-face route.
+// The project board is only on this surface.
 func agentRouteHidden(path string) bool {
 	// World publication/export is instance content management. Project sessions
 	// nominate through their own authenticated API, not the operator's routes.
@@ -550,7 +555,7 @@ func agentRouteHidden(path string) bool {
 	case "retrieval":
 		return rest != "retrieval/status" && rest != "retrieval/index"
 	case "board", "intents", "facts", "evidence", "goals", "playbooks",
-		"runs", "messages", "participants", "kb", "access", "artifacts", "operator-requests", "actions":
+		"runs", "messages", "participants", "kb", "access", "artifacts", "operator-requests", "actions", "proposals":
 		// state is absent by default: it is the commander's private memory, and
 		// the gate serves it only to the commander identity (wrap → isStatePath).
 		// An executor sees the same 404 it would for a missing route.
@@ -680,10 +685,7 @@ func (a *consoleAuth) wrap(next http.Handler) http.Handler {
 					http.NotFound(w, r)
 					return
 				}
-				// The operator inbox is control-plane workflow, not battlefield:
-				// the commander reads it; an executor asks for help through
-				// /agent/ and does not need another direction's request.
-				if !scope.commander && isOperatorInboxPath(r.URL.Path) {
+				if !scope.commander && isCommanderInboxPath(r.URL.Path) {
 					http.NotFound(w, r)
 					return
 				}
@@ -887,6 +889,13 @@ func withConsoleAuth(next http.Handler, token string, sessions sessionResolver) 
 // ensureConsoleToken resolves the token from the flag/file/env, generating and
 // persisting one when the operator did not supply any. The file is the source a
 // restart reads, so the login survives a restart without repeating the flag.
+//
+// It lives under the data directory: the console token is an instance artifact,
+// and the deployment contract keeps every instance artifact in one place that is
+// backed up and access-controlled together. The trade-off is explicit in
+// SECURITY.md — the host runs from the data directory, so an executor's file
+// tools can reach a token stored here; operators who need it outside that root
+// point --console-token-file at another location.
 func ensureConsoleToken(dataDir, inline, file string) (token, path string, generated bool, err error) {
 	t, err := resolveConsoleToken(inline, file)
 	if err != nil {
@@ -977,7 +986,7 @@ color:#170303;font:inherit;font-weight:700;cursor:pointer}
          placeholder="启动时 --console-token 的值">
   <button type="submit">进入</button>
   {{err}}
-  <div class="hint">令牌在启动日志里（自动生成时会同时写到 &lt;data&gt;/console.token）；会话 12 小时，退出访问 /logout。</div>
+  <div class="hint">令牌由 <code>--console-token</code> / <code>--console-token-file</code> / <code>TW_CONSOLE_TOKEN</code> 指定；自动生成时写入 &lt;data&gt;/console.token（启动日志只打印路径，不打印令牌）。会话 12 小时，退出访问 /logout。</div>
 </form></body></html>`
 
 // renderLogin fills the two placeholders; formatting the page with Printf would

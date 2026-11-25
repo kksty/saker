@@ -192,10 +192,24 @@ func detachIntent(in model.Intent) model.Intent {
 		h.FactClaimVersions = copyVersions(h.FactClaimVersions)
 		h.Evidence = append([]string(nil), h.Evidence...)
 		h.Attempts = append([]string(nil), h.Attempts...)
-		h.Children = append([]string(nil), h.Children...)
 		in.Handoff = &h
 	}
 	return in
+}
+
+// detachProposal gives a snapshot its own slices: the row is updated in place
+// under the lock (decisions replace the whole row, callers keep the returned
+// value after the lock is released).
+func detachProposal(p model.Proposal) model.Proposal {
+	p.FromFactIDs = append([]string(nil), p.FromFactIDs...)
+	p.ContextFactIDs = append([]string(nil), p.ContextFactIDs...)
+	p.PinnedFactIDs = append([]string(nil), p.PinnedFactIDs...)
+	p.Skills = append([]string(nil), p.Skills...)
+	if p.DecidedAt != nil {
+		at := *p.DecidedAt
+		p.DecidedAt = &at
+	}
+	return p
 }
 
 func detachWait(wait *model.Wait) *model.Wait {
@@ -208,7 +222,6 @@ func detachWait(wait *model.Wait) *model.Wait {
 		deadline := *w.Deadline
 		w.Deadline = &deadline
 	}
-	w.Children = append([]string(nil), w.Children...)
 	w.Results = append([]model.WaitResult(nil), w.Results...)
 	for i := range w.Results {
 		w.Results[i].FactIDs = append([]string(nil), w.Results[i].FactIDs...)

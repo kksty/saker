@@ -59,26 +59,6 @@ test('a hard prerequisite and a reference are drawn as different relations', () 
   assert.equal(ref?.intent?.id, 'in_task')
 })
 
-test('delegation stays the spawn lineage with the parent named', () => {
-  const parent = intent({ id: 'in_parent', title: 'parent', status: 'waiting' })
-  const child = intent({ id: 'in_child', title: 'child', parent_intent_id: 'in_parent' })
-  const graph = buildGraph(
-    [],
-    [parent, child],
-    [],
-    undefined,
-    [],
-    '',
-    [],
-    [{ source: 'intent:in_parent', target: 'intent:in_child', kind: 'delegates' }],
-  )
-  const relative = graph.edges.find((e) => e.source === 's:in_parent' && e.target === 's:in_child')
-  assert.equal(relative?.kind, 'spawn')
-  assert.equal(relative?.intent?.id, 'in_child')
-  assert.equal(relative?.parentIntent, 'in_parent')
-  // The anchor edge (parent output → child step) remains the visible branch.
-  assert.ok(graph.edges.some((e) => e.target === 's:in_child' && e.kind === 'spawn'))
-})
 
 test('a fact that supports a goal is its own relation, not an intent fan', () => {
   const goal: Goal = {
@@ -112,7 +92,6 @@ test('relation labels say what each edge means, and the produced fan stays unlab
   // Goal proof has two spellings: the ledger's supports edge and the legacy
   // evidence-id line; both must be named so the legend can tell them apart.
   assert.equal(edgeKindLabel('goal'), '目标证据')
-  assert.equal(edgeKindLabel('spawn'), '委托（等待）')
   assert.equal(edgeKindLabel('brief'), '项目范围')
   assert.equal(edgeKindLabel('host'), '宿主机')
   assert.equal(edgeKindLabel('intent'), '')

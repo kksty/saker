@@ -9,6 +9,7 @@ import assert from 'node:assert/strict'
 import {
   OPEN_ZOOM,
   cameraStorageKey,
+  focusCamera,
   layoutBounds,
   openCamera,
   parseCamera,
@@ -63,6 +64,35 @@ test('parseCamera accepts only a well-formed saved view', () => {
   assert.equal(parseCamera('{"x":1,"y":2,"k":0}'), null)
   assert.equal(parseCamera('{"x":1,"y":2,"k":-2}'), null)
   assert.equal(parseCamera('{"x":"1","y":2,"k":1}'), null)
+})
+
+test('focusCamera centres a search hit in the band the floating cards leave visible', () => {
+  // 1000x600 canvas, filter card 200px on the left, node panel 300px on the
+  // right, bottom stack 100px: the visible band is x 200..700, y 0..500.
+  const cam = focusCamera({ x: 100, y: 50 }, 1000, 600, 1, { left: 200, right: 300, bottom: 100 })
+  assert.ok(cam)
+  assert.equal(cam.k, 1)
+  assert.equal(cam.x, 450 - 100, 'the hit sits at the band centre, not the canvas centre')
+  assert.equal(cam.y, 250 - 50)
+})
+
+test('focusCamera raises a zoomed-out map to a readable zoom but keeps a closer view', () => {
+  assert.equal(focusCamera({ x: 0, y: 0 }, 800, 600, 0.3)?.k, 1)
+  assert.equal(focusCamera({ x: 0, y: 0 }, 800, 600, 2.4)?.k, 2.4)
+  assert.equal(focusCamera({ x: 0, y: 0 }, 800, 600, 9)?.k, 4, 'the canvas zoom cap still applies')
+  assert.equal(focusCamera({ x: 0, y: 0 }, 800, 600, 0.01)?.k, 1, 'minZoom wins over an absurd current zoom')
+})
+
+test('focusCamera clamps insets and refuses a missing canvas', () => {
+  // A panel may cover at most 60% of an axis; beyond that the node would be
+  // centred in a band that is not on screen at all.
+  const cam = focusCamera({ x: 0, y: 0 }, 1000, 600, 1, { left: 5000, right: 5000 })
+  assert.ok(cam)
+  assert.equal(cam.x, 600.5, 'left is capped at 600 and the right inset only shrinks the band')
+  assert.equal(cam.y, 300)
+  assert.equal(focusCamera({ x: 0, y: 0 }, 0, 600, 1), null)
+  assert.equal(focusCamera({ x: 0, y: 0 }, 800, 0, 1), null)
+  assert.equal(focusCamera({ x: Number.NaN, y: 0 }, 800, 600, 1), null)
 })
 
 test('cameraStorageKey keeps one camera per project', () => {

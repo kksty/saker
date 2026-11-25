@@ -144,6 +144,27 @@ func (s *Server) rescheduleReview(id string) {
 	s.reviewPumpMu.Unlock()
 }
 
+// lockReviewPass serializes automatic review passes for one direction and
+// returns the unlock. The pump is not the only caller: a pass can also be driven
+// directly, and the pass is a read-modify-write of the durable cursor. Without
+// the lock two passes interleave their cursor writes and a candidate can end up
+// behind both of them, which reads as "starved" even though every finding was
+// eligible.
+func (s *Server) lockReviewPass(intentID string) func() {
+	s.reviewPassMu.Lock()
+	if s.reviewPasses == nil {
+		s.reviewPasses = map[string]*sync.Mutex{}
+	}
+	mu := s.reviewPasses[intentID]
+	if mu == nil {
+		mu = &sync.Mutex{}
+		s.reviewPasses[intentID] = mu
+	}
+	s.reviewPassMu.Unlock()
+	mu.Lock()
+	return mu.Unlock
+}
+
 // runReviewPump serves due directions with at most reviewConcurrency() workers.
 // Each worker runs autoVerify for one direction and then reschedules that
 // direction; the pump itself only chooses which direction is due. A direction

@@ -30,7 +30,6 @@ export interface GraphFiltersState {
   onlyIds?: ReadonlySet<string>
   /** Draw the derived 发起边 (executor-launched peer directions). Drawing-only:
    *  the provenance marks and the panel stay; the layout is unaffected either way. */
-  showOriginLinks: boolean
   /** Draw the native-subagent satellites on step pills. Drawing-only: the panel
    *  aggregate is never hidden. */
   showHelpers: boolean
@@ -41,7 +40,6 @@ export function defaultGraphFilters(): GraphFiltersState {
     hiddenKinds: new Set(),
     timeRange: 'all',
     hideDone: false,
-    showOriginLinks: true,
     showHelpers: true,
   }
 }
@@ -157,9 +155,7 @@ function intentSignature(i: Intent): string {
     i.attempts,
     i.created_at,
     i.updated_at,
-    i.parent_intent_id ?? '',
     i.created_by_participant_id ?? '',
-    i.delegated_by_run_id ?? '',
     i.profile ?? '',
     i.context_version ?? 0,
     i.handoff_version ?? 0,

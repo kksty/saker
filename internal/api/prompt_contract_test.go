@@ -263,14 +263,11 @@ func TestSlimBriefKeepsHardConstraints(t *testing.T) {
 	in := db.Intents[0]
 	in.Eval = "验收标准标记"
 	in.FromFactIDs = []string{"f_1"}
-	instructions := "\n## 当前持久指令\n指令标记\n"
-
-	full := BuildPromptWithInstructions(db, in, "10.0.0.0/24", "", "", 0, true, true, "笔记标记", instructions, "")
-	slim := buildPromptWithoutOptionalSummaries(db, in, "10.0.0.0/24", "", "", 0, true, true, instructions, "", false)
+	full := BuildPromptWithFocus(db, in, "10.0.0.0/24", "", "", 0, true, true, "笔记标记")
+	slim := buildPromptWithoutOptionalSummaries(db, in, "10.0.0.0/24", "", "", 0, true, true, "", false)
 
 	// Hard material survives the degradation, whole.
 	for _, want := range []string{
-		"指令标记",
 		"## 约束",
 		"10.0.0.0/24",
 		"## 本轮指派",

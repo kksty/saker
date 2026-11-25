@@ -20,10 +20,12 @@ if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
 
 Push-Location $root
 try {
-    # The repository's own gate runs serial (`go test ./... -p 1`), but this
-    # host also runs a live project: parallel package tests fight it for
-    # loopback connects, and 2026-11-22 that surfaced as connect timeouts
-    # reported as test failures (aopexec 1, api 2 — each passing alone).
+    # The repository's own gate runs serial (`go test ./cmd/... ./internal/...
+    # -p 1`), but this host also runs a live project: parallel package tests
+    # fight it for loopback connects, and 2026-11-22 that surfaced as connect
+    # timeouts reported as test failures (aopexec 1, api 2 — each passing
+    # alone). The gate scopes Go steps to ./cmd/... ./internal/... because the
+    # default data directory is inside the module.
     # Default the forwarded flags to serial unless the caller chose test flags
     # explicitly. tw-gate replaces its own default when -test-flags is given, so
     # the 20m timeout that default carried is repeated here.

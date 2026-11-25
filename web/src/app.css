@@ -544,13 +544,18 @@
    * gradient over a 楷体/衬线 stack with a hair of engraving shadow, and a tiny
    * vermillion seal dot. Keeping it in CSS (not baked into an image) means the
    * treatment is identical in both shells and on the login page, and the name
-   * stays selectable/readable for assistive tech. */
+   * stays selectable/readable for assistive tech.
+   *
+   * Sizes are one lockup, not two unrelated lines: the CJK mark is the name and
+   * the latin caption is its fallback, so the caption has to stay legible at
+   * 1x (7px read as a smudge beside the 22px mark) while the mark steps back a
+   * hair so the pair still reads as one block inside the 216px rail. */
   .tw-brand-cn {
     font-family: "Kaiti SC", "STKaiti", "KaiTi", "Noto Serif SC", "Songti SC", serif;
-    font-size: 22px;
+    font-size: 21px;
     font-weight: 700;
     line-height: 1;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.1em;
     background: linear-gradient(180deg, var(--tw-brand-top, #6c1a1b), var(--tw-brand-bottom, #b43730));
     -webkit-background-clip: text;
     background-clip: text;
@@ -565,18 +570,18 @@
 
   .tw-brand-latin {
     font-family: var(--font-mono);
-    font-size: 7px;
+    font-size: 9px;
     font-weight: 600;
     line-height: 1;
-    letter-spacing: 0.36em;
+    letter-spacing: 0.26em;
     text-transform: uppercase;
-    color: var(--ink-3);
+    color: var(--ink-2);
   }
 
   /* The one graphic accent of the wordmark: a stamped vermillion square. */
   .tw-brand-dot {
-    width: 5px;
-    height: 5px;
+    width: 4px;
+    height: 4px;
     margin-top: 4px;
     border-radius: 1px;
     background: var(--primary);
@@ -778,12 +783,24 @@
   max-block-size: max(3.125rem, calc(var(--graph-overlay-height) * 0.48 - var(--graph-filter-offset)));
 }
 .tw-graph-stack {
-  inline-size: clamp(12.5rem, 14cqi, 17rem);
+  /* Wider than the filter card: the legend is a two-column swatch list and the
+     commander card carries a phase line plus running directions. The old
+     12.5–17rem column wrapped every status label and forced the cards to grow
+     tall; ~16–20rem gives each column room without taking the map's centre. */
+  inline-size: clamp(16rem, 18cqi, 20rem);
   min-block-size: 3.5rem;
-  max-block-size: max(3.5rem, calc(var(--graph-overlay-height) * 0.52));
+  /* Goal, commander and an open legend share the column. Goal and commander are
+     always whole; the legend takes the remaining height (GraphLegend flexes only
+     while open), so the three cards fill this budget instead of fighting it. */
+  max-block-size: max(3.5rem, calc(var(--graph-overlay-height) * 0.72));
 }
 .tw-graph-stack > .tw-scroll {
   scrollbar-gutter: auto;
+}
+/* The legend body is the card's flexible remainder while open; its rows scroll
+   inside that share instead of growing the column past the map. */
+.tw-graph-legend-body {
+  overscroll-behavior: contain;
 }
 .tw-graph-filter > .tw-graph-grip {
   translate: 42% 42%;
@@ -898,11 +915,12 @@
  * Narrow map: the filter card (≈16rem) and the node panel (≥300px) cannot both
  * float over the same map — at 640 the two of them left an 84px strip, and the
  * tree was framed into that sliver. While a node is open the panel is what the
- * operator is reading, so the filter card gives its width back to the map;
- * clearing the selection brings the card straight back.
+ * operator is reading, so the map cards that would sit under it give their space
+ * back; clearing the selection brings them straight back.
  */
 @container graph (inline-size < 44rem) {
-  .tw-graph-stage:has(.tw-graph-panel, [data-graph-chat]) .tw-graph-filter {
+  .tw-graph-stage:has(.tw-graph-panel, [data-graph-chat]) .tw-graph-filter,
+  .tw-graph-stage:has(.tw-graph-panel, [data-graph-chat]) .tw-graph-stack {
     display: none;
   }
 }

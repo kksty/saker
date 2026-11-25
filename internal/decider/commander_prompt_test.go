@@ -27,8 +27,8 @@ func TestCommanderRoundPromptStatesTheRoleFirst(t *testing.T) {
 	// The intent definition must survive a compacted or resumed session in
 	// either review mode, even when the earlier skill turn is gone.
 	for name, prompt := range map[string]string{
-		"round":    p,
-		"handoff":  h,
+		"round":      p,
+		"handoff":    h,
 		"reviewsOff": CommanderRoundPrompt(board.View{}, "笔记", "", ContextStatus{}, RoundContext{ReviewsOff: true}),
 	} {
 		// 图谱直接展示已保存的意图，续轮也要明确正文语言。
@@ -68,8 +68,8 @@ func TestCommanderPromptPreservesOperatorAuthorityOverGoalChanges(t *testing.T) 
 }
 
 // The board in the prompt is the summary layer: long summaries are clipped and
-// the full text is read by id, exactly like sapper/nvwabase's title→summary→doc
-// split (docs/17 §3.1). Ids, titles and counts must survive the projection.
+// the full text is read by id — the title → summary → doc split of docs/17 §3.1.
+// Ids, titles and counts must survive the projection.
 func TestCommanderRoundPromptBoardIsTheSummaryLayer(t *testing.T) {
 	long := strings.Repeat("细节", 300) // 600 runes, over the prompt budget
 	b := board.View{

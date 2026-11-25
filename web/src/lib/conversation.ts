@@ -1,16 +1,18 @@
 // The communication page's chronological model: one row per message, plus one
 // row per instruction revision (not one per recipient).
 //
-// The message ledger stores an instruction change as a notification to every
-// affected session. Rendering each copy would repeat the same system event N
-// times; dropping them into a separate tab (the retired instruction / native IOA tabs) made
-// the conversation look quieter than it was. The timeline keeps the revision
-// visible once, in its real position, and the management surface behind it.
-/** An instruction-change notice is one ledger row, not a chat line. Instructions
- *  are no longer created; old ledgers still carry the notices. */
+// The ledger stores an instruction change as a notification to every affected
+// recipient. Rendering each copy would repeat the same system event N times, so
+// the timeline groups the copies of one revision and keeps it visible once, in
+// its real position; creating, editing and revoking live in the instructions
+// surface.
+import type { Message } from './types.ts'
+
+/** An instruction-change notice is one ledger row, not a chat line: it points
+ *  at the revision, not at the body someone typed into the conversation. */
 function isInstructionNotice(m: { kind?: string }): boolean {
   return m.kind === 'instruction'
-}import type { Message } from './types.ts'
+}
 
 export type TimelineEntry =
   | { kind: 'message'; seq: number; message: Message }

@@ -15,7 +15,6 @@ import { Button, EmptyState, buttonVariants } from '@cyber/ui'
 import { cn } from '@cyber/theme'
 import { BoardSummary, MetaRule } from '@/components/BoardCounters'
 import { CommanderCard } from '@/components/CommanderCard'
-import { CreateChildIntentDialog } from '@/components/CreateChildIntentDialog'
 import { GoalEditorDialog, type EditableGoal } from '@/components/GoalEditorDialog'
 import { GraphCanvas, type GraphControls } from '@/components/GraphCanvas'
 import { GraphChatDock } from '@/components/GraphChatDock'
@@ -25,11 +24,12 @@ import { cameraStorageKey } from '@/graph/camera'
 import { useViewWidth } from '@/graph/view-store'
 import type { GraphNode } from '@/graph/model'
 import type { LayoutMode } from '@/graph/sim'
-import { buildTimelineFromSnapshot, revealedCount, timelineGate } from '@/graph/timeline'
+import { buildTimelineFromSnapshot, revealedCount, timelineGate, revealedIn } from '@/graph/timeline'
 import { chainView, subtree } from '@/graph/chain'
 import { fmtTime } from '@/lib/format'
 import { hasNewContent, liveReloadDelay, shouldLiveReload } from '@/lib/graph-live'
 import { graphSelectionRoot } from '@/lib/graph-pages'
+import { cycleSearchIndex, searchGraph } from '@/lib/graph-search'
 import { useSessionState } from '@/lib/session-state'
 import { api, type ChangePage } from '@/lib/api'
 import type { useGraphSnapshot } from '@/lib/graph-data'
@@ -212,7 +212,6 @@ export function GraphPanel({
   // The inspector asks GraphPanel to open the child dialog for the direction the
   // operator is looking at; the dialog lives here because it belongs to the map,
   // not to the project shell.
-  const [childParent, setChildParent] = useState<{ id: string; title: string } | null>(null)
   // The 终点 card is the goal's home on this page, so an unmet goal can be
   // redefined here instead of sending the operator back to 概览. The dialog is
   // the same one that page uses: it writes through the operator-scoped goal API
@@ -220,7 +219,6 @@ export function GraphPanel({
   const [editingGoal, setEditingGoal] = useState<EditableGoal | null>(null)
   // Bumped after a child is created so the inspector's (otherwise static) child
   // list reloads without waiting for the operator to reselect the node.
-  const [childRefresh, setChildRefresh] = useState(0)
   const [listView, setListView] = useState(false)
   // Time axis. The cursor is ephemeral on purpose: opening the map means "show me
   // the whole thing", and a half-scrubbed map that survived a reload would hide
@@ -359,38 +357,32 @@ export function GraphPanel({
   // leaving the map parked at the origin.
   const graphReady = !graph.loading
 
-  const matches = useMemo(() => {
-    if (!query.trim()) return null
-    const needle = query.trim().toLowerCase()
-    const set = new Set<string>()
-    for (const n of model.nodes) {
-      if (n.label.toLowerCase().includes(needle) || (n.sub ?? '').toLowerCase().includes(needle)) {
-        set.add(n.id)
-      }
-    }
-    for (const e of model.edges) {
-      if (e.label?.toLowerCase().includes(needle)) set.add(e.id)
-    }
-    return set
-  }, [query, model])
-
-  // `matches` 里也放航道 id（航道标注命中时同样要调亮），但面板上写的是「命中 N 个节点」，
-  // 所以计数只数节点：旧代码用 matches.size，把航道算进去，显示 707 而画布只有 563 个节点。
-  const matchNodeCount = useMemo(() => {
-    if (!matches) return null
-    let count = 0
-    for (const node of model.nodes) if (matches.has(node.id)) count += 1
-    return count
-  }, [matches, model])
-
-  // The names behind `matches`, in a stable order: the canvas only highlights,
-  // so this is what a screen reader (and an automated check) can read.
-  const matchNames = useMemo(() => {
-    if (!matches) return undefined
-    const names: string[] = []
-    for (const id of matches) names.push(model.byId.get(id)?.label ?? id)
-    return names.sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'))
-  }, [matches, model])
+  // Node search runs over the drawn model (lib/graph-search.ts): the ranking,
+  // the keyboard cycle and the canvas highlight all read the same result.
+  const search = useMemo(() => searchGraph(model, query), [query, model])
+  const matches = search.matches
+  // The row the keyboard/pointer is on. The canvas paints it with a stronger
+  // ring so ↑↓ gives feedback even before Enter opens the panel.
+  const [activeHit, setActiveHit] = useState(-1)
+  // The hit Enter opened last; the next Enter advances instead of reopening it.
+  const [landedHit, setLandedHit] = useState<string | null>(null)
+  useEffect(() => {
+    // A new query starts at its strongest hit. `search.hits` belongs to
+    // `query`, which is already debounced here.
+    setActiveHit(search.hits.length > 0 ? 0 : -1)
+    setLandedHit(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query])
+  useEffect(() => {
+    // A live snapshot can remove rows under a standing query; keep the active
+    // row inside the new list instead of pointing past its end.
+    setActiveHit((current) => {
+      if (search.hits.length === 0) return -1
+      if (current < 0) return 0
+      return Math.min(current, search.hits.length - 1)
+    })
+  }, [search.hits.length])
+  const activeMatchId = activeHit >= 0 ? search.hits[activeHit]?.node.id ?? null : null
 
   // An unmet goal has no completed work to stand on, so it is not a map node
   // and owns no edge: the compact 终点 card states the target instead. A met
@@ -432,8 +424,6 @@ export function GraphPanel({
         // Provenance and helper decorations live on the step; carry them so an
         // edge selection opens the same panel a node selection does.
         origin: selectedStep?.origin,
-        originIntent: selectedStep?.originIntent,
-        lineageDepth: selectedStep?.lineageDepth,
         helpers: selectedStep?.helpers,
         meta: { intent: selectedEdge.intent },
       }
@@ -501,6 +491,45 @@ export function GraphPanel({
     () => timelineGate(timeline, timelineOpen, timeCursor),
     [timeline, timelineOpen, timeCursor],
   )
+
+  // Locate one search hit: a boundary is a reference the snapshot does not
+  // carry, so it expands the neighborhood instead of pinning a missing record;
+  // everything else is selected (which opens its panel) and framed inside the
+  // strip the panel leaves visible.
+  const jumpToHit = useCallback((index: number) => {
+    const hit = search.hits[index]
+    if (!hit) return
+    setActiveHit(index)
+    setLandedHit(hit.node.id)
+    if (hit.node.boundary) {
+      void graph.focus(hit.node.boundary)
+      return
+    }
+    // A row hidden behind the time cursor is not on the map; locating it means
+    // revealing the axis (the cursor itself is an explicit stop, so move the
+    // slider to latest rather than silently centring on nothing).
+    if (timeGate && !revealedIn(timeGate.rank, timeGate.cursor, hit.node.id)) setTimeCursor(null)
+    setChatDock(false)
+    // On a narrow map the search card and the node panel cannot coexist (the
+    // card is hidden whenever a dock is open). Opening the panel here would take
+    // the box the operator is typing in away on the first result; locate the
+    // node without the dock instead, and let a tap on the located node open it.
+    const narrow = stageWidth < NARROW_MAP_PX
+    if (!narrow) onSelect(hit.node.id)
+    canvas.current?.focusNode(hit.node.id, { rightInset: narrow ? 0 : dock.width })
+  }, [search.hits, graph, timeGate, onSelect, dock.width, stageWidth])
+
+  // Enter walks the results: the first press locates the active hit, later
+  // presses advance from the one already located (Shift reverses).
+  const activateHit = useCallback((backward: boolean) => {
+    if (search.hits.length === 0) return
+    let target = activeHit >= 0 ? activeHit : 0
+    const current = search.hits[target]
+    if (current && current.node.id === landedHit) {
+      target = cycleSearchIndex(target, search.hits.length, backward ? -1 : 1)
+    }
+    jumpToHit(target)
+  }, [search.hits, activeHit, landedHit, jumpToHit])
   const timelineRevealed = !timelineUsable || !timelineOpen
     ? timeline.order.length
     : timeCursor === null
@@ -703,6 +732,7 @@ export function GraphPanel({
         model={model}
         selected={selected}
         matches={matches}
+        activeMatch={activeMatchId}
         showLabels={showLabels}
         // The dock (node panel / 下发) covers the right edge; hand its width to
         // the canvas so a label flips to the other side instead of hiding.
@@ -714,7 +744,6 @@ export function GraphPanel({
         // back to the same pan/zoom instead of the opening centre.
         cameraKey={cameraStorageKey(current)}
         ready={graphReady}
-        showOriginLinks={filters.showOriginLinks}
         showHelpers={filters.showHelpers}
         timeGate={timeGate}
         hoverPreview={hoverPreview}
@@ -731,8 +760,12 @@ export function GraphPanel({
           current={current}
           q={q}
           onQueryChange={setQ}
-          matchCount={matchNodeCount}
-          matchNames={matchNames}
+          hits={search.hits}
+          activeIndex={activeHit}
+          onActiveIndex={setActiveHit}
+          onOpenHit={jumpToHit}
+          onActivate={activateHit}
+          pending={q !== query}
           counts={board?.facts.by_kind ?? {}}
           filters={filters}
           onFiltersChange={setFilters}
@@ -813,20 +846,27 @@ export function GraphPanel({
         className="tw-graph-corner-bl tw-graph-dock tw-graph-stack absolute flex flex-col rounded-xl"
       >
         <div className="tw-scroll flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto">
+          {/* Order is deliberate: the target and the legend come first; the live
+              commander state sits at the bottom where it stays whole and pinned
+              while the legend's own body scrolls above it. */}
           {openGoals.length > 0 && (
             <div className="w-full shrink-0 rounded-xl border border-hairline bg-card/95 px-3 py-2 shadow-lifted backdrop-blur">
               <div className="flex items-center gap-1.5">
                 <Crosshair className="h-3.5 w-3.5 shrink-0 text-warning" />
-                <span className="text-[12px] font-semibold text-ink">
-                  终点 · 未达成{openGoals.length > 1 ? `（${openGoals.length}）` : ''}
+                <span className="tw-section-title">终点</span>
+                <span className="tw-nums ml-auto shrink-0 font-mono text-[11px] text-ink-3">
+                  未达成 {openGoals.length}
                 </span>
               </div>
-              <div className="mt-1 space-y-1">
+              <div className="mt-1 space-y-0.5">
                 {openGoals.slice(0, 2).map((g) => (
-                  <div key={g.id} className="flex items-start gap-1.5">
-                    <div className="tw-break line-clamp-2 min-w-0 flex-1 text-caption text-ink-2" title={g.statement}>
+                  <div key={g.id} className="flex items-center gap-1.5">
+                    <span
+                      className="tw-break min-w-0 flex-1 truncate text-caption text-ink-2"
+                      title={g.statement}
+                    >
                       {g.statement}
-                    </div>
+                    </span>
                     <Button
                       size="xs"
                       variant="ghost"
@@ -839,6 +879,16 @@ export function GraphPanel({
                   </div>
                 ))}
               </div>
+              {openGoals.length > 2 && (
+                <button
+                  type="button"
+                  className="mt-0.5 rounded text-left text-[10px] text-ink-3 transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                  onClick={() => onNavigate('state')}
+                  title="打开状态页查看全部未达成目标"
+                >
+                  另有 {openGoals.length - 2} 个未达成目标，去状态页查看 →
+                </button>
+              )}
             </div>
           )}
 
@@ -858,7 +908,6 @@ export function GraphPanel({
               defaultSide={stageWidth >= 2000 ? 184 : stageWidth >= 1150 ? 160 : undefined}
               live={running > 0 || model.nodes.some((n) => n.status === 'reviewing')}
               matches={matches}
-              showOriginLinks={filters.showOriginLinks}
               onCenter={(x, y) => canvas.current?.centerOn(x, y)}
               onFit={() => canvas.current?.fit()}
             />
@@ -879,8 +928,6 @@ export function GraphPanel({
             }}
             onClose={() => onSelect(null)}
             onChanged={refresh}
-            childRefresh={childRefresh}
-            onChildIntent={(parent) => setChildParent(parent)}
             onOpenRun={onOpenRun}
             treeActive={Boolean(treeIds)}
             onOnlyTree={chain ? showOnlyTree : undefined}
@@ -918,6 +965,7 @@ export function GraphPanel({
           model={model}
           selected={selected}
           matches={matches}
+          activeMatch={activeMatchId}
           onSelect={handleCanvasSelect}
           onClose={() => setListView(false)}
         />
@@ -980,21 +1028,6 @@ export function GraphPanel({
         }}
       />
 
-      {/* Child dialog: rendered here, not in the shell, because it is opened from
-          the node inspector this panel owns. */}
-      {childParent && (
-        <CreateChildIntentDialog
-          open
-          onOpenChange={(v) => {
-            if (!v) setChildParent(null)
-          }}
-          parent={childParent}
-          onCreated={() => {
-            setChildRefresh((n) => n + 1)
-            refresh()
-          }}
-        />
-      )}
     </Page>
   )
 }

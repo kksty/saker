@@ -155,7 +155,7 @@ func TestProbeTableReachesOnlyTheExecutorTaskBook(t *testing.T) {
 		probeJournalLine(time.Now().UTC(), "bash", "curl -sS http://113.219.171.189:9012/"))
 
 	db := p.Store.Snapshot()
-	executor := BuildPromptWithInstructions(db, intents[0], "10.0.0.0/8", "", "", 0, false, false, "", "", s.probeSection(intents[0], db))
+	executor := buildDispatchPrompt(db, intents[0], "10.0.0.0/8", "", "", 0, false, false, "", s.probeSection(intents[0], db), false)
 	if !strings.Contains(executor, probeTableTitle) {
 		t.Fatal("the executor task book lost the probe table")
 	}

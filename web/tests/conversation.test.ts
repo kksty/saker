@@ -64,7 +64,7 @@ test('an unnamed notice stays its own line instead of collapsing with another', 
 })
 
 test('the notice revision state is read from the server sentence', () => {
-  assert.equal(instructionNoticeState('持久指令 ins_1 已更新至 v2（active）。'), 'active')
-  assert.equal(instructionNoticeState('持久指令 ins_1 已更新至 v3（revoked）。'), 'revoked')
+  assert.equal(instructionNoticeState('永久消息 ins_1 已更新至 v2（active）。'), 'active')
+  assert.equal(instructionNoticeState('永久消息 ins_1 已更新至 v3（revoked）。'), 'revoked')
   assert.equal(instructionNoticeState('something else'), '')
 })

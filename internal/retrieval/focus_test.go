@@ -73,8 +73,8 @@ func focusFixtures(t *testing.T) *focusFixture {
 		t.Fatal(err)
 	}
 	task, err := s.CreateIntent(model.Intent{
-		Title:          "focus",
-		ParentID:       ancestor.ID,
+		Title: "focus",
+
 		FromFactIDs:    []string{required.ID},
 		PinnedFactIDs:  []string{pinned.ID},
 		ContextFactIDs: []string{reference.ID},

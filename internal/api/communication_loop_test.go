@@ -9,7 +9,6 @@ package api
 // browser, harness, model or real project data is touched.
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -22,8 +21,6 @@ import (
 	"github.com/kksty/tianwu/internal/executor"
 	"github.com/kksty/tianwu/internal/model"
 )
-
-// ---- request / acceptance / result correlation ----
 
 func TestMessageThreadEndpointCorrelatesAcceptanceAndResult(t *testing.T) {
 	f := newAgentFixture(t)
@@ -120,9 +117,7 @@ type threadMessageEnvelope struct {
 // participants involved (including the subtask) can read it.
 func TestMessageThreadCoversCommanderAndSubtaskParticipants(t *testing.T) {
 	f := newParentFixture(t)
-	child, _, err := f.p.Store.CreateChildIntent(f.ident.IntentID, model.Intent{
-		Title: "子意图", CreatedBy: f.ident.ParticipantID,
-	})
+	child, err := f.p.Store.CreateIntent(model.Intent{Title: "子意图", CreatedBy: f.ident.ParticipantID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,8 +174,6 @@ func TestMessageThreadCoversCommanderAndSubtaskParticipants(t *testing.T) {
 	}
 }
 
-// ---- quoted request in the injected inbox ----
-
 func TestInboxQuotesTheRequestAndMarksAMissingQuote(t *testing.T) {
 	f := newAgentFixture(t)
 	asker := collab.ParticipantID(f.src.ID)
@@ -224,8 +217,6 @@ func TestInboxQuotesTheRequestAndMarksAMissingQuote(t *testing.T) {
 	}
 }
 
-// ---- wait releases capacity and resumes exactly once ----
-
 // countingExec wraps the node registry so the test can observe concurrent runs
 // while still answering node resolution like a real host.
 type countingExec struct {
@@ -257,80 +248,4 @@ func (e *countingExec) peak() (active, max, runs int) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.active, e.max, e.runs
-}
-
-func TestWaitResumesExactlyOnceWithoutASlotLeak(t *testing.T) {
-	f := newParentFixture(t)
-	f.srv.MaxRuns = 1 // capacity 1: the parent must yield for the children to run
-	ex := &countingExec{}
-	f.srv.Exec = ex
-	t.Cleanup(func() {
-		f.srv.CancelAll()
-		f.srv.WaitIdle(5 * time.Second)
-	})
-
-	var children []string
-	for i := 0; i < 2; i++ {
-		rec := f.call(t, &f.ident, http.MethodPost, "/api/intents/"+f.ident.IntentID+"/children", map[string]any{
-			"title": "子意图", "idempotency_key": "wait-once-" + string(rune('a'+i)),
-		})
-		if rec.Code != http.StatusCreated {
-			t.Fatalf("delegate: %d %s", rec.Code, rec.Body.String())
-		}
-		var resp struct {
-			Child childIntentView `json:"child"`
-		}
-		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-			t.Fatal(err)
-		}
-		children = append(children, resp.Child.ID)
-	}
-	if rec := f.call(t, &f.ident, http.MethodPost, "/api/intents/"+f.ident.IntentID+"/wait", map[string]any{
-		"children": children, "mode": model.WaitAll,
-	}); rec.Code != http.StatusAccepted || !bytes.Contains(rec.Body.Bytes(), []byte(`"waiting":true`)) {
-		t.Fatalf("wait: %d %s", rec.Code, rec.Body.String())
-	}
-	// The parent's turn ends: the direction becomes waiting and its slot is
-	// released for the children.
-	f.srv.finish(f.run.ID, f.ident.IntentID, model.RunDone, "", executor.Result{}, 0)
-	if cur := f.parent(t); cur.Status != model.StatusWaiting {
-		t.Fatalf("parent status = %s, want waiting", cur.Status)
-	}
-
-	parentRuns := func() int {
-		n := 0
-		for _, r := range f.p.Store.Runs() {
-			if r.IntentID == f.ident.IntentID {
-				n++
-			}
-		}
-		return n
-	}
-	waitFor(t, 5*time.Second, func() bool {
-		parent, _ := f.p.Store.GetIntent(f.ident.IntentID)
-		return parent.Wait == nil && parent.Status != model.StatusWaiting && parentRuns() == 2
-	})
-	// Exactly one wake run: no duplicate claim, no second scheduler pass.
-	time.Sleep(300 * time.Millisecond)
-	if got := parentRuns(); got != 2 {
-		t.Fatalf("parent resumed %d times, want exactly 2 runs total (initial + one wake)", got)
-	}
-	parent, _ := f.p.Store.GetIntent(f.ident.IntentID)
-	if parent.Wait != nil || parent.Status == model.StatusWaiting {
-		t.Fatalf("parent still holds the consumed wait: %+v", parent)
-	}
-	// Capacity was released and never exceeded.
-	if active, max, runs := ex.peak(); active != 0 {
-		t.Fatalf("executor still active=%d after settlement", active)
-	} else if max > 1 {
-		t.Fatalf("slot limit exceeded: peak concurrency %d, want 1", max)
-	} else if runs < 3 {
-		t.Fatalf("expected two children plus one wake run, got %d exec runs", runs)
-	}
-	// No slot leak: every run row settled and the direction is not stuck.
-	for _, r := range f.p.Store.Runs() {
-		if r.Status == model.RunRunning {
-			t.Fatalf("run %s leaked as running", r.ID)
-		}
-	}
 }

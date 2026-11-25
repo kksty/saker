@@ -210,8 +210,8 @@ func TestUnknownWindowHasNoPressureSection(t *testing.T) {
 	}
 }
 
-// Sapper rewrites STATE once and then continues the loop; the 85% line must not
-// turn every later round into another handoff.
+// The note is rewritten once per pressure cycle and then the loop continues; the
+// 85% line must not turn every later round into another handoff.
 func TestHandoffHappensOncePerPressureCycle(t *testing.T) {
 	c := ContextStatus{Used: 110000, Window: 128000}
 	if !c.Handoff() {

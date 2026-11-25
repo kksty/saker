@@ -79,7 +79,7 @@ export function CommanderCard({ board, onOpen }: { board?: BoardResponse; onOpen
       </button>
 
       {open && (
-        <div className="space-y-2 border-t border-hairline px-3.5 py-2.5">
+        <div className="space-y-1.5 border-t border-hairline px-3 py-2">
           <div className="flex items-center gap-2">
             <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
             <span className="text-[12px] font-medium text-ink">{PHASE_LABEL[phase] ?? phase}</span>

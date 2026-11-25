@@ -75,24 +75,49 @@ func (s *Store) BeginAction(intentID, runID, key, name, reference string) (model
 // ResolveAction is CAS. Only a receipt or explicit reconciliation changes an
 // unknown operation to completed; a completed action can never be reset.
 func (s *Store) ResolveAction(id string, version int, state, result, resultRef, resolvedByRun string) (model.ExternalAction, error) {
+	out, _, err := s.ResolveActionIdempotent(id, version, state, result, resultRef, resolvedByRun)
+	return out, err
+}
+
+// ResolveActionIdempotent is the retry-safe form of ResolveAction. The second
+// return value reports that the call restated an outcome already stored, so the
+// caller can answer success without pretending it recorded anything new.
+//
+// A closing-out direction resends the same receipt easily: a retried HTTP call,
+// a reintroduced report line, an operator reconciling an action the previous run
+// had already settled. The outcome is already in the ledger and identical, so
+// the second submission is the same fact, not a conflict — surfacing it as 409
+// taught the fleet to report a failure for work that was actually done, which is
+// exactly the noise a closeout cannot afford.
+//
+// It stays narrower than "ignore conflicts": a completed action still cannot be
+// reset, a different payload for the same action is still a conflict, and a run
+// that is no longer the direction's current run still cannot mutate anything.
+// A duplicate writes nothing: no version bump, no flush, no wake.
+func (s *Store) ResolveActionIdempotent(id string, version int, state, result, resultRef, resolvedByRun string) (model.ExternalAction, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	state, result, resultRef = strings.TrimSpace(state), strings.TrimSpace(result), strings.TrimSpace(resultRef)
 	if state != model.ActionCompleted && state != model.ActionUnknown {
-		return model.ExternalAction{}, fmt.Errorf("状态只能是 completed 或 unknown")
+		return model.ExternalAction{}, false, fmt.Errorf("状态只能是 completed 或 unknown")
 	}
-	result, resultRef = strings.TrimSpace(result), strings.TrimSpace(resultRef)
 	if result == "" || len(result) > 12000 || len(resultRef) > 4000 {
-		return model.ExternalAction{}, fmt.Errorf("必须提供结果或未知原因，且长度必须有效")
+		return model.ExternalAction{}, false, fmt.Errorf("必须提供结果或未知原因，且长度必须有效")
 	}
 	a, ok := s.actionLocked(id)
 	if !ok {
-		return model.ExternalAction{}, fmt.Errorf("外部动作不存在")
+		return model.ExternalAction{}, false, fmt.Errorf("外部动作不存在")
 	}
 	if resolvedByRun != "" && !s.currentActionRunLocked(a.IntentID, resolvedByRun) {
-		return model.ExternalAction{}, ErrActionConflict
+		return model.ExternalAction{}, false, ErrActionConflict
+	}
+	// The identity of a resolution is its payload, not the version the caller
+	// read: a retry through a stale version still describes the same receipt.
+	if a.State == state && a.State != model.ActionStarted && a.Result == result && a.ResultRef == resultRef {
+		return *a, true, nil
 	}
 	if a.Version != version || a.State == model.ActionCompleted {
-		return model.ExternalAction{}, ErrActionConflict
+		return model.ExternalAction{}, false, ErrActionConflict
 	}
 	a.State, a.Result, a.ResultRef, a.ResolvedByRun = state, result, resultRef, resolvedByRun
 	a.Version++
@@ -100,9 +125,9 @@ func (s *Store) ResolveAction(id string, version int, state, result, resultRef, 
 	s.wakeActionWaitsLocked(id)
 	out := *a
 	if err := s.flushNoRev("action", "intent"); err != nil {
-		return model.ExternalAction{}, err
+		return model.ExternalAction{}, false, err
 	}
-	return out, nil
+	return out, false, nil
 }
 
 func (s *Store) currentActionRunLocked(intentID, runID string) bool {

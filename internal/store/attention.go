@@ -30,39 +30,6 @@ type AttentionBatch struct {
 	Reasons          []AttentionReason `json:"reasons"`
 }
 
-func coordinatorLocked(in model.Intent, intents map[string]model.Intent) string {
-	seen := map[string]bool{in.ID: true}
-	for id := in.ParentID; id != "" && !seen[id]; {
-		seen[id] = true
-		p, ok := intents[id]
-		if !ok {
-			break
-		}
-		if !model.Settled(p.Status) && !p.Hold && !p.Aborted {
-			return p.ID
-		}
-		id = p.ParentID
-	}
-	if id, ok := collab.IntentIDFromParticipant(in.CreatedBy); ok && !seen[id] {
-		if p, exists := intents[id]; exists && !model.Settled(p.Status) && !p.Hold && !p.Aborted {
-			return id
-		}
-	}
-	return ""
-}
-
-// IntentCoordinator identifies the live parent/creator responsible for a local
-// result. Creation and task ownership are separate relationships.
-func (s *Store) IntentCoordinator(id string) string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	intents := make(map[string]model.Intent, len(s.db.Intents))
-	for _, in := range s.db.Intents {
-		intents[in.ID] = in
-	}
-	return coordinatorLocked(intents[id], intents)
-}
-
 // CommanderAttention reads the existing durable change journal. A process crash
 // or a failed model request cannot lose the demand: only an explicit successful
 // delivery advances AttentionThrough. This is independent of context/ack.
@@ -133,10 +100,6 @@ func (s *Store) CommanderAttentionAt(at time.Time) AttentionBatch {
 			add("instruction:"+c.ID, c, "instruction_changed", "操作员的持久约束发生变化", "")
 		case "intent":
 			in := r.value.(model.Intent)
-			if coordinatorLocked(in, intents) != "" {
-				out.Local++
-				continue
-			}
 			if in.Status == model.StatusDone || in.Status == model.StatusFailed || in.Status == model.StatusReviewFailed || in.Status == model.StatusParked {
 				detail := "意图已结束，没有局部承接者；需要全局判断"
 				if in.Status == model.StatusParked {
@@ -183,7 +146,7 @@ func (s *Store) CommanderAttentionAt(at time.Time) AttentionBatch {
 				}
 			}
 			in, ok := intents[f.IntentID]
-			if ok && ((!model.Settled(in.Status) && !in.Hold && !in.Aborted) || coordinatorLocked(in, intents) != "") {
+			if ok && !model.Settled(in.Status) && !in.Hold && !in.Aborted {
 				out.Local++
 				continue
 			}

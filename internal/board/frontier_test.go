@@ -56,12 +56,4 @@ func TestFrontierMarksPremiseStateWithoutChangingReadiness(t *testing.T) {
 		t.Fatalf("changed premise marker = %+v", item)
 	}
 
-	// A pending child is open work under the direction.
-	if _, err := st.CreateIntent(model.Intent{Title: "child", ParentID: consumer.ID}); err != nil {
-		t.Fatal(err)
-	}
-	item = byID()[consumer.ID]
-	if item.Descendants != 1 {
-		t.Fatalf("descendants = %d, want 1", item.Descendants)
-	}
 }

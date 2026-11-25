@@ -214,7 +214,7 @@ func (g *Generator) Generate(ctx context.Context) (Meta, error) {
 	if g.Policy != nil {
 		policy = g.Policy()
 	}
-	db, instructions, err := g.Store.PreparePurposeInput(run.ID, policy)
+	db, _, err := g.Store.PreparePurposeInput(run.ID, policy)
 	if err != nil {
 		fail(err.Error())
 		return Meta{}, err
@@ -247,7 +247,7 @@ func (g *Generator) Generate(ctx context.Context) (Meta, error) {
 		fail(err.Error())
 		return Meta{}, err
 	}
-	if err := writeSnapshot(dir, db, copied, scope, instructions); err != nil {
+	if err := writeSnapshot(dir, db, copied, scope, nil); err != nil {
 		fail(err.Error())
 		return Meta{}, err
 	}
@@ -314,7 +314,7 @@ func (g *Generator) Generate(ctx context.Context) (Meta, error) {
 	}
 	if runErr == nil {
 		res, runErr = g.Exec.Run(ctx, executor.Request{
-			Prompt:  executor.InstructionSection(instructions) + BuildPrompt(len(facts), scope),
+			Prompt:  BuildPrompt(len(facts), scope),
 			WorkDir: dir,
 			Node:    nodeID,
 			Purpose: "report",

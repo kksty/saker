@@ -16,7 +16,7 @@ func TestWaitingDirectionsBlockCompletionWithoutHeartbeatSpin(t *testing.T) {
 	waits := map[string]*model.Wait{
 		"operator_receipt": {Operator: &model.OperatorWait{Request: "扫码登录"}},
 		"external_action":  {Actions: []string{"ac_1"}},
-		"subtask":          {Children: []string{"in_child"}},
+		"subtask":          {Actions: []string{"in_child"}},
 		"bare":             {},
 	}
 	for name, wait := range waits {

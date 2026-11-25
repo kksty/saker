@@ -80,7 +80,7 @@ export function OperatorInboxCard({
     setNotice('')
     try {
       await api.resolveOperatorRequest(id, '操作员已处理')
-      setNotice('请求已标记为已处理。')
+      setNotice('请求已处理；指挥官会收到这条决定的消息并继续推进其他方向，不需要重启项目或等待心跳。')
       onChanged()
     } catch (e) {
       setNotice(e instanceof Error ? e.message : String(e))

@@ -11,6 +11,7 @@ import (
 
 	"github.com/kksty/tianwu/internal/aop"
 	"github.com/kksty/tianwu/internal/aopexec"
+	"github.com/kksty/tianwu/internal/brake"
 	"github.com/kksty/tianwu/internal/executor"
 	"github.com/kksty/tianwu/internal/model"
 )
@@ -27,12 +28,43 @@ import (
 // is deliberately NOT the gate here: it returns "transient" for anything it does
 // not recognise, which includes tool and judgement failures. The gate is the
 // transport vocabulary below, which only a broken link produces.
-const (
-	maxAutoResumes = 3
-	autoResumeStep = 10 * time.Second // 10s, 30s, 90s; sapper's 10*2^n, capped
-)
+const maxAutoResumes = 3
 
+// autoResumeDelays is the whole backoff schedule: 10s → 30s → 90s, and the
+// last entry caps it.
 var autoResumeDelays = []time.Duration{10 * time.Second, 30 * time.Second, 90 * time.Second}
+
+// autoResumeBrake bounds recovery on the *shared* dependency, not on the
+// direction. The per-direction budget above counts attempts per intent; with N
+// directions behind one dead gateway, every direction can spend its own three
+// chances and the fleet sends N×3 dials at a link that is already down. Nobody
+// exceeded a limit and the platform still hammered itself.
+//
+// 30s between recoveries and at most 12 in ten minutes per gateway/node pair is
+// deliberately conservative: the cost of being slow is a direction that resumes
+// a little later, and the cost of being fast is the storm this exists to stop.
+// A refusal is not a failure of the work: like an exhausted per-direction
+// budget, it hands the direction back to the commander.
+var autoResumeBrake = brake.New(brake.Options{
+	Cooldown: 30 * time.Second,
+	Window:   10 * time.Minute,
+	Max:      12,
+})
+
+// recoveryKey names the shared dependency behind one run's transport death. The
+// node is part of the key: a dead scan node fails every direction on it, while a
+// healthy node sharing the same gateway must not inherit that node's cooldown.
+func (s *Server) recoveryKey(runID string) string {
+	provider, modelName := "", ""
+	if s.ModelSettings != nil {
+		provider, modelName, _ = s.ModelSettings()
+	}
+	node := ""
+	if run, ok := s.Store.GetRun(runID); ok {
+		node = run.Node
+	}
+	return "gateway=" + provider + "/" + modelName + ";node=" + node
+}
 
 // transportFailurePatterns is the provider-side vocabulary, used only when the
 // run carries no recorded cause: the harness reports a dead dial or a broken
@@ -169,8 +201,12 @@ func (s *Server) autoResumeAfterFailure(runID, intentID, status string, res exec
 	// nowhere to land (SatisfyWait needs the wait the failure cleared); restarting
 	// the parent would put it on the same ground as its children, which is the
 	// concurrent pair this design refuses.
-	if kids := s.Store.ActiveChildren(intentID); len(kids) > 0 {
-		s.noteAutoResume(runID, intentID, autoResumeUsed(intentID)+1, "子意图还在跑，不重启父意图")
+	key := s.recoveryKey(runID)
+	slot, reason := autoResumeBrake.Reserve(key)
+	if slot == nil {
+		s.noteAutoResume(runID, intentID, autoResumeUsed(intentID)+1,
+			"共享依赖闸：本窗口内同一网关/节点的自动恢复次数已用尽（"+string(reason)+"），留给指挥官决定")
+		log.Printf("run %s：传输失败，但共享依赖闸 %s 在本窗口内已满，不自动续跑 %s", runID, key, intentID)
 		return
 	}
 	attempt := autoResumeUsed(intentID) + 1
@@ -178,22 +214,32 @@ func (s *Server) autoResumeAfterFailure(runID, intentID, status string, res exec
 	if attempt-1 < len(autoResumeDelays) {
 		delay = autoResumeDelays[attempt-1]
 	}
+	// The dependency's own spacing can be wider than the per-direction backoff:
+	// a queued recovery waits its turn instead of arriving with the herd.
+	if wait := time.Until(slot.At()); wait > delay {
+		delay = wait
+	}
 	s.noteAutoResume(runID, intentID, attempt, "")
-	log.Printf("run %s：传输失败，%s 后自动续跑 %s（第 %d 次，上限 %d）", runID, delay, intentID, attempt, maxAutoResumes)
-	time.AfterFunc(delay, func() { s.autoResumeFire(runID, intentID) })
+	log.Printf("run %s：传输失败，%s 后自动续跑 %s（第 %d 次，上限 %d；依赖 %s）", runID, delay, intentID, attempt, maxAutoResumes, key)
+	time.AfterFunc(delay, func() { s.autoResumeFire(runID, intentID, slot) })
 }
 
 // autoResumeFire is the timer body, kept separate so a test can drive it
-// without waiting out the backoff.
-func (s *Server) autoResumeFire(runID, intentID string) {
+// without waiting out the backoff. It carries the reserved slot: a timer that
+// never starts a run gives the shared budget back, because a lost race is not a
+// storm.
+func (s *Server) autoResumeFire(runID, intentID string, slot *brake.Slot) {
+	started := false
+	defer func() {
+		if !started {
+			slot.Release()
+		}
+	}()
 	if s.paused.Load() || s.closing.Load() || s.deleting.Load() {
 		return
 	}
 	cur, ok := s.Store.GetIntent(intentID)
 	if !ok || cur.Aborted || cur.Hold || cur.Status != model.StatusFailed {
-		return
-	}
-	if kids := s.Store.ActiveChildren(intentID); len(kids) > 0 {
 		return
 	}
 	// The budget is spent when a retry actually starts, not when the timer is
@@ -230,6 +276,8 @@ func (s *Server) autoResumeFire(runID, intentID string) {
 					autoResumeRefund(intentID)
 					log.Printf("自动续跑 %s 失败：%v / 新会话：%v", intentID, err, ferr)
 					s.noteAutoResume(runID, intentID, attempt, "启动失败："+ferr.Error())
+				} else {
+					started = true
 				}
 				return
 			}
@@ -241,7 +289,9 @@ func (s *Server) autoResumeFire(runID, intentID string) {
 		autoResumeRefund(intentID)
 		log.Printf("自动续跑 %s 失败：%v", intentID, err)
 		s.noteAutoResume(runID, intentID, attempt, "启动失败："+err.Error())
+		return
 	}
+	started = true
 }
 
 // noteAutoResume writes the decision to the failed run's journal: the run is

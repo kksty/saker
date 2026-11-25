@@ -118,7 +118,6 @@ const (
 	// OperatorWait yields a turn to a persisted human condition, preserving
 	// the session and wait without running the model/evaluator while waiting.
 	CancelCauseOperatorWait = "operator_wait"
-	CancelCauseChildWait    = "child_wait"
 	// CancelCauseModelStall is the liveness stop: a weak model kept answering
 	// with empty assistant messages (each followed by another llm_request) and
 	// never called a tool or ended the turn. It is not a task verdict — the
@@ -242,22 +241,8 @@ type Intent struct {
 	// remote host has its own configuration); the run freezes the resolved
 	// profile and revision so a later edit cannot rewrite history.
 	Profile string `json:"profile,omitempty"`
-	// ParentID is the direction that delegated this one. It is empty for a
-	// direction created by the commander/human. Parent and child are always in
-	// the same project; the child has its own case, claim and run.
-	ParentID string `json:"parent_intent_id,omitempty"`
-	// CreatedBy is the participant id that created this direction (the
-	// commander for an operator-created intent); DelegatedByRun is the run that
-	// created it, for audit. Neither is a permission.
-	CreatedBy      string `json:"created_by_participant_id,omitempty"`
-	DelegatedByRun string `json:"delegated_by_run_id,omitempty"`
-	// IdempotencyKey dedupes repeated child creation by the same parent run.
-	IdempotencyKey string `json:"idempotency_key,omitempty"`
-	// CandidateGroup marks alternative next steps produced by one decision. At
-	// most one direction of a group runs at a time: dispatching one is the pick,
-	// and the others stay pending with the gate's reason. It is an explicit
-	// grouping, never derived from the premise set.
-	CandidateGroup string `json:"candidate_group,omitempty"`
+	// CreatedBy records the participant that registered the intent.
+	CreatedBy string `json:"created_by_participant_id,omitempty"`
 	// Wait is set while the direction is waiting for children. It is business
 	// state, not a sleep: the run ends, the slot is released, and a result event
 	// (or the deadline) moves the direction back to pending.
@@ -367,9 +352,6 @@ type Wait struct {
 	// Operator is an external condition, completed only by an operator receipt.
 	// It is mutually exclusive with Children and has no automatic deadline.
 	Operator *OperatorWait `json:"operator,omitempty"`
-	// Children are the child intent ids this wait covers. They must all name
-	// this intent as ParentID.
-	Children []string `json:"children"`
 	// Mode is all (every child settled) or any (the first settled child).
 	Mode string `json:"mode,omitempty"`
 	// Deadline is optional. A ticker wakes the parent with a timeout result
@@ -379,10 +361,6 @@ type Wait struct {
 	// RegisteredByRun is the run whose turn yielded. A later run's completion
 	// must not consume this wait.
 	RegisteredByRun string `json:"registered_by_run,omitempty"`
-	// Implicit is the "you still have active children" wait the control plane
-	// adds when a parent finishes without registering one, so a parent cannot
-	// orphan children by ending its turn.
-	Implicit bool `json:"implicit,omitempty"`
 	// WakePending means the condition is satisfied (or the deadline fired) but
 	// the parent has not been re-dispatched yet. The scheduler consumes it.
 	WakePending bool   `json:"wake_pending,omitempty"`
@@ -455,8 +433,7 @@ const (
 	WaitAll = "all"
 	WaitAny = "any"
 
-	WaitReasonChildren = "children_settled"
-	WaitReasonTimeout  = "timeout"
+	WaitReasonTimeout = "timeout"
 )
 
 // WaitResult is one settled child's outcome. Status is the child intent's
@@ -465,7 +442,6 @@ type WaitResult struct {
 	ActionID    string    `json:"action_id,omitempty"`
 	Result      string    `json:"result,omitempty"`
 	ResultRef   string    `json:"result_ref,omitempty"`
-	ChildID     string    `json:"child_id"`
 	Status      string    `json:"status"`
 	RunID       string    `json:"run_id,omitempty"`
 	StopReason  string    `json:"stop_reason,omitempty"`
@@ -726,7 +702,6 @@ type Message struct {
 	GoalInstruction     bool     `json:"goal_instruction,omitempty"`
 	DirectiveRecipients []string `json:"directive_recipients,omitempty"`
 	NoticeIntentID      string   `json:"notice_intent_id,omitempty"`
-	NoticeRunID         string   `json:"notice_run_id,omitempty"`
 	NoticeFactID        string   `json:"notice_fact_id,omitempty"`
 	NoticeVersion       uint64   `json:"notice_version,omitempty"`
 	Coalesced           int      `json:"coalesced,omitempty"`
@@ -971,7 +946,6 @@ type Handoff struct {
 	FactClaimVersions map[string]uint64 `json:"fact_claim_versions,omitempty"`
 	Evidence          []string          `json:"evidence,omitempty"`
 	Attempts          []string          `json:"attempts,omitempty"`
-	Children          []string          `json:"children,omitempty"`
 	Wait              *Wait             `json:"wait,omitempty"`
 	// MessageCursor is the highest message seq visible when the handoff was
 	// written, so the next session can read only newer peer messages.

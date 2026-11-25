@@ -32,7 +32,7 @@ func TestFailedLedgerWritesRestoreWholeCommittedState(t *testing.T) {
 					_, e := s.UpdateIntent(parent.ID, func(in *model.Intent) { in.Title = "phantom" })
 					return e
 				},
-				func() error { _, _, e := s.CreateChildIntent(parent.ID, model.Intent{Title: "phantom"}); return e },
+				func() error { _, e := s.CreateIntent(model.Intent{Title: "phantom"}); return e },
 				func() error { _, e := s.AddFact(model.Fact{IntentID: parent.ID, Title: "phantom"}); return e },
 				func() error {
 					_, _, e := s.AddMessage(model.Message{Text: "phantom", FromParticipantID: "a", ToParticipantID: "b"})
@@ -40,6 +40,10 @@ func TestFailedLedgerWritesRestoreWholeCommittedState(t *testing.T) {
 				},
 				func() error { _, _, e := s.StartIntentRun(parent.ID, "local", "", model.Run{}); return e },
 				func() error { _, e := s.BeginHandoff(parent.ID, 0); return e },
+				func() error {
+					_, _, e := s.CreateProposal(proposalFixture("pr_phantom"))
+					return e
+				},
 			}
 			for i, mutate := range mutations {
 				if err := mutate(); err == nil {
@@ -218,30 +222,5 @@ func TestOldRunSettlementCannotConsumeHandoffWait(t *testing.T) {
 				t.Fatal("snapshot alias")
 			}
 		})
-	}
-}
-
-func TestSatisfyWaitRechecksCurrentCondition(t *testing.T) {
-	s := open(t)
-	parent, _ := s.CreateIntent(model.Intent{Title: "parent"})
-	a, _, _ := s.CreateChildIntent(parent.ID, model.Intent{Title: "a"})
-	b, _, _ := s.CreateChildIntent(parent.ID, model.Intent{Title: "b"})
-	if _, err := s.RegisterWait(parent.ID, "", model.Wait{Children: []string{a.ID, b.ID}, Mode: model.WaitAny}); err != nil {
-		t.Fatal(err)
-	}
-	_, _ = s.UpdateIntent(a.ID, func(in *model.Intent) { in.Status = model.StatusDone })
-	state, _ := s.EvaluateWait(parent.ID)
-	if !state.Ready {
-		t.Fatal("old wait should be ready")
-	}
-	if _, err := s.RegisterWait(parent.ID, "", model.Wait{Children: []string{b.ID}, Mode: model.WaitAll}); err != nil {
-		t.Fatal(err)
-	}
-	if _, changed, err := s.SatisfyWait(parent.ID); err != nil || changed {
-		t.Fatalf("stale satisfaction=%v %v", changed, err)
-	}
-	in, _ := s.GetIntent(parent.ID)
-	if in.Wait.WakePending {
-		t.Fatal("old readiness satisfied the replacement condition")
 	}
 }

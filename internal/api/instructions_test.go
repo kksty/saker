@@ -59,7 +59,7 @@ func TestCommanderEveryTurnReceivesCurrentInstructionsIncludingRevocation(t *tes
 	if _, _, err := s.StartCommander(context.Background(), withBoardAnchor("round"), false); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(ex.req.Prompt, "persistent scope") || !strings.Contains(ex.req.Prompt, "当前没有有效持久指令") {
+	if strings.Contains(ex.req.Prompt, "persistent scope") {
 		t.Fatal("revoked instruction still injected")
 	}
 }
@@ -85,29 +85,17 @@ func TestInboxDrainsOldestMessagesBeforeNewTraffic(t *testing.T) {
 	}
 }
 
-func TestParticipantInstructionReadIsScopedAndWritesAreAbsent(t *testing.T) {
+func TestParticipantCannotReadCommanderSavedMessages(t *testing.T) {
 	f := newAgentFixture(t)
-	in, _, _ := f.p.Store.CreateInstruction(model.Instruction{CreatedBy: collab.OperatorID, Text: "target only", IntentID: f.target.ID, IdempotencyKey: "local"})
-	if rec := f.call(t, f.srcID, http.MethodGet, "/api/instructions", nil); rec.Code != 200 || strings.Contains(rec.Body.String(), in.ID) {
-		t.Fatal(rec.Body.String())
-	}
-	if rec := f.call(t, f.srcID, http.MethodGet, "/api/instructions/"+in.ID, nil); rec.Code != 404 {
-		t.Fatal(rec.Code)
-	}
-	if rec := f.call(t, f.tgtID, http.MethodGet, "/api/instructions/"+in.ID, nil); rec.Code != 200 {
-		t.Fatal(rec.Code)
-	}
-	if rec := f.call(t, f.tgtID, http.MethodPost, "/api/instructions", map[string]any{"text": "invent scope", "idempotency_key": "x"}); rec.Code != 405 && rec.Code != 404 {
-		t.Fatal(rec.Code)
+	for _, path := range []string{"/api/instructions", "/api/instructions/example"} {
+		if rec := f.call(t, f.srcID, http.MethodGet, path, nil); rec.Code != http.StatusNotFound {
+			t.Fatalf("saved message reader exposed to executor: %d", rec.Code)
+		}
 	}
 }
 
-func TestInstructionChangeIsInjectedWhenWorkerSessionContinues(t *testing.T) {
+func TestSavedMessageIsAbsentWhenWorkerSessionContinues(t *testing.T) {
 	s, ex, task := newSteerServer(t)
-	first := ex.requests()[0]
-	if !strings.Contains(first.Prompt, "当前没有有效持久指令") {
-		t.Fatal("first turn has no authoritative baseline")
-	}
 	_, _, err := s.Store.CreateInstruction(model.Instruction{CreatedBy: collab.OperatorID, IntentID: task.ID, Text: "只使用新增的只读约束", IdempotencyKey: "scope"})
 	if err != nil {
 		t.Fatal(err)
@@ -126,12 +114,12 @@ func TestInstructionChangeIsInjectedWhenWorkerSessionContinues(t *testing.T) {
 	}
 	waitFor(t, 5*time.Second, func() bool { return len(ex.requests()) >= 2 })
 	second := ex.requests()[1]
-	if !second.Resume || !strings.Contains(second.Prompt, "只使用新增的只读约束") {
+	if !second.Resume || strings.Contains(second.Prompt, "只使用新增的只读约束") {
 		t.Fatalf("continuation lost guidance: %s", second.Prompt)
 	}
 	cur, _ := s.Store.GetIntent(task.ID)
 	run, _ := s.Store.GetRun(cur.RunID)
-	if len(run.InstructionVersions) != 1 || len(run.InstructionAcks) != 0 {
+	if len(run.InstructionVersions) != 0 || len(run.InstructionAcks) != 0 {
 		t.Fatal("input versions lost or falsely acknowledged")
 	}
 }
@@ -140,7 +128,7 @@ func TestInstructionAckCannotNameAnotherParticipantsRun(t *testing.T) {
 	f := newAgentFixture(t)
 	other := f.makeLive(t)
 	rec := f.call(t, f.srcID, http.MethodPost, "/api/instructions/instruction_fixture/ack", map[string]any{"version": 1, "run_id": other.ID})
-	if rec.Code != http.StatusForbidden {
+	if rec.Code != http.StatusNotFound {
 		t.Fatalf("foreign acknowledgement=%d %s", rec.Code, rec.Body.String())
 	}
 }

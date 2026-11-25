@@ -109,7 +109,7 @@ test('the list view switches its wide columns with container queries', async () 
     )
   })
   const markup = html()
-  for (const cls of ['tw-graph-list-id', 'tw-graph-list-lineage', 'tw-graph-list-hint']) {
+  for (const cls of ['tw-graph-list-id', 'tw-graph-list-hint']) {
     assert.ok(markup.includes(cls), `list view emits ${cls}`)
   }
   // Scroll region: reserved gutter + contained scroll.
@@ -182,11 +182,15 @@ test('returning to the graph restores its cards for the same project', async (t)
       React.createElement(GraphFilters, {
         current: location.pathname.split('/')[2],
         q: '',
-        matchCount: null,
+        hits: [],
+        activeIndex: -1,
         counts: {},
         filters: defaultGraphFilters(),
         coldDim: false,
         onQueryChange: noop,
+        onActiveIndex: noop,
+        onOpenHit: noop,
+        onActivate: noop,
         onFiltersChange: noop,
         onFocusFact: noop,
         onToggleColdDim: noop,

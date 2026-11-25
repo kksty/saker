@@ -100,7 +100,7 @@ test('switching graph nodes retires the previous fact detail while the next requ
     ? {fact: fact(id), evidence: [{id: 'e_a', name: 'proof-for-a', uri: 'a.txt'}], reviews: []}
     : new Promise(() => {})
   const props = {
-    facts: [], runs: [], onSelectFact() {}, onClose() {}, onChanged() {}, childRefresh: 0, onChildIntent() {},
+    facts: [], runs: [], onSelectFact() {}, onClose() {}, onChanged() {},
     // The panel reads its width from the graph page's shared dock size.
     dock: {width: 360, min: 300, max: 760, resizing: false, onResizeStart() {}, onResizeKey() {}},
   }
@@ -116,7 +116,7 @@ test('the node panel renders at the shared dock width and exposes its resize han
   api.fact = async () => ({fact, evidence: [], reviews: []})
   const dock = {width: 520, min: 300, max: 760, resizing: false, onResizeStart() {}, onResizeKey() {}}
   const props = {
-    facts: [], runs: [], dock, onSelectFact() {}, onClose() {}, onChanged() {}, childRefresh: 0, onChildIntent() {},
+    facts: [], runs: [], dock, onSelectFact() {}, onClose() {}, onChanged() {},
   }
   const node = {id: 'f:a', type: 'fact', label: 'a', meta: {fact}}
   await act(async () => { renderer = create(React.createElement(NodePanel, {...props, node})) })

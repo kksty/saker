@@ -15,8 +15,6 @@ const NoticeSenderID = "ledger"
 // pointer (fact id, record version, change operation), never the fact text.
 const NoticeKindFact = "fact_notice"
 
-const NoticeKindTask = "task_notice"
-
 // RouteCheckpoint is transport bookkeeping, independent of graph content and
 // model read receipts. Cursor only advances after queue admission or an explicit
 // determination that this recorded change is unrelated to the recipient.

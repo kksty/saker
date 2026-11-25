@@ -22,12 +22,19 @@ func TestSessionWriteAllowlistIsDefaultDeny(t *testing.T) {
 		{"POST", "/p/p1/api/messages/m_1/retract", true},
 		{"POST", "/p/p1/api/operator-requests", true},
 		{"PUT", "/p/p1/api/operator-requests/or_1", true},
+		// The commander decides proposals on the project face; filing and
+		// withdrawing one stay participant-only (/agent), so those are absent here.
+		{"POST", "/p/p1/api/proposals/pr_1/approve", true},
+		{"POST", "/p/p1/api/proposals/pr_1/reject", true},
+		{"POST", "/p/p1/api/proposals/pr_1/dispatch", true},
 		{"PUT", "/p/p1/api/state", true},
 		{"POST", "/p/p1/api/project/standby", true},
 		// Operator-only writes are not named, so they stay invisible.
 		{"PUT", "/p/p1/api/documents/scope", false},
 		{"POST", "/p/p1/api/goals/g_1/met", false},
 		{"POST", "/p/p1/api/project/pause", false},
+		{"POST", "/p/p1/api/proposals", false},
+		{"POST", "/p/p1/api/proposals/pr_1/withdraw", false},
 		{"PUT", "/api/settings", false},
 		{"POST", "/p/p1/api/instructions", false},
 		{"PUT", "/p/p1/api/instructions/instruction_1", false},

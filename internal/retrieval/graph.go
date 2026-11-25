@@ -148,9 +148,6 @@ func Graph(s *store.Store, q GraphQuery) (GraphPage, error) {
 		for _, id := range in.PinnedFactIDs {
 			edges = append(edges, Edge{Source: "fact:" + id, Target: "intent:" + in.ID, Kind: "pin"})
 		}
-		if in.ParentID != "" {
-			edges = append(edges, Edge{Source: "intent:" + in.ParentID, Target: "intent:" + in.ID, Kind: "delegates"})
-		}
 	}
 	for _, g := range db.Goals {
 		nodes["goal:"+g.ID] = g
@@ -402,11 +399,6 @@ func deriveGraphDepths(db store.DB) graphDepths {
 			}
 			if src+1 > depth {
 				depth = src + 1
-			}
-		}
-		if in.ParentID != "" {
-			if parent, ok := out.step[in.ParentID]; ok && parent+1 > depth {
-				depth = parent + 1
 			}
 		}
 		out.step[in.ID] = depth

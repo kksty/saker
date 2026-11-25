@@ -11,7 +11,7 @@ import {
   type MoveCoalescer,
 } from '@/graph/sim'
 import { PILL_MAX_LINES, PILL_TEXT_W, fitText, halfExtentX, paint, wrapText, type Camera } from '@/graph/render'
-import { layoutBounds, openCamera, parseCamera, type NodeExtent } from '@/graph/camera'
+import { layoutBounds, openCamera, parseCamera, focusCamera, type NodeExtent } from '@/graph/camera'
 import { focusFadeMix, initialFocusFade } from '@/graph/focus-fade'
 import { GraphIndex, edgeHitTest, pickAt as pickLinear, type GraphPick } from '@/graph/hit'
 import {
@@ -44,6 +44,12 @@ export interface GraphControls {
   zoom: (factor: number) => void
   /** Centre the camera on a graph-space point (minimap click/drag). */
   centerOn: (x: number, y: number) => void
+  /**
+   * Frame one node for a search hit: centre it at a readable zoom, inside the
+   * strip the open search card and the right dock leave visible. A no-op when
+   * the node is not in the current simulation.
+   */
+  focusNode: (id: string, options?: { rightInset?: number }) => void
   /** Set the zoom around the current viewport centre (minimap/toolbar). */
   zoomTo: (k: number) => void
 }
@@ -74,12 +80,13 @@ interface Props {
   model: GraphModel
   selected: string | null
   matches: Set<string> | null
+  /** The hit the search list is on: painted with a stronger, doubled ring. */
+  activeMatch?: string | null
   /** Show every intent label, not just the focused/running ones. */
   showLabels: boolean
   /** Force map or left-to-right penetration layers. */
   layout: LayoutMode
   /** Drawing-only: draw the derived 发起边 provenance lines. */
-  showOriginLinks?: boolean
   /** Drawing-only: draw the native-subagent satellites on step pills. */
   showHelpers?: boolean
   /**
@@ -151,10 +158,6 @@ const NO_DRAG: DragState = { mode: null, sx: 0, sy: 0, cx: 0, cy: 0, moved: fals
 
 /** The edge list one frame may draw/hit-test. The 发起线 switch is a drawing
  *  filter over a derived view, never an edit of the ledger model. */
-function visibleEdges(edges: GraphEdge[], showOrigin: boolean): GraphEdge[] {
-  return showOrigin ? edges : edges.filter((e) => e.kind !== 'origin')
-}
-
 /**
  * One canvas, one camera: the engagement graph.
  *
@@ -165,7 +168,7 @@ function visibleEdges(edges: GraphEdge[], showOrigin: boolean): GraphEdge[] {
  * so the frame loop always paints the current selection.
  */
 export const GraphCanvas = forwardRef<GraphControls, Props>(function GraphCanvas(
-  { model, selected, matches, showLabels, layout, cameraKey, ready = true, timeGate, hoverPreview = true, onSelect, showOriginLinks = true, showHelpers = true, rightInset = 0, leftInset = 0, bottomInset = 0, coldDim = false },
+  { model, selected, matches, activeMatch = null, showLabels, layout, cameraKey, ready = true, timeGate, hoverPreview = true, onSelect, showHelpers = true, rightInset = 0, leftInset = 0, bottomInset = 0, coldDim = false },
   ref,
 ) {
   const wrapRef = useRef<HTMLDivElement | null>(null)
@@ -248,16 +251,13 @@ export const GraphCanvas = forwardRef<GraphControls, Props>(function GraphCanvas
   // from the deterministic layout, so a drop has to be re-applied to each new
   // sim. Only 重新布局 (or a layout switch) clears it.
   const manualRef = useRef(new Map<string, { x: number; y: number }>())
-  const stateRef = useRef({ selected, matches, showLabels, showHelpers, timeGate, hoverPreview, rightInset, leftInset, bottomInset, coldDim })
-  stateRef.current = { selected, matches, showLabels, showHelpers, timeGate, hoverPreview, rightInset, leftInset, bottomInset, coldDim }
+  const stateRef = useRef({ selected, matches, activeMatch, showLabels, showHelpers, timeGate, hoverPreview, rightInset, leftInset, bottomInset, coldDim })
+  stateRef.current = { selected, matches, activeMatch, showLabels, showHelpers, timeGate, hoverPreview, rightInset, leftInset, bottomInset, coldDim }
   // The 发起边 drawing switch filters sim.edges (so paint AND hit-testing agree),
   // but the unfiltered model is the source of truth when it is toggled back on.
   const modelRef = useRef(model)
   modelRef.current = model
-  const originVisibleRef = useRef(showOriginLinks)
-  originVisibleRef.current = showOriginLinks
   // The flag the current sim was built/filtered with; toggling re-filters once.
-  const originAppliedRef = useRef(showOriginLinks)
 
   // Multi-touch pan/zoom: live touches and the pinch anchor (world point under
   // the midpoint of the two fingers when the gesture started).
@@ -330,8 +330,7 @@ export const GraphCanvas = forwardRef<GraphControls, Props>(function GraphCanvas
       for (const n of prevNodes) kept.set(n.id, { x: n.x, y: n.y })
     }
     const sim = new ForceSim(model, { mode: layout })
-    sim.edges = visibleEdges(model.edges, originVisibleRef.current)
-    originAppliedRef.current = originVisibleRef.current
+    sim.edges = model.edges
     if (kept.size > 0) {
       for (const n of sim.nodes) {
         const old = kept.get(n.id)
@@ -573,17 +572,7 @@ export const GraphCanvas = forwardRef<GraphControls, Props>(function GraphCanvas
 
   // A switch the operator flips: the sim's edge list feeds paint, hit-testing and
   // the (already origin-free) layout, so filtering it once is enough.
-  useEffect(() => {
-    if (originAppliedRef.current === showOriginLinks) return
-    originAppliedRef.current = showOriginLinks
-    const sim = simRef.current
-    if (sim) {
-      sim.edges = visibleEdges(modelRef.current.edges, showOriginLinks)
-      invalidateIndex()
-    }
-    paintOnce()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showOriginLinks])
+
 
   // Props that change what is drawn (but not the layout) repaint directly; hover
   // is handled internally and does not go through React at all.
@@ -593,7 +582,7 @@ export const GraphCanvas = forwardRef<GraphControls, Props>(function GraphCanvas
     // on a settled canvas.
     if (focusFadeUntilRef.current > performance.now()) start()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, matches, showLabels, showHelpers, timeGate, hoverPreview, rightInset, leftInset, coldDim])
+  }, [selected, matches, activeMatch, showLabels, showHelpers, timeGate, hoverPreview, rightInset, leftInset, coldDim])
 
   /** One coalesced size measurement per frame (see the resize effect). */
   function scheduleSizeSync() {
@@ -838,6 +827,7 @@ export const GraphCanvas = forwardRef<GraphControls, Props>(function GraphCanvas
       selected: state.selected,
       hovered: hoverRef.current,
       matches: state.matches,
+      activeMatch: state.activeMatch,
       focus,
       near: display?.near ?? null,
       chainEdges: display?.edges ?? null,
@@ -1195,6 +1185,26 @@ export const GraphCanvas = forwardRef<GraphControls, Props>(function GraphCanvas
       const cam = camRef.current
       cam.x = w / 2 - x * cam.k
       cam.y = h / 2 - y * cam.k
+      paintOnce()
+      saveCamera()
+      requestPublish()
+    },
+    // Search hit: frame the node in the band the floating cards leave visible.
+    // A hit found while zoomed far out must not stay a speck, so the zoom is at
+    // least 1; an already closer view is kept (the operator's zoom wins).
+    focusNode: (id: string, options: { rightInset?: number } = {}) => {
+      const sim = simRef.current
+      const { w, h } = sizeRef.current
+      if (!sim || w === 0 || h === 0) return
+      const node = indexOf(sim).get(id)
+      if (!node) return
+      const cam = focusCamera(node, w, h, camRef.current.k, {
+        left: stateRef.current.leftInset,
+        right: options.rightInset ?? stateRef.current.rightInset,
+        bottom: stateRef.current.bottomInset,
+      })
+      if (!cam) return
+      camRef.current = cam
       paintOnce()
       saveCamera()
       requestPublish()

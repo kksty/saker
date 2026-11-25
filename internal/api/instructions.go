@@ -17,9 +17,12 @@ import (
 )
 
 func instructionSection(rows []model.Instruction, runID string) string {
+	if len(rows) == 0 {
+		return ""
+	}
 	var b strings.Builder
 	b.WriteString(executor.InstructionSection(rows))
-	fmt.Fprintf(&b, "当前 run_id=%s。处理后可 POST /api/instructions/{id}/ack，携带 version 和 run_id；确认表示已处理这版指令，不代表动作已执行或结论成立。\n", runID)
+	fmt.Fprintf(&b, "当前 run_id=%s。阅读后可 POST /api/instructions/{id}/ack，携带 version 和 run_id；确认表示已读这版消息，不代表动作已执行或结论成立。\n", runID)
 	return b.String()
 }
 

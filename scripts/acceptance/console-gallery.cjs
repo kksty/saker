@@ -1,4 +1,5 @@
-// Reproducible README screenshots from synthetic responses and the real bundle.
+// Reproducible console screenshots from synthetic responses and the real bundle.
+// Nothing is committed: shots land in .build/ui-qa/.
 // No console, harness, saved project, model API or credential is accessed.
 const fs = require('node:fs');
 const path = require('node:path');
@@ -69,7 +70,7 @@ const twoGoalsArg = argv.includes('--two-goals');
 const pauseArg = argValue('pause');
 const appendGoalArg = argValue('append-goal');
 const PAUSE_COPY = {
-  restart_pause: '平台重启后项目默认暂停',
+  restart_pause: '控制面重启：对账后自动恢复；若仍暂停，确认现场后点「继续项目」',
   unrecorded: '暂停原因未记录：确认现场后点「继续项目」',
   manual_pause: '操作员暂停',
 };
@@ -85,7 +86,7 @@ if (appendResumedArg) {
 }
 // The dialog names the machine code, not the long status sentence.
 const PAUSE_LABEL = {
-  restart_pause: '平台重启后默认暂停',
+  restart_pause: '平台重启后自动恢复未完成',
   unrecorded: '暂停原因未记录',
   manual_pause: '人工暂停',
 };
@@ -696,9 +697,9 @@ function api(url) {
         board.runs = { ...board.runs, total: 341, failed: 9, running: 0 };
         board.intents = { ...board.intents, total: 57, pending: 7, held: 1, parked: 6, running: 0, waiting: 0 };
         board.goals = { ...board.goals, total: 2, met: 1 };
-        board.decider = { ...board.decider, paused_reason: '重启后项目默认暂停' };
+        board.decider = { ...board.decider, paused_reason: '控制面重启后自动恢复未完成：确认现场后继续' };
         board.project_actions = { ...board.project_actions,
-          state: { ...board.project_actions.state, reason: '重启后项目默认暂停' },
+          state: { ...board.project_actions.state, reason: '控制面重启后自动恢复未完成：确认现场后继续' },
           facts: { ...board.project_actions.facts, goals_total: 2, goals_met: 1, pending_directions: 7 } };
       }
       if (pauseArg) {
@@ -781,7 +782,7 @@ function api(url) {
               note: appendResumedArg
                 // Quoted from internal/api/goal_continue.go (restart resume note) so
                 // the capture shows the sentence the server really returns.
-                ? '项目此前因平台重启而暂停（不是谁主动停的），已按本次显式操作追加目标并恢复派发；旧目标的完成收据保持不变。'
+                ? '项目此前因控制面重启而暂停、自动恢复未完成，已按本次显式操作追加目标并恢复派发；旧目标的完成收据保持不变。'
                 : '项目仍处于暂停：本次没有改动暂停状态，旧目标的完成收据保持不变。',
             }));
             await call('Fetch.fulfillRequest', { requestId, responseCode: 200,

@@ -82,10 +82,8 @@ export interface GraphNode {
   /** The resolved direction that launched this one (executor origin only). When
    *  the creator intent is not in this snapshot the edge is skipped and this is
    *  absent — the console never invents an origin. */
-  originIntent?: { id: string; title: string }
   /** Hops along the origin (发起) lineage, not the spawn tree. 0 = a commander/
    *  operator root; undefined = the chain cannot be resolved from this snapshot. */
-  lineageDepth?: number
   /** Native subagent aggregate of this direction's latest executor run that
    *  actually called one. A run-internal helper, not a ledger run: no separate
    *  run/usage/fact is ever derived from it. Absent = no calls recorded. */
@@ -140,7 +138,8 @@ export function originLabel(origin: IntentOrigin | undefined): string {
 }
 
 /**
- * What an edge means, not merely where it goes:
+ * What an edge means, not merely where it goes. These are the relation kinds the
+ * ledger actually emits (internal/retrieval/graph.go + derived brief/host edges):
  *   intent    — a step's produced fact / ghost ring (status colour carries it)
  *   premise   — a hard prerequisite (from_fact_ids): the step cannot be read
  *               without this fact; a missing/rejected premise blocks dispatch
@@ -149,11 +148,10 @@ export function originLabel(origin: IntentOrigin | undefined): string {
  *   pin       — an explicitly pinned read (pinned_fact_ids); still context, but
  *               the operator asked to see it first
  *   supports  — a fact that backs an achieved goal's evidence
- *   spawn     — parent direction delegated the child direction
- *   origin    — an executor launched a parentless peer direction (平级发起);
- *               derived from created_by/delegated_by_run, never a ledger row and
- *               never part of layout/depth/degree (see buildGraph)
- *   brief/host — project boundary and service-on-host grouping
+ *   brief/host — project boundary and service-on-host grouping (derived here)
+ *
+ * 发起者 is a shape on the node, not a relation: there is no spawn/origin edge
+ * to draw, and the legend must not promise one.
  */
 export type EdgeKind =
   | 'intent'
@@ -164,8 +162,6 @@ export type EdgeKind =
   | 'brief'
   | 'host'
   | 'goal'
-  | 'spawn'
-  | 'origin'
 
 /**
  * The Chinese name of a node's kind for text surfaces (node panel, list rows).
@@ -203,10 +199,6 @@ export function edgeKindLabel(kind: EdgeKind): string {
       return '固定'
     case 'supports':
       return '支持目标'
-    case 'spawn':
-      return '委托（等待）'
-    case 'origin':
-      return '发起'
     case 'brief':
       return '项目范围'
     case 'host':
@@ -223,10 +215,9 @@ export interface GraphEdge {
   source: string
   target: string
   kind: EdgeKind
-  /** Present on intent/spawn edges: the work this edge stands for. */
+  /** Present on intent edges: the work this edge stands for. */
   intent?: Intent
-  /** On spawn edges: the parent intent that created the child (血缘分叉). */
-  parentIntent?: string
+  /** Optional display label; ledger graph edges do not set one today. */
   label?: string
   status?: string
   /** The direction behind this edge was explicitly stopped (intent.hold). */
@@ -447,57 +438,11 @@ export function buildGraph(
       const srcDepth = s.startsWith('f:') ? factDepth.get(s.slice(2)) ?? 1 : 0
       depth = Math.max(depth, srcDepth + 1)
     }
-    const parent = it.parent_intent_id ? intentByID.get(it.parent_intent_id) : undefined
-    if (parent) depth = Math.max(depth, (stepDepth.get(parent.id) ?? 0) + 1)
     stepDepth.set(it.id, depth)
     for (const f of factsOutByIntent.get(it.id) ?? []) {
       if (!factDepth.has(f.id)) factDepth.set(f.id, depth + 1)
     }
   }
-
-  // ---- 发起者 provenance (second channel, derived) ----
-  // A parentless direction whose created_by names another direction's
-  // participant ("pt_<intentID>") was launched by that executor as a peer (平级
-  // 发布), not delegated as a child. The ledger does not carry an edge for it, so
-  // the console derives one from its own fields: created_by first, then the run
-  // that created the direction (delegated_by_run_id → runs → intent_id) as a
-  // fallback. Unresolvable creators are skipped: a guessed line would claim
-  // provenance the ledger does not prove.
-  const originOf = new Map<string, Intent>()
-  for (const it of intents) {
-    if (it.parent_intent_id) continue // delegated children already hang off the parent
-    if (intentOrigin(it) !== 'executor') continue
-    const by = (it.created_by_participant_id ?? '').trim()
-    // Only the pt_ contract names an intent participant; anything else is unknown.
-    const direct = by.startsWith('pt_') && by.length > 3 ? intentByID.get(by.slice(3)) : undefined
-    const run = it.delegated_by_run_id ? runByID.get(it.delegated_by_run_id) : undefined
-    const viaRun = run?.intent_id ? intentByID.get(run.intent_id) : undefined
-    const creator = direct && direct.id !== it.id ? direct : viaRun && viaRun.id !== it.id ? viaRun : undefined
-    if (creator) originOf.set(it.id, creator)
-  }
-  // Origin lineage hops (NOT the spawn tree and NOT the structural depth): a
-  // commander/operator direction is a root (0), a resolved peer-launch is one
-  // hop below its initiator. A delegated child or an unresolved row stays
-  // undefined — the column shows "—" rather than a number the snapshot cannot
-  // support.
-  const lineageDepth = new Map<string, number>()
-  const lineageWalk = new Set<string>()
-  const lineageOf = (it: Intent): number | undefined => {
-    if (lineageDepth.has(it.id)) return lineageDepth.get(it.id)
-    if (lineageWalk.has(it.id)) return undefined // corrupt cycle: never invent depth
-    lineageWalk.add(it.id)
-    const creator = originOf.get(it.id)
-    let depth: number | undefined
-    if (creator) {
-      const up = lineageOf(creator)
-      depth = up === undefined ? undefined : up + 1
-    } else if (intentOrigin(it) === 'commander' || intentOrigin(it) === 'operator') {
-      depth = 0
-    }
-    if (depth !== undefined) lineageDepth.set(it.id, depth)
-    return depth
-  }
-  for (const it of ordered) lineageOf(it)
 
   // ---- nodes ----
 
@@ -567,10 +512,6 @@ export function buildGraph(
       warnings: warningsByIntent.get(it.id),
       model: ranModel || defaultModel,
       origin: intentOrigin(it),
-      ...(originOf.has(it.id)
-        ? { originIntent: { id: originOf.get(it.id)!.id, title: originOf.get(it.id)!.title } }
-        : {}),
-      ...(lineageDepth.has(it.id) ? { lineageDepth: lineageDepth.get(it.id)! } : {}),
       ...(helpersByIntent.has(it.id) ? { helpers: helpersByIntent.get(it.id)! } : {}),
       meta: { intent: it },
     }
@@ -596,8 +537,6 @@ export function buildGraph(
         warnings: warningsByIntent.get(it.id),
         model: step.model,
         origin: step.origin,
-        ...(step.originIntent ? { originIntent: step.originIntent } : {}),
-        ...(step.lineageDepth !== undefined ? { lineageDepth: step.lineageDepth } : {}),
         ...(step.helpers ? { helpers: step.helpers } : {}),
         meta: { intent: it },
       })
@@ -637,6 +576,24 @@ export function buildGraph(
   // example an open goal, which is deliberately not a map node). Drawing those
   // as "未载入引用" would invent an orphan ghost for a row the map already has,
   // so loaded rows are never turned into boundary leaves.
+  //
+  // The four states are the backend's graph_page.go contract: not_loaded,
+  // missing, rejected, withdrawn. The short label is what the node pill and the
+  // find list read; the hover inspector carries the full sentence.
+  const boundaryWhy = (state: string | undefined): string => {
+    switch (state) {
+      case 'missing':
+        return '引用缺失'
+      case 'rejected':
+        return '已否定'
+      case 'withdrawn':
+        return '已撤回'
+      case 'not_loaded':
+        return '未载入'
+      default:
+        return '展开'
+    }
+  }
   const loadedRefIDs = new Set<string>([
     ...facts.map(f => `fact:${f.id}`),
     ...intents.map(it => `intent:${it.id}`),
@@ -654,7 +611,7 @@ export function buildGraph(
       const state = boundaryState.get(id)
       // "The ledger cannot show this row here" is a different fact from "the
       // ledger says this id is gone". Only the first is an expandable leaf.
-      const why = state === 'missing' ? '引用缺失' : state === 'rejected' ? '已否定' : state === 'not_loaded' ? '未载入' : '展开'
+      const why = boundaryWhy(state)
       addNode({id:nodeID(id),type:'boundary',label:`${id} · ${why}`,boundary:id,boundaryState:state,x:0,y:0,vx:0,vy:0,degree:0,w:9,h:9,depth:1})
     }
   }
@@ -677,7 +634,6 @@ export function buildGraph(
     kind: EdgeKind,
     intent?: Intent,
     label?: string,
-    parentIntent?: string,
     /** False for derived provenance lines: they are drawn/hit-tested but must
      *  not change a node's degree (degree is a layout input). */
     countDegree = true,
@@ -694,7 +650,6 @@ export function buildGraph(
       target,
       kind,
       intent,
-      parentIntent,
       label,
       status: intent?.status,
       stopped: intentStopped(intent?.hold),
@@ -723,8 +678,6 @@ export function buildGraph(
   // unknown kind stays the neutral intent edge it used to be.
   const sourceKind = (kind: string): EdgeKind => {
     switch (kind) {
-      case 'delegates':
-        return 'spawn'
       case 'premise':
         return 'premise'
       case 'reference':
@@ -751,34 +704,9 @@ export function buildGraph(
     if (!linkedEdges.has(`${source}/${target}/${kind}`)) {
       // An edge selection opens the direction panel: carry the intent for any
       // edge whose endpoint is a step. A supports edge (fact→goal) has none.
-      link(source, target, kind, intentAt(e.target) ?? intentAt(e.source), undefined, kind === 'spawn' ? intentAt(e.source)?.id : undefined)
+      link(source, target, kind, intentAt(e.target) ?? intentAt(e.source))
       linkedEdges.add(`${source}/${target}/${kind}`)
     }
-  }
-
-  // Spawn lineage: a delegated child hangs off its parent's output anchor. The
-  // child step is one layer deeper — that is the visible "branch" of the tree.
-  const anchorOf = (it: Intent): string => {
-    const out = factsOutByIntent.get(it.id) ?? []
-    if (out.length > 0) return `f:${out[0].id}`
-    if (byId.has(ghostID(it.id))) return ghostID(it.id)
-    return stepID(it.id)
-  }
-  for (const it of intents) {
-    const parentID = it.parent_intent_id
-    if (!parentID) continue
-    const parent = intentByID.get(parentID)
-    if (!parent) continue
-    link(anchorOf(parent), stepID(it.id), 'spawn', it, edgeKindLabel('spawn'), parentID)
-  }
-
-  // 发起边: executor-launched peer directions point back at their initiator.
-  // Drawn as a low-key dashed line with an open arrow (render.ts) and excluded
-  // from degree/layout/depth: it is provenance, not a hop in the work chain.
-  for (const it of intents) {
-    const creator = originOf.get(it.id)
-    if (!creator) continue
-    link(stepID(creator.id), stepID(it.id), 'origin', it, edgeKindLabel('origin'), creator.id, false)
   }
 
   // service "10.0.0.5:8080" sits on host "10.0.0.5".
