@@ -237,10 +237,12 @@ function Exchange({title, start, headers = [], body = ''}: {title: string; start
   const preview = bodyPreview(body)
   return (
     <Panel title={title} bodyClassName="space-y-2">
-      <pre className="tw-inset tw-break overflow-auto overscroll-contain whitespace-pre-wrap rounded-lg p-3 font-mono text-[11px] leading-5 text-ink-2 [scrollbar-width:thin]">
+      {/* 正文块自己滚（max-h + overflow-auto），但不拦截滚动链：指针停在报文上时，
+          块内到底后滚轮必须继续带动外层详情面板，否则整页看起来「滑不动」。 */}
+      <pre className="tw-inset tw-break overflow-auto whitespace-pre-wrap rounded-lg p-3 font-mono text-[11px] leading-5 text-ink-2 [scrollbar-width:thin]">
         {start}{'\n'}{headers.map(h => `${h.name}: ${h.value}`).join('\n')}
       </pre>
-      <pre className="tw-inset tw-break max-h-[420px] overflow-auto overscroll-contain whitespace-pre-wrap rounded-lg p-3 font-mono text-[11px] leading-5 text-ink-2 [scrollbar-width:thin]">
+      <pre className="tw-inset tw-break max-h-[420px] overflow-auto whitespace-pre-wrap rounded-lg p-3 font-mono text-[11px] leading-5 text-ink-2 [scrollbar-width:thin]">
         {preview.text || '（空正文）'}
       </pre>
       <p className="tw-nums text-[11px] leading-4 text-ink-3">

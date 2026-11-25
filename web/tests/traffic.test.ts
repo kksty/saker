@@ -102,6 +102,41 @@ after(async () => {
   await server.close()
 })
 
+test('the packet block scrolls itself but does not swallow the wheel', async () => {
+  const body = Buffer.from(
+    Array.from({ length: 80 }, (_, i) => `"row_${i + 1}": "keep scrolling past this line"`).join('\n'),
+  ).toString('base64')
+  const record = {
+    ref: 'r_1/f_9', run_id: 'r_1', intent_id: 'in_1', event_id: 'ev_9', flow_id: 'f_9',
+    method: 'GET', url: 'https://target.test/', status: 200, at: '2026-11-15T00:00:00Z',
+    complete: true, request_bytes: 10, response_bytes: 20,
+  }
+  api.httpFlows = async () => ({ flows: [record], total: 1 })
+  api.httpFlow = async () => ({
+    record,
+    flow: {
+      request: { method: 'GET', url: 'https://target.test/', protocol: 'HTTP/1.1', headers: [], body: '' },
+      response: { status_code: 200, reason_phrase: 'OK', headers: [], body },
+    },
+  })
+  await act(async () => { renderer = create(React.createElement(Traffic)) })
+  await act(async () => { for (const fn of timers.values()) fn() })
+  const pres = renderer!.root.findAll((node: any) => node.type === 'pre')
+  assert.equal(pres.length, 4, 'request and response each render a start block and a body block')
+  for (const pre of pres) {
+    const cls = String(pre.props.className)
+    assert.match(cls, /overflow-auto/, 'the packet block keeps its own scrolling')
+    // overscroll-contain stops the wheel at the block's end: the pointer sits on
+    // the body most of the time, so the whole panel read as unscrollable.
+    assert.doesNotMatch(cls, /overscroll-contain/, 'the packet block must not cut the scroll chain')
+  }
+  assert.equal(
+    pres.filter((pre: any) => String(pre.props.className).includes('max-h-[420px]')).length,
+    2,
+    'both bodies keep their own height cap',
+  )
+})
+
 test('the traffic detail keeps preview labels and ignores the retired quota field', async () => {
   const record = {
     ref: 'r_1/f_1', run_id: 'r_1', intent_id: 'in_1', event_id: 'ev_1', flow_id: 'f_1',
