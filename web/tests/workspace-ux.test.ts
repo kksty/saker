@@ -8,7 +8,7 @@ import { createTestServer } from './helpers/vite.ts'
 let server: Awaited<ReturnType<typeof createTestServer>>
 let renderer: ReactTestRenderer | undefined
 let useSessionState: any, usePoll: any, Reports: any, SettingsPage: any, Workers: any, ConfirmProvider: any, api: any, ApiError: any
-let EvidencePreview: any
+let EvidencePreview: any, Playbooks: any
 const storage = new Map<string, string>()
 const timers = new Map<number, () => void>()
 let timerID = 0
@@ -42,6 +42,7 @@ before(async () => {
   useSessionState = (await server.ssrLoadModule('/src/lib/session-state.ts')).useSessionState
   usePoll = (await server.ssrLoadModule('/src/lib/hooks.ts')).usePoll
   Reports = (await server.ssrLoadModule('/src/views/Reports.tsx')).Reports
+  Playbooks = (await server.ssrLoadModule('/src/views/Playbooks.tsx')).Playbooks
   SettingsPage = (await server.ssrLoadModule('/src/views/Settings.tsx')).SettingsPage
   Workers = (await server.ssrLoadModule('/src/views/Workers.tsx')).Workers
   EvidencePreview = (await server.ssrLoadModule('/src/components/EvidencePreview.tsx')).EvidencePreview
@@ -388,4 +389,32 @@ test('report generation can queue unverified candidates when reviews are disable
   await act(async () => { await generate.props.onClick() })
   assert.equal(posts, 1)
   assert.match(JSON.stringify(renderer!.toJSON()), /已排队/)
+})
+
+// Candidates from an executor can already have an execution record. The detail
+// must explain the source requirements without attributing them to the commander.
+test('battlefield knowledge explains each candidate by its recorded origin', async () => {
+  const candidate = {
+    status: 'candidate', when: '示例条件', outcome: 'success', tags: [],
+    created_at: '2026-11-01T00:00:00Z', updated_at: '2026-11-01T00:00:00Z',
+  }
+  api.playbooksPage = async () => ({
+    playbooks: [
+      { ...candidate, id: 'pb_a', title: '执行者样例', origin: 'executor', from_fact_ids: ['f_a'] },
+      { ...candidate, id: 'pb_b', title: '指挥官样例', origin: 'commander' },
+    ],
+    counts: { candidate: 2 }, total: 2,
+  })
+  await act(async () => {
+    renderer = create(React.createElement(ConfirmProvider, null, React.createElement(Playbooks)))
+  })
+  const body = () => JSON.stringify(renderer!.toJSON())
+  assert.match(body(), /执行者已声明这条知识/)
+  assert.match(body(), /缺少原始证据登记/)
+  const commander = renderer!.root.findAllByType('button').find(node =>
+    node.findAllByType('span').some(span => span.children.includes('指挥官样例')))
+  assert.ok(commander)
+  await act(async () => { commander.props.onClick() })
+  assert.match(body(), /指挥官提名，目前显示为候选/)
+  assert.doesNotMatch(body(), /执行者已声明这条知识/)
 })

@@ -21,16 +21,14 @@ import { fmtTime } from '@/lib/format'
 import { useDebounced, useLoad } from '@/lib/hooks'
 import type { Playbook, PlaybookStatus } from '@/lib/types'
 
-// The project's knowledge table, not its findings (D70). Two writers, two
-// tiers: the executor that ran the tactic writes a confirmed entry, the
-// commander can only nominate a candidate; recall in the dispatch brief marks
-// the difference, and this page is where a human sees and curates it.
+// The API derives the displayed status from the entry and its source facts.
+// Origin records who wrote the entry and remains visible after a downgrade.
 const STATUS: Record<
   string,
   { label: string; variant: 'success' | 'warning' | 'muted'; hint: string }
 > = {
-  confirmed: { label: '已确认', variant: 'success', hint: '执行者在跑过的那一轮里声明' },
-  candidate: { label: '候选', variant: 'warning', hint: '指挥官提名，还没有任何一轮执行确认过' },
+  confirmed: { label: '已确认', variant: 'success', hint: '执行者声明，来源事实均已核验并登记了原始证据' },
+  candidate: { label: '候选', variant: 'warning', hint: '指挥官提名，或执行者声明的来源事实未满足确认条件' },
   retired: { label: '已退役', variant: 'muted', hint: '不再进入派发简报；文本保留' },
 }
 
@@ -474,8 +472,9 @@ export function Playbooks() {
 
               {current.status === 'candidate' && (
                 <Callout tone="warning" className="mt-3">
-                  候选只是指挥官从既有事实里看出的模式，没有执行证据。它会在派发简报里标“候选·未验证”，
-                  用前先按现场核对。
+                  {current.origin === 'executor'
+                    ? '执行者已声明这条知识。来源事实缺失、未核验、已失效，或缺少原始证据登记时，条目显示为候选。'
+                    : '这条知识由指挥官提名，目前显示为候选。'}
                 </Callout>
               )}
               {current.outcome === 'dead_end' && (
