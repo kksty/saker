@@ -656,7 +656,7 @@ function ChatMessage({
               </>
             )}
             {message.notice_intent_id && (
-              <span title="子意图结果通知：交给承接者判断，不改写原意图的必要前提">
+              <span title="下游意图结果通知：交给承接者判断，不改写原意图的必要前提">
                 来源意图 <span className="font-mono">{message.notice_intent_id}</span>
                 {message.notice_run_id && <> · 运行 <span className="font-mono">{message.notice_run_id}</span></>}
               </span>

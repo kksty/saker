@@ -410,7 +410,7 @@ export function messageKindLabel(kind: string): string {
     case 'result':
       return '结果回传'
     case 'task_notice':
-      return '子意图结果'
+      return '下游意图结果'
     case 'note':
       return '备注'
     default:

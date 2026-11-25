@@ -252,7 +252,7 @@ export function Overview({
               <Callout tone="warning">
                 <div className="flex flex-wrap items-center gap-2 text-[12px] leading-relaxed">
                   <span className="min-w-0">
-                    已停止（人工）：{stopped.title}。子意图已一并停止；恢复要用重试，不会自动重派。
+                    已停止（人工）：{stopped.title}。下游意图已一并停止；恢复要用重试，不会自动重派。
                   </span>
                   <Button size="xs" variant="outline" onClick={() => setRetryTarget(stopped)}>
                     重试
@@ -1329,7 +1329,7 @@ function FrontierPanel({
             </Badge>
           )}
           {waiting.length > 0 && (
-            <Badge size="sm" variant="secondary" title="等待子意图 / 操作员 / 外部动作的意图">
+            <Badge size="sm" variant="secondary" title="等待意图 / 操作员 / 外部动作的意图">
               {waiting.length} 等待中
             </Badge>
           )}

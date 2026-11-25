@@ -45,7 +45,7 @@ const statusLabels: Record<string, string> = {
   pending: '待办',
   claimed: '认领',
   running: '运行中',
-  waiting: '等待子意图',
+  waiting: '等待意图',
   reviewing: '复核中',
   done: '完成',
   failed: '失败',
@@ -72,7 +72,7 @@ export function statusLabel(status?: string): string {
 
 /**
  * One sentence for the persisted wait (`intent.wait`), in the operator's words.
- * Children carry their current state, so 「等子意图」 tells which one is still
+ * Children carry their current state, so 「等下游意图」 tells which one is still
  * running without opening each direction; a child that is no longer in the
  * ledger is said as such instead of being dropped from the sentence.
  */
@@ -96,7 +96,7 @@ export function intentWaitText(
   })
   const mode = wait.mode === 'any' ? '任一即可' : '全部完成'
   const implicit = wait.implicit ? '（控制面补的等待：还有意图未收口）' : ''
-  // 不写「子意图」：层级叫法另有口径，这里只说是哪几条、各自到哪一步。
+  // 不写「下游意图」：层级叫法另有口径，这里只说是哪几条、各自到哪一步。
   return `等待 ${ids.length} 条意图（${mode}）${implicit}：${parts.join(' · ')}`
 }
 
@@ -148,7 +148,7 @@ export function runStatusLabel(run?: { status?: string; cancel_cause?: string })
       case 'action_wait':
         return '等待外部结果'
       case 'child_wait':
-        return '等待子意图'
+        return '等待意图'
       case 'pause':
         return '项目暂停'
       case 'review_pause':
@@ -192,7 +192,7 @@ export function cancelCauseText(cause?: string): string {
     case 'action_wait':
       return '等待外部动作：保留会话并释放执行槽，只在匹配结果或超时后继续'
     case 'child_wait':
-      return '等待子意图：保留会话并释放执行槽，条件满足后携带结果继续'
+      return '等待意图：保留会话并释放执行槽，条件满足后携带结果继续'
     case 'pause':
       return '项目暂停：停止指挥官与所有执行者'
     case 'review_pause':
@@ -558,7 +558,7 @@ export function frontierMarkers(frontier?: FrontierItem): FrontierMarker[] {
     out.push({
       key: 'descendants',
       label: `后代 ${frontier.descendants}`,
-      detail: `该意图下还有 ${frontier.descendants} 个未结束的后代意图；父意图可能在等待它们，先看子意图再决定是否重派。`,
+      detail: `该意图下还有 ${frontier.descendants} 个未结束的后代意图；上游意图可能在等待它们，先看下游意图再决定是否重派。`,
       tone: 'secondary',
     })
   }

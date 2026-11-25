@@ -81,7 +81,7 @@ export function projectStatusSummary(
   } else if (directionsBlocked > 0) {
     nextStep = `有 ${directionsBlocked} 个意图被前提挡住：在图谱里核对前提是否还成立，再决定改道或停止。`
   } else if (waiting > 0) {
-    nextStep = `${waiting} 个意图在等子意图、你或外部动作；它们已让出槽位，不算卡住。`
+    nextStep = `${waiting} 个意图在等下游意图、你或外部动作；它们已让出槽位，不算卡住。`
   } else if (directionsPending > 0) {
     nextStep = `${directionsPending} 个意图待派发：指挥官下一轮会处理。`
   } else if (running > 0) {

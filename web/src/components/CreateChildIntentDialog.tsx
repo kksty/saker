@@ -89,7 +89,7 @@ export function CreateChildIntentDialog({
     const cleanTitle = title.trim()
     if (!cleanTitle) {
       setTitleInvalid(true)
-      setError('先写标题：子意图是账本里的一行')
+      setError('先写标题：意图是账本里的一行')
       titleRef.current?.focus()
       return
     }
@@ -126,15 +126,15 @@ export function CreateChildIntentDialog({
     <Dialog open={open} onOpenChange={(next) => { if (!busy) onOpenChange(next) }}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto overscroll-contain" aria-busy={busy}>
         <DialogHeader>
-          <DialogTitle>派子意图</DialogTitle>
+          <DialogTitle>派发意图</DialogTitle>
           <DialogDescription>
-            把一块工作挂到「{parent.title}」下面（可选）：子意图有自己的 run，会自动开跑；
-            父意图继续跑，子意图出现在子意图列表和图谱里。
+            把一块工作挂到「{parent.title}」下面（可选）：新意图有自己的 run，会自动开跑；
+            原意图继续跑，新意图出现在意图列表和图谱里。
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
-          <Field label="执行节点"><Select value={nodeID} onValueChange={setNodeID}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="inherit">沿用父意图节点</SelectItem>{bound.map(n=><SelectItem key={n.id} value={n.id}>{n.name||n.note||n.id}</SelectItem>)}</SelectContent></Select></Field>
+          <Field label="执行节点"><Select value={nodeID} onValueChange={setNodeID}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="inherit">沿用原意图节点</SelectItem>{bound.map(n=><SelectItem key={n.id} value={n.id}>{n.name||n.note||n.id}</SelectItem>)}</SelectContent></Select></Field>
           <Field label="标题" hint={titleInvalid ? undefined : '一句话说清这块工作要产出什么'}>
             <Input
               ref={titleRef}
@@ -148,7 +148,7 @@ export function CreateChildIntentDialog({
               onChange={(e) => { setTitle(e.target.value); if (titleInvalid) setTitleInvalid(false) }}
               placeholder="例如：验证 /admin 越权读取订单"
             />
-            {titleInvalid && <span id="child-intent-title-error" className="block text-[11px] leading-4 text-destructive">先写标题：子意图是账本里的一行</span>}
+            {titleInvalid && <span id="child-intent-title-error" className="block text-[11px] leading-4 text-destructive">先写标题：意图是账本里的一行</span>}
           </Field>
           <Field label="要回答的问题" hint="执行者只看这段文字：目标、输入、边界">
             <Textarea
@@ -169,7 +169,7 @@ export function CreateChildIntentDialog({
           </Field>
           <Field
             label="幂等键（自动生成）"
-            hint="同一对话框内保持不变：重试用同一个键会找回这个子意图，不会重复创建"
+            hint="同一对话框内保持不变：重试用同一个键会找回这个意图，不会重复创建"
           >
             <div className="tw-break font-mono text-[11px] text-ink-3">{key}</div>
           </Field>
@@ -181,12 +181,12 @@ export function CreateChildIntentDialog({
               <div className="space-y-0.5">
                 {result.created ? (
                   <div>
-                    子意图已创建{result.started ? '并开跑' : '，等并发空闲后自动开始'}：
+                    意图已创建{result.started ? '并开跑' : '，等并发空闲后自动开始'}：
                     <span className="ml-1 font-mono">{result.child.id}</span>
                   </div>
                 ) : (
                   <div>
-                    幂等命中：子意图 <span className="font-mono">{result.child.id}</span>{' '}
+                    幂等命中：意图 <span className="font-mono">{result.child.id}</span>{' '}
                     已存在，没有重复创建。
                   </div>
                 )}
@@ -204,7 +204,7 @@ export function CreateChildIntentDialog({
             {result ? '关闭' : '取消'}
           </Button>
           <Button onClick={() => void submit()} disabled={busy}>
-            {busy ? '创建中…' : '创建子意图'}
+            {busy ? '创建中…' : '创建意图'}
           </Button>
         </DialogFooter>
       </DialogContent>

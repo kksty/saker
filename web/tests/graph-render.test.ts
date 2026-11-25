@@ -470,7 +470,7 @@ test('a waiting direction is amber, not the parked grey', () => {
   const node: GraphNode = {
     id: 's:in_wait',
     type: 'step',
-    label: '等待子意图',
+    label: '等待意图',
     status: 'waiting',
     x: 0,
     y: 0,

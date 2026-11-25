@@ -589,7 +589,7 @@ function UnitRow({
               ? `等待 ${intent.wait.actions.length} 个外部动作`
               : intent.wait.operator
                 ? `等待人工：${intent.wait.operator.request}`
-                : `等 ${intent.wait.children?.length ?? 0} 个子意图${intent.wait.mode ? ` · ${intent.wait.mode === 'any' ? '任一' : '全部'}` : ''}`}
+                : `等 ${intent.wait.children?.length ?? 0} 个下游意图${intent.wait.mode ? ` · ${intent.wait.mode === 'any' ? '任一' : '全部'}` : ''}`}
           </span>
         ) : latest ? (
           <span className="min-w-0 flex-1 basis-[12rem] truncate font-mono tw-nums">
@@ -807,8 +807,8 @@ function UnitDetail({
                   {intentStateLabel(intent, reviewFailure.data)}
                 </Badge>
                 {intent.parent_intent_id && (
-                  <Badge size="sm" variant="muted" title={`父意图 ${intent.parent_intent_id}`}>
-                    子意图
+                  <Badge size="sm" variant="muted" title={`上游意图 ${intent.parent_intent_id}`}>
+                    下游意图
                   </Badge>
                 )}
                 <DoneDeclaredBadge intent={intent} />
@@ -876,7 +876,7 @@ function UnitDetail({
           {intent.wait && (
             <Callout tone="info" icon={<CircleDashed className="h-4 w-4" />}>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
-                {/* 等待条件与子意图当前状态同一句：不必逐条点开才知道等的是谁、还差谁。 */}
+                {/* 等待条件与下游意图当前状态同一句：不必逐条点开才知道等的是谁、还差谁。 */}
                 <span data-testid="intent-wait">{intentWaitText(intent.wait, childOf)}</span>
                 {intent.wait.deadline && (
                   <span className="ml-auto font-mono text-[11px] tw-nums">截止 {fmtTime(intent.wait.deadline)}</span>
@@ -2003,7 +2003,7 @@ function intentStateLabel(intent: Intent, failure?: ReviewFailure | null): strin
   if (intent.status === 'parked') return '已停放'
   if (intent.hold) return '已停止（人工）'
   if (intent.status === 'claimed') return '派发中'
-  if (intent.status === 'waiting') return '等子意图'
+  if (intent.status === 'waiting') return '等下游意图'
   if (intent.status === 'running') return '运行中'
   if (intent.status === 'reviewing') return '复核中'
   // Derived, not a new status: a verdict that said no is a different thing from

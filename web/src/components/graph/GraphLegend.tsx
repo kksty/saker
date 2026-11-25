@@ -223,7 +223,7 @@ export function GraphLegend({ className }: { className?: string }) {
                   key === 'reviewing'
                     ? '青色 + 缓慢呼吸框：复核者正在为这条结论跑一次独立复核。产出边是青色虚线，和蓝色实线「必要前提」区分'
                     : key === 'pending'
-                      ? '排队、认领（claimed）和等待子意图（waiting）都还没有执行，统一用琥珀色；它们的产出边是琥珀虚线'
+                      ? '排队、认领（claimed）和等待意图（waiting）都还没有执行，统一用琥珀色；它们的产出边是琥珀虚线'
                       : key === 'stopped'
                         ? '账本里是 failed 或 pending 加 hold：被指挥官/操作员显式叫停，不会自动重派，要 retry 才恢复；不等于执行失败'
                         : undefined
@@ -239,7 +239,7 @@ export function GraphLegend({ className }: { className?: string }) {
             ))}
           </div>
           <Hint>
-            排队、认领（claimed）、等待子意图（waiting）都还没有执行，统一用琥珀色；等待子意图不是停放，它会被唤醒。
+            排队、认领（claimed）、等待意图（waiting）都还没有执行，统一用琥珀色；等待意图不是停放，它会被唤醒。
           </Hint>
           <Hint>
             复核中（reviewing）：复核者正在为这条结论跑一次独立复核，青色 + 缓慢呼吸框；
@@ -257,7 +257,7 @@ export function GraphLegend({ className }: { className?: string }) {
               <OriginGlyph shape="diamond" />
               指挥官（实心菱形）
             </Row>
-            <Row title="created_by_participant_id = pt_<意图>：由另一个执行者发起，双方是平级，不是父意图">
+            <Row title="created_by_participant_id = pt_<意图>：由另一个执行者发起，双方是平级，不是上游意图">
               <OriginGlyph shape="circle" />
               执行者（空心圆）
             </Row>
@@ -337,7 +337,7 @@ export function GraphLegend({ className }: { className?: string }) {
               <Line color={EDGE_COLORS.goal} style="solid" />
               目标证据（旧盖章）
             </Row>
-            <Row title="parent_intent_id：父意图委派出的子意图，父意图要等它结束；紫色虚线">
+            <Row title="parent_intent_id：上游意图委派出的下游意图，上游意图要等它结束；紫色虚线">
               <Line color={EDGE_COLORS.spawn} style="dashed" />
               委托（等待）
             </Row>

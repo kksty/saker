@@ -79,7 +79,7 @@ export function StopIntentDialog({
 
         <Callout tone="warning">
           <div className="space-y-1 text-[12px] leading-relaxed">
-            <p>会连带取消这条意图的整棵子意图树；正在跑的 run 也会立即取消。</p>
+            <p>会连带取消这条意图的整棵下游意图树；正在跑的 run 也会立即取消。</p>
             <p>停止不会自动恢复。之后需要继续时，用同一处的「重试」显式恢复。</p>
           </div>
         </Callout>

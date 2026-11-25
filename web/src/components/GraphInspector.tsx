@@ -326,7 +326,7 @@ export function GraphInspector({
                     value={resolvedModel}
                   />
                 ) : null}
-                {intent.parent_intent_id && <Meta label="父意图" value={intent.parent_intent_id} />}
+                {intent.parent_intent_id && <Meta label="上游意图" value={intent.parent_intent_id} />}
                 {intent.delegated_by_run_id && (
                   <Meta label="委派 run" value={intent.delegated_by_run_id} />
                 )}

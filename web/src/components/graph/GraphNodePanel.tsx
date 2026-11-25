@@ -664,7 +664,7 @@ function NodeWorkspace({
                 />
               )}
               {intent.parent_intent_id && (
-                <Prop label="父意图" value={intent.parent_intent_id} title={`父意图 ${intent.parent_intent_id}`} />
+                <Prop label="上游意图" value={intent.parent_intent_id} title={`上游意图 ${intent.parent_intent_id}`} />
               )}
               {intent.delegated_by_run_id && <Prop label="委派 run" value={intent.delegated_by_run_id} />}
               <Prop
@@ -683,7 +683,7 @@ function NodeWorkspace({
               )}
               {peerOrigin && (
                 <div className="pt-0.5 text-[11px] leading-relaxed text-ink-3">
-                  平级发布：发起者与本意图都是执行者，不是父意图关系；双方各自对结论负责。
+                  平级发布：发起者与本意图都是执行者，不是上游意图关系；双方各自对结论负责。
                 </div>
               )}
               {intent.updated_at && <Prop label="更新" value={fmtTime(intent.updated_at)} />}
@@ -825,7 +825,7 @@ function NodeWorkspace({
           )}
 
           {(children.data?.length ?? 0) > 0 && (
-            <Section title={`子意图（${children.data?.length}）`}>
+            <Section title={`下游意图（${children.data?.length}）`}>
               {children.data?.map((child) => (
                 <div
                   key={child.id}
@@ -1010,9 +1010,9 @@ function NodeWorkspace({
                   variant="soft"
                   disabled={busy}
                   onClick={() => onChildIntent({ id: intent.id, title: intent.title })}
-                  title="把一块工作挂到当前意图下面（可选）：子意图有自己的 run、会自动开跑，父意图继续"
+                  title="把一块工作挂到当前意图下面（可选）：新意图有自己的 run、会自动开跑，上游意图继续"
                 >
-                  <GitBranch className="h-3.5 w-3.5" /> 派子意图
+                  <GitBranch className="h-3.5 w-3.5" /> 派发意图
                 </Button>
               )}
             {intent && intent.status === 'running' && intent.run_id && (

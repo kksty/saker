@@ -562,7 +562,7 @@ export function Runs({
                     宿主主动关闭，未续跑
                   </p>
                 )}
-                {/* 这条 run 所属意图在等什么：子意图带着当前状态，不必再逐条点开。 */}
+                {/* 这条 run 所属意图在等什么：下游意图带着当前状态，不必再逐条点开。 */}
                 {currentIntent?.wait && (
                   <p data-testid="run-intent-wait" className="text-[12px] leading-relaxed text-ink-2">
                     {intentWaitText(currentIntent.wait, (id) => intentByID.get(id))}

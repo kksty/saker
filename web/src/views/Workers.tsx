@@ -381,8 +381,8 @@ function WorkerRow({
             {w.running && <StatusIndicator compact className="shrink-0 whitespace-nowrap" status="running" label="生成中" />}
             {w.hold && <Badge size="sm" variant="outline">Hold</Badge>}
             {w.parent_intent_id && (
-              <Badge size="sm" variant="secondary" title={`父意图 ${w.parent_intent_id}`}>
-                子意图
+              <Badge size="sm" variant="secondary" title={`上游意图 ${w.parent_intent_id}`}>
+                下游意图
               </Badge>
             )}
             <span className="min-w-0 truncate text-[13px] font-medium text-ink">{w.title}</span>

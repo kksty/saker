@@ -30,8 +30,8 @@ export function StopIntentButton({
         'group/stop shrink-0 px-1.5 text-ink-3 hover:bg-destructive/10 hover:text-destructive',
         className,
       )}
-      aria-label="停止意图：会取消整棵子意图树"
-      title={`停止「${title}」（人工）：会取消整棵子意图树，理由必填`}
+      aria-label="停止意图：会取消整棵下游意图树"
+      title={`停止「${title}」（人工）：会取消整棵下游意图树，理由必填`}
       onClick={onStop}
     >
       <CircleStop className="h-4 w-4" aria-hidden="true" />
