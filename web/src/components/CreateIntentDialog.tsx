@@ -33,6 +33,7 @@ export function CreateIntentDialog({
 }) {
   const [title, setTitle] = useSessionState('intent.title', '')
   const [description, setDescription] = useSessionState('intent.description', '')
+  const [evalText, setEvalText] = useSessionState('intent.eval', '')
   const [busy, setBusy] = useState(false)
   const [nodeID,setNodeID]=useSessionState('intent.node','default')
   const [error, setError] = useState('')
@@ -64,6 +65,7 @@ export function CreateIntentDialog({
       const created = await api.createIntent({
         title: title.trim(),
         description: description.trim(),
+        eval: evalText.trim() || undefined,
         // Authorization and prohibitions live in the project brief + built-in
         // constraints; an intent does not carry its own scope document.
         node: nodeID==='default'?undefined:nodeID,
@@ -71,6 +73,7 @@ export function CreateIntentDialog({
       })
       setTitle('')
       setDescription('')
+      setEvalText('')
       setNodeID('default')
       onOpenChange(false)
       onCreated(created.id)
@@ -124,6 +127,16 @@ export function CreateIntentDialog({
                 标题或问题至少填一个
               </span>
             )}
+          </Field>
+          <Field label="验收标准（可选）" hint="怎样判断这一步完成；留空表示不设">
+            <Textarea
+              disabled={busy}
+              rows={3}
+              value={evalText}
+              onChange={(e) => setEvalText(e.target.value)}
+              placeholder="例如：拿到 /admin 的 200 响应原文"
+              className="text-[12px]"
+            />
           </Field>
           {checking ? <p role="status" className="text-xs text-ink-3">正在检查执行节点…</p> : dependencyError ? (
             <div role="alert" className="space-y-2 text-xs text-destructive">

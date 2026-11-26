@@ -151,6 +151,9 @@ func (s *Store) startIntentRunLocked(id, node, owner string, run model.Run) (mod
 	in.UpdatedAt = now
 	run.ID, run.IntentID, run.Status = s.uniqueIDLocked("r"), id, model.RunRunning
 	run.StartedAt, run.Generation = now, in.Attempts
+	// Stamp the plan version in the same transaction as the claim, so an edit
+	// racing this dispatch cannot make the run claim text it never read.
+	run.IntentVersion = in.EditVersion
 	run.PremiseVersions = map[string]uint64{}
 	for _, id := range in.FromFactIDs {
 		run.PremiseVersions[id] = s.records[recordKey("fact", id)].version

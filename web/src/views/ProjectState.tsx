@@ -18,6 +18,7 @@ import { cn } from '@cyber/theme'
 import { Page, pageGutter } from '@/components/Page'
 import { WorkspaceSidebar } from '@/components/WorkspaceSidebar'
 import { DoneDeclaredBadge } from '@/components/DoneDeclaredBadge'
+import { IntentPlanEditor } from '@/components/IntentPlanEditor'
 import { RetryIntentDialog } from '@/components/RetryIntentDialog'
 import { StopIntentButton } from '@/components/StopIntentButton'
 import { StopIntentDialog, type StopTarget } from '@/components/StopIntentDialog'
@@ -872,6 +873,9 @@ function UnitDetail({
         </header>
 
         <div className="space-y-4 p-4 sm:p-5">
+          {/* Before the first dispatch the plan text is still the source of
+              truth; once a run exists the component renders nothing. */}
+          <IntentPlanEditor intent={intent} onSaved={onRunsChanged} />
           {/* The composer no longer offers "stop and steer": that is an action on
               a live turn, so it lives here, one screen from the direction it stops. */}
           <SteerCallout intent={intent} onChanged={onRunsChanged} />

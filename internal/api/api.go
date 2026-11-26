@@ -630,6 +630,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/nodes/join", s.nodeJoin)
 	mux.HandleFunc("GET /api/nodes/{id}/terminal", s.nodeTerminal)
 	mux.HandleFunc("POST /api/intents", s.createIntent)
+	// Plan-text edits are pre-dispatch only: a direction with a run keeps the
+	// brief that run was dispatched with (intent_edit.go).
+	mux.HandleFunc("PATCH /api/intents/{id}", s.editIntent)
 	mux.HandleFunc("POST /api/chat", s.chat)
 	// One operator text entry: transient hint vs durable constraint is a
 	// lifetime choice, not a second panel (docs/06 D147).

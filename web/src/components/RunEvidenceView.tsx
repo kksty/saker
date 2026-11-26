@@ -63,6 +63,14 @@ export function RunEvidenceView({
         />
       </div>
 
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-hairline bg-surface-2/40 px-2 py-1.5">
+        <span className="text-[12px] font-medium text-ink-2">计划正文</span>
+        <Badge size="sm" variant={run.intent_version ? 'primary' : 'muted'}>
+          v{run.intent_version ?? 0}
+        </Badge>
+        <span className="text-[11px] text-ink-3">派发时采用的意图正文版本；0 = 未编辑</span>
+      </div>
+
       <div className="border-t border-hairline pt-1.5 text-[11px] leading-relaxed text-ink-3">
         版本与事实内容在派发时冻结；之后修改事实不会改写这里。断言版本看断言是否还是同一句，记录版本看账本行是否被改过。
       </div>

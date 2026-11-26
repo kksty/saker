@@ -31,6 +31,7 @@ import { EvidencePreview } from '@/components/EvidencePreview'
 import { DoneDeclaredBadge } from '@/components/DoneDeclaredBadge'
 import { FactClaimDetail } from '@/components/FactClaimDetail'
 import { IntentContextEditor } from '@/components/IntentContextEditor'
+import { IntentPlanEditor } from '@/components/IntentPlanEditor'
 import { RetryIntentDialog } from '@/components/RetryIntentDialog'
 import { RunEvidenceView } from '@/components/RunEvidenceView'
 import { CancelReasonCallout } from './CancelReasonCallout'
@@ -481,6 +482,9 @@ function NodeWorkspace({
             <div className="saker-break text-[14px] font-semibold leading-5 text-ink">{node.label}</div>
             {node.sub && <div className="saker-break mt-1 text-[12px] leading-relaxed text-ink-2">{node.sub}</div>}
           </div>
+          {/* The plan text is fixed once dispatched; before that it can be
+              corrected here without opening a separate dialog. */}
+          {intent && <IntentPlanEditor intent={intent} onSaved={onChanged} />}
           {/* Why the direction is stopped, in the same words the run page uses.
               Only a cancelled executor run has this text, and only a held
               direction shows it: a continuation cancel (steer/retry/pause) is
@@ -714,6 +718,11 @@ function NodeWorkspace({
                 title={intent.created_by_participant_id ? `created_by_participant_id = ${intent.created_by_participant_id}` : '旧数据没有记录发起者'}
               />
               {intent.updated_at && <Prop label="更新" value={fmtTime(intent.updated_at)} />}
+              <Prop
+                label="计划正文"
+                value={`v${intent.edit_version ?? 0}${intent.edited_by ? ` · ${intent.edited_by}` : ''}`}
+                title="标题/说明/验收标准的版本；派发前可编辑，派发后正文随任务书归档"
+              />
             </Section>
           )}
           {helpers && helpers.calls > 0 && (

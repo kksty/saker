@@ -245,6 +245,7 @@ func TestExecutorCredentialReadsBattlefieldOnly(t *testing.T) {
 	}
 	for _, tc := range []struct{ method, path string }{
 		{http.MethodPost, "/p/prj-1/api/intents/in_1/run"},
+		{http.MethodPatch, "/p/prj-1/api/intents/in_1"},
 		{http.MethodPost, "/p/prj-1/api/intents/in_1/continue"},
 		{http.MethodPost, "/p/prj-1/api/goals/g_1/complete"},
 		{http.MethodPost, "/p/prj-1/api/project/standby"},
@@ -297,5 +298,14 @@ func TestCommanderSessionHasTheWholeIntentLifecycle(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Errorf("commander POST intents/in_x/%s = %d", action, rec.Code)
 		}
+	}
+	// The pre-dispatch text edit is part of the lifecycle too: the commander may
+	// fix a direction it has not dispatched yet.
+	req := httptest.NewRequest(http.MethodPatch, "/p/prj-1/api/intents/in_x", nil)
+	req.Header.Set("Authorization", "Bearer "+commander.Token)
+	rec := httptest.NewRecorder()
+	protected.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Errorf("commander PATCH intents/in_x = %d", rec.Code)
 	}
 }

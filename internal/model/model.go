@@ -211,12 +211,21 @@ type Intent struct {
 	// never prose) whose other observations should surface for this direction.
 	InterestEntityRefs []string `json:"interest_entity_refs,omitempty"`
 	// ContextVersion is the optimistic concurrency token of the selection above.
-	ContextVersion uint64   `json:"context_version"`
-	ID             string   `json:"id"`
-	Title          string   `json:"title"`
-	Description    string   `json:"description"`
-	Doc            string   `json:"doc,omitempty"`
-	FromFactIDs    []string `json:"from_fact_ids,omitempty"`
+	ContextVersion uint64 `json:"context_version"`
+	// EditVersion is the optimistic-concurrency token of the pre-dispatch plan
+	// text (title, description, eval). Only a text edit bumps it, so a status
+	// transition or a context edit does not invalidate an editor's token. It is
+	// frozen once a run exists: the text that run was dispatched with belongs to
+	// that run's archived brief, not to this row.
+	EditVersion uint64 `json:"edit_version"`
+	// EditedBy records the participant that last edited the plan text before it
+	// was dispatched. Empty means nobody edited it.
+	EditedBy    string   `json:"edited_by,omitempty"`
+	ID          string   `json:"id"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Doc         string   `json:"doc,omitempty"`
+	FromFactIDs []string `json:"from_fact_ids,omitempty"`
 	// FromFactClaims records the claim version of each premise when the
 	// direction was created. A later revision of a premise is surfaced in the
 	// board frontier as "premise_changed": it is a judgement input for the
@@ -1231,11 +1240,17 @@ type Run struct {
 	HandoffVersion int    `json:"handoff_version,omitempty"`
 	// Generation is the intent's claim count at this run (matches the participant
 	// token generation); a later replacement session increments it.
-	Generation int        `json:"generation,omitempty"`
-	Status     string     `json:"status"` // running|done|failed|canceled
-	StartedAt  time.Time  `json:"started_at"`
-	EndedAt    *time.Time `json:"ended_at,omitempty"`
-	ExitReason string     `json:"exit_reason,omitempty"`
+	Generation int `json:"generation,omitempty"`
+	// IntentVersion is the pre-dispatch plan-text version (Intent.EditVersion)
+	// this run was dispatched with. It is stamped in the same claim transaction
+	// as the run row, so an edit racing a dispatch cannot leave a run claiming a
+	// version it never read. 0 means the intent was dispatched unedited; the
+	// field is always present so "v0" is not confused with "not recorded".
+	IntentVersion uint64     `json:"intent_version"`
+	Status        string     `json:"status"` // running|done|failed|canceled
+	StartedAt     time.Time  `json:"started_at"`
+	EndedAt       *time.Time `json:"ended_at,omitempty"`
+	ExitReason    string     `json:"exit_reason,omitempty"`
 	// CancelCause is structured only when Status is canceled: steer / retry /
 	// stop_loss / restart / watchdog / operator / worker_kill / pause /
 	// review_pause. Empty for old rows.

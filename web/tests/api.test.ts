@@ -199,6 +199,50 @@ test('editing an instruction is a versioned PUT carrying the body this page read
     else Reflect.deleteProperty(globalThis, 'window')
   }
 })
+test('editing an intent is a PATCH of the plan text carrying the edit_version read', async () => {
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
+  const originalFetch = globalThis.fetch
+  const calls: { url: string; method: string; body: unknown }[] = []
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { location: { pathname: '/p/fixture/' } } })
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), method: init?.method ?? 'GET', body: init?.body ? JSON.parse(String(init.body)) : null })
+    return new Response('{"id":"in_1","title":"新标题","description":"旧说明","eval":"新验收","edit_version":1,"status":"pending"}')
+  }
+  try {
+    const updated = await api.editIntent('in_1', { version: 0, title: '新标题', eval: '新验收' })
+    assert.deepEqual(calls, [{
+      url: '/p/fixture/api/intents/in_1',
+      method: 'PATCH',
+      body: { version: 0, title: '新标题', eval: '新验收' },
+    }])
+    assert.equal(updated.edit_version, 1)
+  } finally {
+    globalThis.fetch = originalFetch
+    if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow)
+    else Reflect.deleteProperty(globalThis, 'window')
+  }
+})
+
+test('a refused intent edit keeps its stable code so the editor can explain the lock', async () => {
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
+  const originalFetch = globalThis.fetch
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { location: { pathname: '/p/fixture/' } } })
+  globalThis.fetch = async () =>
+    new Response('{"error":"意图已有运行记录，计划正文不能再改","code":"intent_not_editable"}', { status: 409 })
+  try {
+    await assert.rejects(api.editIntent('in_1', { version: 2, eval: 'x' }), (error: unknown) => {
+      assert.ok(error instanceof ApiError)
+      assert.equal(error.status, 409)
+      assert.equal(error.code, 'intent_not_editable')
+      return true
+    })
+  } finally {
+    globalThis.fetch = originalFetch
+    if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow)
+    else Reflect.deleteProperty(globalThis, 'window')
+  }
+})
+
 test('project-scoped health and bundle download stay under the project base', async () => {
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
   const originalFetch = globalThis.fetch

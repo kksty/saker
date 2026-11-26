@@ -328,6 +328,11 @@ export interface Intent {
   interest_entity_refs?: string[]
   /** Optimistic-concurrency token of the context selection; PUT /context carries it. */
   context_version?: number
+  /** Optimistic-concurrency token of the pre-dispatch plan text (title,
+   *  description, eval); PATCH /api/intents/{id} carries it. */
+  edit_version?: number
+  /** Participant that last edited the plan text before dispatch. */
+  edited_by?: string
   id: string
   title: string
   description: string
@@ -425,6 +430,17 @@ export interface IntentContextRequest {
 
 /** The context PUT answers with the updated direction (context_version +1). */
 export type IntentContextResponse = Intent
+
+/** PATCH /api/intents/{id}: the pre-dispatch plan text plus the edit_version the
+ *  editor displayed. Only the fields present are written. The server refuses a
+ *  stale version (`intent_edit_conflict`) and a direction that already has a run
+ *  (`intent_not_editable`). */
+export interface IntentPlanEdit {
+  version: number
+  title?: string
+  description?: string
+  eval?: string
+}
 
 // Ref is a citation the ledger kept but cannot open: a url, a tool artifact, or
 // a file the run named that is gone. It is provenance, not proof (D44).
@@ -864,6 +880,8 @@ export interface Run {
   handoff_from?: string
   handoff_version?: number
   generation?: number
+  /** The intent's plan-text version this run was dispatched with (0 = unedited). */
+  intent_version?: number
   status: RunStatus
   started_at: string
   /** When the current/last turn began (a resume continues the same run). */

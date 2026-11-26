@@ -13,6 +13,7 @@ func TestSessionWriteAllowlistIsDefaultDeny(t *testing.T) {
 	}{
 		// Documented commander writes.
 		{"POST", "/p/p1/api/intents", true},
+		{"PATCH", "/p/p1/api/intents/in_1", true},
 		{"POST", "/p/p1/api/intents/in_1/run", true},
 		{"POST", "/p/p1/api/intents/in_1/say", true},
 		{"POST", "/p/p1/api/intents/in_1/operator", true},

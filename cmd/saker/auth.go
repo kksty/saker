@@ -387,6 +387,7 @@ func hubAccessToken(consoleToken, dataDir string) string {
 var sessionWriteRoutes = map[string]bool{
 	"POST /api/instructions/*/ack": true, // acknowledge an instruction
 	"POST /api/intents":            true, // open a direction
+	"PATCH /api/intents/*":         true, // edit an undispatched direction's plan text
 	"POST /api/intents/*/run":      true,
 	"POST /api/intents/*/handoff":  true,
 	"POST /api/intents/*/steer":    true,
@@ -463,7 +464,9 @@ func normalizeSessionPath(path string) string {
 			segs[2] = "*"
 		}
 	case "intents":
-		if len(segs) == 4 {
+		// A 3-segment path is the direction itself (PATCH text); a 4-segment
+		// path is one of its actions. Both hide the id behind the same "*".
+		if len(segs) == 3 || len(segs) == 4 {
 			segs[2] = "*"
 		}
 	case "goals":

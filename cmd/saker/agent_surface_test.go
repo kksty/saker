@@ -44,6 +44,7 @@ func TestAgentTokenSeesOnlyTheBattlefield(t *testing.T) {
 		{http.MethodGet, "/p/p1/api/board"},
 		{http.MethodGet, "/p/p1/api/intents"},
 		{http.MethodPost, "/p/p1/api/intents"},
+		{http.MethodPatch, "/p/p1/api/intents/in_1"},
 		{http.MethodPost, "/p/p1/api/intents/in_1/retry"},
 		{http.MethodGet, "/p/p1/api/facts"},
 		{http.MethodGet, "/p/p1/api/facts/f_1"},

@@ -102,6 +102,7 @@ GNU 参数（如 `--max-filesize`）。
 | 动作 | 调用 |
 |---|---|
 | 派意图 | `POST /api/intents` 建意图，再 `POST /api/intents/in_x/run` 开跑；`from_fact_ids` 记录这一步所依赖的必要事实，前提的当前准入结果见 readiness。`context_fact_ids` / `pinned_fact_ids` 用于提供阅读参考。真没有事实可引（授权首轮探测）时，在 description 写明「无前提，本轮首触探测」，并在 `interest_entity_refs` 写**本轮目标**实体（如 `host:10.0.0.5`）：无前提意图直接运行、在图上挂到项目节点，不会挂起等操作员。不要编造 id |
+| 改未派发意图的正文 | `PATCH /api/intents/in_x`，`{"version":<edit_version>,"title":"…","description":"…","eval":"…"}`（只写要改的字段）：只对尚无 run 的 pending 意图生效；派发后的正文随任务书归档，改用 say/steer。409 `intent_edit_conflict` 重读后再改；409 `intent_not_editable` 表示不在可编辑窗口（已有运行、已停放或已收口），不要再试 |
 | 看一次运行用了什么 | `GET /api/runs`，看 `provider` / `model` / `usage`；run 行的 `premise_claim_versions` / `context_fact_versions` 记录这次运行实际读到的前提断言版本与参考/固定版本 |
 | 看 token 用量 | `GET /api/intents/in_x/usage`（本意图） |
 | 看外部动作状态 | `GET /api/actions`，状态为 started / completed / unknown；这是执行历史，不自动构成事实或结论 |

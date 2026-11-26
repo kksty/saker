@@ -35,6 +35,7 @@ import type {
   ImportResult,
   IOAObservations,
   Intent,
+  IntentPlanEdit,
   Instruction,
   InstructionHistoryResponse,
   InstructionPage,
@@ -328,6 +329,8 @@ const post = <T>(url: string, body?: unknown, options?: RequestOptions) =>
   request<T>(url, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) }, true, options)
 const put = <T>(url: string, body?: unknown, options?: RequestOptions) =>
   request<T>(url, { method: 'PUT', body: JSON.stringify(body) }, true, options)
+const patch = <T>(url: string, body?: unknown, options?: RequestOptions) =>
+  request<T>(url, { method: 'PATCH', body: JSON.stringify(body) }, true, options)
 const del = <T>(url: string, options?: RequestOptions) =>
   request<T>(url, { method: 'DELETE' }, true, options)
 // The archive is the request body, not a JSON field: a project can be hundreds
@@ -592,10 +595,16 @@ export const api = {
     title: string
     description: string
     doc?: string
+    eval?: string
     from_fact_ids?: string[]
     skills?: string[]
     node?: string
   }) => post<Intent>(`${pbase()}/api/intents`, body),
+  // Plan text is editable only before the first dispatch: the server refuses a
+  // direction with a run and returns a stable code, so the editor can explain
+  // the lock instead of turning it into a generic failure.
+  editIntent: (id: string, body: IntentPlanEdit) =>
+    patch<Intent>(`${pbase()}/api/intents/${encodeURIComponent(id)}`, body),
   runIntent: (id: string) =>
     post<{ run_id: string; intent_id: string }>(`${pbase()}/api/intents/${encodeURIComponent(id)}/run`),
   // steer cancels the current run and resumes the same trajectory as a new
