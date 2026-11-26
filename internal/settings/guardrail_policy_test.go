@@ -62,6 +62,19 @@ func TestGuardrailPolicyParsesJudgeConfiguration(t *testing.T) {
 				Scope: []string{"bash", "subagent"}, AllowPrefixesCount: 2, JEVConfigured: true,
 			},
 		},
+		"jev ignores unused zero-temperature llm block": {
+			body: `guardrail:
+  provider: jev
+  llm:
+    temperature: 0
+jev:
+  api_key: fixture
+`,
+			want: GuardrailPolicyView{
+				Configured: true, Provider: "jev", Mode: "auto",
+				Scope: []string{}, JEVConfigured: true,
+			},
+		},
 		"llm judge": {
 			body: `extensions:
   guardrail:
@@ -185,6 +198,25 @@ func TestGuardrailPolicyReportsInvalidConfiguration(t *testing.T) {
 jev:
   api_key: fixture
 `, "仅适用于"},
+		"jev with llm binding": {`guardrail:
+  provider: jev
+  llm:
+    model: judge
+jev:
+  api_key: fixture
+`, "guardrail.llm 仅在 provider=llm 或 hybrid 时生效"},
+		"none with llm binding": {`guardrail:
+  provider: none
+  llm:
+    base_url: http://judge.test/v1
+`, "guardrail.llm 仅在 provider=llm 或 hybrid 时生效"},
+		"jev with llm temperature": {`guardrail:
+  provider: jev
+  llm:
+    temperature: 0.7
+jev:
+  api_key: fixture
+`, "guardrail.llm 仅在 provider=llm 或 hybrid 时生效"},
 		"jev with invalid endpoint": {`guardrail:
   provider: jev
 jev:

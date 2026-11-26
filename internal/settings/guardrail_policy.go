@@ -181,6 +181,25 @@ func (s *Store) GuardrailPolicy() GuardrailPolicyView {
 			view.Reason = "guardrail.llm 必须是映射"
 			return view
 		}
+		if !usesLLM {
+			// The harness rejects an llm binding under a provider that never
+			// uses it, even when the block is left over from a previous
+			// provider. Mirror that rule: reporting such a file as enabled
+			// would disagree with the process that executes the policy.
+			for _, field := range []string{"base_url", "model", "api_key"} {
+				if scalar(mapGet(llm, field)) != "" {
+					view.Reason = "guardrail.llm 仅在 provider=llm 或 hybrid 时生效"
+					return view
+				}
+			}
+			if temperature := mapGet(llm, "temperature"); temperature != nil {
+				var value float64
+				if err := temperature.Decode(&value); err != nil || value != 0 {
+					view.Reason = "guardrail.llm 仅在 provider=llm 或 hybrid 时生效"
+					return view
+				}
+			}
+		}
 		view.LLM.Model = scalar(mapGet(llm, "model"))
 		endpoint, err := url.Parse(strings.TrimRight(scalar(mapGet(llm, "base_url")), "/"))
 		if err == nil && endpoint.Host != "" && (endpoint.Scheme == "http" || endpoint.Scheme == "https") {
