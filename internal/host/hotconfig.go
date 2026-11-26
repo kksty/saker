@@ -103,9 +103,10 @@ func bindingMatches(got, want string) bool {
 // touching the live child. The hot-update path commits the new configuration to
 // the running host, so the control plane must not restart it; the pending
 // values still have to be in place for a crash restart.
-func (h *Host) StageConfig(env, args []string) {
+func (h *Host) StageConfig(env, hubArgs, nodeArgs []string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.cfg.Env = append([]string(nil), env...)
-	h.cfg.Args = append([]string(nil), args...)
+	h.cfg.HubArgs = append([]string(nil), hubArgs...)
+	h.cfg.Args = append([]string(nil), nodeArgs...)
 }

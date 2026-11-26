@@ -57,15 +57,15 @@ func TestSettingsSaveWritesProductExtensions(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	for _, want := range []string{"extensions:", "mcpServers:", "idalib-mcp", "tavily_keys: tv-one,tv-two", "model: fast-model"} {
+	for _, want := range []string{"\nmcp:", "\nsearch:", "mcpServers:", "idalib-mcp", "tavily_keys: tv-one,tv-two", "model: fast-model"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("saved harness config missing %q:\n%s", want, text)
 		}
 	}
-	for _, wrong := range []string{"\nmcp:", "\nsearch:"} {
-		if strings.Contains(text, wrong) {
-			t.Fatalf("product section written at the rejected top level:\n%s", text)
-		}
+	// The harness removed the `extensions:` envelope; a save must keep writing
+	// flat root sections.
+	if strings.Contains(text, "extensions:") {
+		t.Fatalf("product sections were wrapped in the removed extensions envelope:\n%s", text)
 	}
 
 	// The GET view is masked the same way and never contains the search key.

@@ -2,10 +2,10 @@ package settings
 
 // Product configuration (MCP servers and web search) is the scan node's own
 // configuration, not a shared harness option. It lives in the operator's
-// cyber.yaml under `extensions` — the one place the harness's strict file
-// validator accepts product sections it does not itself declare. The generated
-// runtime yaml copies the document through unchanged, so the scan reads the
-// same sections from the file the local host is started with.
+// cyber.yaml as the flat top-level `mcp` and `search` sections — the harness
+// reads extension configuration as flat root sections now. The generated
+// runtime document copies them through unchanged, so the scan reads the same
+// sections from the file the local host is started with.
 //
 // The settings API is the operator surface for these two sections. It never
 // echoes a stored secret: MCP env/header values read back as maskedValue, and
@@ -168,15 +168,14 @@ func (s *Store) Product() (Product, error) {
 
 func productFromDocument(doc *yaml.Node) (Product, error) {
 	var out Product
-	extensions := mapGet(doc, "extensions")
-	mcp := mapGet(extensions, "mcp")
+	mcp := sectionNode(doc, "mcp")
 	if servers := mapGet(mcp, "mcpServers"); servers != nil {
 		if servers.Kind != yaml.MappingNode {
-			return out, fmt.Errorf("extensions.mcp.mcpServers 必须是映射")
+			return out, fmt.Errorf("mcp.mcpServers 必须是映射")
 		}
 		var raw map[string]map[string]any
 		if err := servers.Decode(&raw); err != nil {
-			return out, fmt.Errorf("extensions.mcp.mcpServers 结构无效：%w", err)
+			return out, fmt.Errorf("mcp.mcpServers 结构无效：%w", err)
 		}
 		out.MCPServers = make(map[string]MCPServer, len(raw))
 		for alias, fields := range raw {
@@ -191,9 +190,9 @@ func productFromDocument(doc *yaml.Node) (Product, error) {
 			out.MCPServers[alias] = server
 		}
 	}
-	if search := mapGet(extensions, "search"); search != nil {
+	if search := sectionNode(doc, "search"); search != nil {
 		if search.Kind != yaml.MappingNode {
-			return out, fmt.Errorf("extensions.search 必须是映射")
+			return out, fmt.Errorf("search 必须是映射")
 		}
 		out.SearchKeys = scalar(mapGet(search, "tavily_keys"))
 	}
@@ -346,6 +345,10 @@ func (s *Store) SaveProduct(in ProductInput) error {
 	if err != nil {
 		return err
 	}
+	// A save is where a legacy xtensions: envelope is migrated: promote its
+	// sections before editing, so the write keeps flat root sections and this
+	// document is what every harness process reads next.
+	flattenLegacyExtensions(doc)
 	current, err := productFromDocument(doc)
 	if err != nil {
 		return err
@@ -418,12 +421,11 @@ func mergeMCPSecrets(incoming, stored map[string]MCPServer) (map[string]MCPServe
 }
 
 func setMCPSection(doc *yaml.Node, servers map[string]MCPServer) error {
-	extensions := ensureMapping(doc, "extensions")
 	if len(servers) == 0 {
-		mapDelete(mapGet(extensions, "mcp"), "mcpServers")
+		mapDelete(mapGet(doc, "mcp"), "mcpServers")
 		return nil
 	}
-	mcp := ensureMapping(extensions, "mcp")
+	mcp := ensureMapping(doc, "mcp")
 	encoded, err := json.Marshal(servers)
 	if err != nil {
 		return fmt.Errorf("编码 MCP 配置失败：%w", err)
@@ -441,8 +443,7 @@ func setMCPSection(doc *yaml.Node, servers map[string]MCPServer) error {
 }
 
 func setSearchSection(doc *yaml.Node, key string) {
-	extensions := ensureMapping(doc, "extensions")
-	search := ensureMapping(extensions, "search")
+	search := ensureMapping(doc, "search")
 	if key == "" {
 		mapDelete(search, "tavily_keys")
 		return
@@ -453,6 +454,10 @@ func setSearchSection(doc *yaml.Node, key string) {
 // writeDocument encodes the whole operator document with the same indentation
 // writeHarnessModel uses, so a product save does not reflow unrelated sections.
 func (s *Store) writeDocument(root *yaml.Node) error {
+	// A settings save is where a legacy `extensions:` envelope is migrated:
+	// the harness reads flat root sections now, so promoting the envelope here
+	// keeps the operator's file valid for every process that reads it.
+	flattenLegacyExtensions(documentRoot(root))
 	var buf strings.Builder
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(4)

@@ -229,7 +229,7 @@ func TestModelFailureKeepsHostOnlineAndCanRetryUnchangedSettings(t *testing.T) {
 	default:
 	}
 	fixed.Store(true)
-	if !h.Update(cfg.Env, cfg.Args) {
+	if !h.Update(cfg.Env, cfg.Args, cfg.Args) {
 		t.Fatal("unchanged save must retry a failed model")
 	}
 	deadline := time.Now().Add(3 * time.Second)
@@ -343,7 +343,7 @@ func TestDegradedHostRevivesAfterASettingsChange(t *testing.T) {
 	}
 
 	ready.Store(true)
-	h.Update([]string{"CYBER_MODEL=fixed"}, []string{"--model", "fixed"})
+	h.Update([]string{"CYBER_MODEL=fixed"}, []string{"--model", "fixed"}, []string{"--model", "fixed"})
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) && !h.Ready() {
 		time.Sleep(10 * time.Millisecond)
@@ -380,7 +380,7 @@ func TestUpdateReportsRestartAndEveryReadyObserverRuns(t *testing.T) {
 	h.AddOnReady(func(aop.Agent) { first.Add(1) })
 	h.AddOnReady(func(aop.Agent) { second.Add(1) })
 	ready.Store(true)
-	if restarted := h.Update([]string{"CYBER_MODEL=fixed"}, []string{"--model", "fixed"}); !restarted {
+	if restarted := h.Update([]string{"CYBER_MODEL=fixed"}, []string{"--model", "fixed"}, []string{"--model", "fixed"}); !restarted {
 		t.Fatal("Update reported no restart for a changed configuration")
 	}
 	deadline := time.Now().Add(3 * time.Second)
@@ -390,7 +390,7 @@ func TestUpdateReportsRestartAndEveryReadyObserverRuns(t *testing.T) {
 	if first.Load() != 1 || second.Load() != 1 {
 		t.Fatalf("ready observers = %d/%d, want 1/1", first.Load(), second.Load())
 	}
-	if h.Update([]string{"CYBER_MODEL=fixed"}, []string{"--model", "fixed"}) {
+	if h.Update([]string{"CYBER_MODEL=fixed"}, []string{"--model", "fixed"}, []string{"--model", "fixed"}) {
 		t.Fatal("Update reported a restart for an unchanged configuration")
 	}
 }
@@ -525,7 +525,7 @@ func TestHostUpdateRevivesUnhealthySupervisor(t *testing.T) {
 	}
 	launchesAtStop := launcher.count()
 	revived.Store(true)
-	h.Update([]string{"SAKER_TEST=1"}, nil)
+	h.Update([]string{"SAKER_TEST=1"}, nil, nil)
 	deadline = time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
 		st := h.Status()

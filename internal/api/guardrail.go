@@ -360,7 +360,7 @@ func guardrailUnavailableReason(err error) string {
 	switch {
 	case strings.Contains(lower, "unsupported"), strings.Contains(lower, "unknown namespace"),
 		strings.Contains(lower, "guardrail namespace"):
-		return "宿主没有启用工具审批（guardrail/JEV）：AOP guardrail 命名空间不可用，请在 extensions.guardrail 配置 provider=jev 后重启宿主。"
+		return "宿主没有启用工具审批（guardrail/JEV）：AOP guardrail 命名空间不可用，请在 guardrail 配置 provider=jev 后重启宿主。"
 	case strings.Contains(lower, "not_found"), strings.Contains(lower, "not found"):
 		return "宿主没有这个会话（可能已结束）：" + err.Error()
 	default:

@@ -208,13 +208,11 @@ traffic:
 	}
 }
 
-// Product sections (mcp, search, guardrail, jev) are copied through on purpose.
-// They must live under `extensions`: the harness's strict file validator
-// rejects an unknown top-level section on the Hub, while an extension section
-// this host does not declare is preserved and diagnosed. internal/host reuses
-// this same --config file for the local scan (Host.nodeArgs), so the scan
-// resolves the sections from here. An explicit operator traffic value must win
-// field by field.
+// Product sections (mcp, search, guardrail, jev) are copied through on purpose:
+// they are flat top-level sections now, which the scan resolves from this
+// document. The Hub reads the shared-only projection instead
+// (SharedRuntimeConfig), because its strict file validator rejects sections it
+// does not declare. An explicit operator traffic value must win field by field.
 func TestRuntimeConfigPreservesProductSectionsAndExplicitTraffic(t *testing.T) {
 	dir := t.TempDir()
 	source := writeOperatorConfig(t, dir, `llm:
@@ -232,19 +230,18 @@ traffic:
   body_storage: none
   body_max_bytes: 1048576
   body_retention_bytes: 4194304
-extensions:
-  mcp:
-    mcpServers:
-      browser:
-        command: npx
-        args: [browser-mcp]
-  search:
-    tavily_keys: search-key
-  guardrail:
-    provider: jev
-    mode: auto
-  jev:
-    api_key: ""
+mcp:
+  mcpServers:
+    browser:
+      command: npx
+      args: [browser-mcp]
+search:
+  tavily_keys: search-key
+guardrail:
+  provider: jev
+  mode: auto
+jev:
+  api_key: ""
 `)
 	path := generateRuntime(t, source)
 	data, err := os.ReadFile(path)
@@ -264,19 +261,11 @@ extensions:
 		t.Fatalf("operator's explicit body_retention_bytes overwritten: %d", got)
 	}
 
-	extensions, ok := doc["extensions"].(map[string]any)
-	if !ok {
-		t.Fatalf("extensions section was not passed through: %s", data)
+	if _, ok := doc["extensions"]; ok {
+		t.Fatalf("legacy extensions envelope leaked into the runtime document: %s", data)
 	}
 	for _, section := range []string{"mcp", "search", "guardrail", "jev"} {
-		if _, ok := extensions[section].(map[string]any); !ok {
-			t.Fatalf("product section extensions.%s was not passed through: %s", section, data)
-		}
-	}
-	for _, topLevel := range []string{"mcp", "search", "guardrail", "jev"} {
-		if _, ok := doc[topLevel]; ok {
-			t.Fatalf("product section %q leaked to the rejected top level: %s", topLevel, data)
-		}
+		runtimeSection(t, doc, section)
 	}
 	if !strings.Contains(string(data), "npx") || !strings.Contains(string(data), "search-key") {
 		t.Fatalf("product section values were not passed through: %s", data)
@@ -299,31 +288,45 @@ extensions:
 	}
 }
 
-// A legacy top-level product section is rejected by the harness during its own
-// strict file validation, so the control plane names the mistake and the right
-// location while the operator is editing settings instead of failing at the
-// next scan startup.
-func TestRuntimeConfigRejectsTopLevelProductSections(t *testing.T) {
+// An operator file that still uses the removed `extensions:` envelope is
+// promoted to flat root sections in the generated runtime document. The harness
+// rejects the envelope itself, so neither generated document may carry it, and
+// save-time validation must accept the migrated shape.
+func TestRuntimeConfigPromotesLegacyExtensionsEnvelope(t *testing.T) {
 	dir := t.TempDir()
 	source := writeOperatorConfig(t, dir, `llm:
   base_url: http://gateway.test/v1
   model: route
   api_key: key
-mcp:
-  mcpServers:
-    browser:
-      command: npx
+extensions:
+  mcp:
+    mcpServers:
+      browser:
+        command: npx
+  guardrail:
+    provider: jev
 `)
 	s, err := LoadAt(filepath.Join(dir, "settings.json"), source)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = s.RuntimeConfig(filepath.Join(dir, "runtime"))
-	if err == nil || !strings.Contains(err.Error(), "extensions") {
-		t.Fatalf("top-level mcp was not rejected with the extensions hint: %v", err)
+	path, err := s.RuntimeConfig(filepath.Join(dir, "runtime"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if err := s.ValidateRuntimeConfig(); err == nil || !strings.Contains(err.Error(), "extensions") {
-		t.Fatalf("save-time validation accepted a top-level product section: %v", err)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "extensions:") {
+		t.Fatalf("runtime document still carries the legacy envelope: %s", data)
+	}
+	doc := runtimeDocument(t, path)
+	for _, section := range []string{"mcp", "guardrail"} {
+		runtimeSection(t, doc, section)
+	}
+	if err := s.ValidateRuntimeConfig(); err != nil {
+		t.Fatalf("save-time validation rejected the migrated document: %v", err)
 	}
 }
 
@@ -347,5 +350,49 @@ func TestRuntimeConfigRejectsInvalidTrafficValues(t *testing.T) {
 				t.Fatalf("invalid traffic config was written to the runtime document: %s", document)
 			}
 		})
+	}
+}
+
+// The Hub never declares the scan-side product sections, and its strict file
+// validator rejects them. SharedRuntimeConfig therefore projects the same
+// operator document down to the shared sections plus the opaque gateway section.
+func TestSharedRuntimeConfigDropsScanSections(t *testing.T) {
+	dir := t.TempDir()
+	source := writeOperatorConfig(t, dir, `llm:
+  base_url: http://gateway.test/v1
+  model: route
+  api_key: key
+agent:
+  timeout: 60
+traffic:
+  body_storage: disk
+mcp:
+  mcpServers:
+    browser:
+      command: npx
+search:
+  tavily_keys: search-key
+guardrail:
+  provider: jev
+gateway:
+  scan:
+    base_url: http://127.0.0.1:1
+`)
+	s, err := LoadAt(filepath.Join(dir, "settings.json"), source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, err := s.SharedRuntimeConfig(filepath.Join(dir, "runtime"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := runtimeDocument(t, path)
+	for _, kept := range []string{"llm", "agent", "traffic", "gateway"} {
+		runtimeSection(t, doc, kept)
+	}
+	for _, dropped := range []string{"mcp", "search", "guardrail"} {
+		if _, ok := doc[dropped]; ok {
+			t.Fatalf("hub projection kept the scan-only section %q: %v", dropped, doc)
+		}
 	}
 }

@@ -392,7 +392,7 @@ func (m Model) Args() []string {
 // the form still shows the effective fallback values).
 //
 // McpServers / SearchHasKey are the product sections the local scan reads from
-// extensions (mcp.mcpServers, search.tavily_keys). On read they are masked; on a
+// the flat top-level sections (mcp.mcpServers, search.tavily_keys). On read they are masked; on a
 // PUT, McpServers=nil keeps the stored servers, an empty map removes them,
 // search_tavily_key=="" keeps the stored key and clear_search_key removes it.
 //
@@ -418,8 +418,8 @@ type View struct {
 	SearchKeyCount int                  `json:"search_key_count,omitempty"`
 	ProductError   string               `json:"product_error,omitempty"`
 
-	// Guardrail is the read-only tool-admission policy summary (extensions.
-	// guardrail / extensions.jev). It is never written by the settings API: the
+	// Guardrail is the read-only tool-admission policy summary (the guardrail /
+	// jev sections). It is never written by the settings API: the
 	// operator edits those sections directly, and the console only reports
 	// whether admission is in effect, fail-open, or shadowing.
 	Guardrail GuardrailPolicyView `json:"guardrail"`

@@ -265,7 +265,7 @@ func main() {
 		_ = os.Setenv(modelclient.EnvModel, *modelName)
 	}
 	eff := st.Effective()
-	harnessArgs, err := runtimeHarnessArgs(st, data, eff)
+	hubHarnessArgs, harnessArgs, err := runtimeHarnessArgs(st, data, eff)
 	if err != nil {
 		log.Fatalf("准备宿主运行配置：%v", err)
 	}
@@ -333,6 +333,7 @@ func main() {
 		Env:             hostEnv(eff.Env(), sessionEnv),
 		DropEnvPrefixes: []string{"SAKER_CONSOLE_TOKEN"},
 		Args:            harnessArgs,
+		HubArgs:         hubHarnessArgs,
 		ExcludeTools:    excludeTools,
 		// The local host is the one endpoint recorded on disk: its PID is how
 		// the next start knows the previous process did not stop cleanly.

@@ -7,7 +7,7 @@ package settings
 // The console therefore edits that file instead of keeping a second copy of the
 // same knobs. Reading it keeps the two in step when someone changes the model in
 // the harness UI or with `cyber-harness config use`; writing it preserves every
-// other section (agent, traffic, extensions, …) and every profile the console
+// other section (agent, traffic, the flat extension sections, …) and every profile the console
 // does not touch. The catalogue itself is the harness's own format; Saker only
 // maintains the active entry and never routes on it.
 
@@ -134,7 +134,7 @@ func readHarnessModel(path string) (Model, string, error) {
 }
 
 // writeHarnessModel updates the active profile in place. Everything the console
-// does not own (other profiles, agent/traffic/extensions sections, proxy,
+// does not own (other profiles, agent/traffic/extension sections, proxy,
 // timeout, images) is left exactly as it was.
 func writeHarnessModel(path string, m Model) error {
 	if path == "" {

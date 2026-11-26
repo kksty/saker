@@ -97,7 +97,7 @@ func TestPushRuntimeConfigTimesOutWithLastBinding(t *testing.T) {
 // future launch reads, and the live child keeps running.
 func TestStageConfigUpdatesPendingLaunchWithoutRestart(t *testing.T) {
 	h := &Host{}
-	h.StageConfig([]string{"CYBER_MODEL=new"}, []string{"--config", "new.yaml"})
+	h.StageConfig([]string{"CYBER_MODEL=new"}, []string{"--config", "hub.yaml"}, []string{"--config", "new.yaml"})
 	if got := h.cfg.Env; len(got) != 1 || got[0] != "CYBER_MODEL=new" {
 		t.Fatalf("env = %v", got)
 	}

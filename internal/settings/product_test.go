@@ -69,15 +69,15 @@ func TestSaveProductWritesExtensionsAndKeepsOtherSections(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	for _, want := range []string{"mcpServers:", "idalib-mcp", "tavily_keys: key-one,key-two", "guardrail:", "provider: jev", "model: route"} {
+	for _, want := range []string{"\nmcp:", "\nsearch:", "mcpServers:", "idalib-mcp", "tavily_keys: key-one,key-two", "guardrail:", "provider: jev", "model: route"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("saved config missing %q:\n%s", want, text)
 		}
 	}
-	for _, wrong := range []string{"\nmcp:", "\nsearch:"} {
-		if strings.Contains(text, wrong) {
-			t.Fatalf("product section written to the rejected top level:\n%s", text)
-		}
+	// The harness removed the xtensions: envelope; a save must keep writing
+	// flat root sections.
+	if strings.Contains(text, "extensions:") {
+		t.Fatalf("product sections were wrapped in the removed extensions envelope:\n%s", text)
 	}
 }
 
@@ -247,8 +247,8 @@ func TestSaveProductRejectsMaskWithoutStoredValue(t *testing.T) {
 	}
 }
 
-// The generated runtime document must carry the same extensions the scan needs,
-// so a settings save does not require a second hand-written file.
+// The generated runtime document must carry the same product sections the scan
+// needs, so a settings save does not require a second hand-written file.
 func TestRuntimeConfigIncludesSavedProductExtensions(t *testing.T) {
 	st, _ := productStore(t)
 	servers := map[string]MCPServer{"ida": {Command: "idalib-mcp"}}
@@ -264,16 +264,12 @@ func TestRuntimeConfigIncludesSavedProductExtensions(t *testing.T) {
 		t.Fatal(err)
 	}
 	doc := runtimeDocument(t, path)
-	extensions, ok := doc["extensions"].(map[string]any)
-	if !ok {
-		t.Fatalf("runtime lost extensions: %s", data)
-	}
-	mcp := extensions["mcp"].(map[string]any)
+	mcp := runtimeSection(t, doc, "mcp")
 	serversDoc := mcp["mcpServers"].(map[string]any)
 	if _, ok := serversDoc["ida"]; !ok {
 		t.Fatalf("runtime mcpServers missing ida: %s", data)
 	}
-	search := extensions["search"].(map[string]any)
+	search := runtimeSection(t, doc, "search")
 	if search["tavily_keys"] != "k1,k2" {
 		t.Fatalf("runtime search keys = %v", search["tavily_keys"])
 	}
@@ -423,5 +419,42 @@ func TestCheckModelOnlineKeepsHostVerdictWithProtoJSONLatency(t *testing.T) {
 	}
 	if !strings.Contains(probe.Error, "invalid key") {
 		t.Fatalf("host error lost: %q", probe.Error)
+	}
+}
+
+// An operator file that still uses the removed `extensions:` envelope must keep
+// reading: the console shows the stored MCP servers and search keys until the
+// next save migrates the file to flat sections.
+func TestProductReadsLegacyExtensionsEnvelope(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cyber.yaml")
+	body := `llm:
+    base_url: http://gateway.test/v1
+    model: route
+    api_key: gateway-key
+extensions:
+    mcp:
+        mcpServers:
+            ida:
+                command: idalib-mcp
+    search:
+        tavily_keys: legacy-key
+`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	st, err := LoadAt(filepath.Join(dir, "settings.json"), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	product, err := st.Product()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := product.MCPServers["ida"]; got.Command != "idalib-mcp" {
+		t.Fatalf("legacy mcp = %+v", got)
+	}
+	if product.SearchKeys != "legacy-key" {
+		t.Fatalf("legacy search keys = %q", product.SearchKeys)
 	}
 }

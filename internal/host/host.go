@@ -71,8 +71,14 @@ type Config struct {
 	// Env is applied. CYBER_* inherited from the parent must not override
 	// the shared model connection.
 	DropEnvPrefixes []string
-	// Args configure the Hub (--config, --context-window, …).
+	// Args configure the scan node (--config, --context-window, …).
 	Args []string
+	// HubArgs configure the Hub process. The Hub and the scan read different
+	// runtime documents: the Hub's strict validator rejects the scan-only
+	// product sections, so Saker writes a shared-only projection for it and the
+	// full document for the scan. Empty HubArgs reuses Args (one document for
+	// both, which is what tests and older callers expect).
+	HubArgs []string
 	// ExcludeTools is the harness's CYBER_EXCLUDE_TOOLS value for this host
 	// (for example "subagent"). Empty leaves the variable alone. Saker sets it
 	// by default so the harness does not expose delegation tools that create
@@ -576,7 +582,7 @@ func (h *Host) isStopping() bool {
 // operator's fix: the failure budget is reset and supervision resumes. That is
 // the console's "fix the key/base_url and retry" path (watchdog-liveness §9);
 // without it the only way back from a bad credential would be restarting saker.
-func (h *Host) Update(env, args []string) bool {
+func (h *Host) Update(env, hubArgs, nodeArgs []string) bool {
 	h.mu.Lock()
 	if h.stopping {
 		h.mu.Unlock()
@@ -585,10 +591,11 @@ func (h *Host) Update(env, args []string) bool {
 	// Saving the settings page without changing anything must not restart the
 	// host: the restart kills every local AOP session, which marks the runs on
 	// this node as failed. Healthy hosts restart only on a configuration change.
-	changed := !equalStrings(h.cfg.Env, env) || !equalStrings(h.cfg.Args, args)
+	changed := !equalStrings(h.cfg.Env, env) || !equalStrings(h.cfg.HubArgs, hubArgs) || !equalStrings(h.cfg.Args, nodeArgs)
 	if changed {
 		h.cfg.Env = append([]string(nil), env...)
-		h.cfg.Args = append([]string(nil), args...)
+		h.cfg.HubArgs = append([]string(nil), hubArgs...)
+		h.cfg.Args = append([]string(nil), nodeArgs...)
 	}
 	cmd := h.cmd
 	// A failed model can be fixed outside this process (for example a balance
@@ -727,6 +734,10 @@ func (h *Host) execLaunch() (*process, error) {
 	h.mu.Lock()
 	env := append([]string(nil), h.cfg.Env...)
 	extra := append([]string(nil), h.cfg.Args...)
+	hubExtra := append([]string(nil), h.cfg.HubArgs...)
+	if len(hubExtra) == 0 {
+		hubExtra = extra
+	}
 	h.mu.Unlock()
 	childEnv := withExcludeTools(h.childEnv(env), h.cfg.ExcludeTools)
 	start := func(bin, name string, args []string) (*exec.Cmd, error) {
@@ -748,7 +759,7 @@ func (h *Host) execLaunch() (*process, error) {
 		}
 		return cmd, nil
 	}
-	hub, err := start(h.cfg.Bin, "hub", append(h.execArgs(), extra...))
+	hub, err := start(h.cfg.Bin, "hub", append(h.execArgs(), hubExtra...))
 	if err != nil {
 		return nil, err
 	}

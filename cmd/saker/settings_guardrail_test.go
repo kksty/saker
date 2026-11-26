@@ -65,6 +65,21 @@ func TestSettingsGETExposesGuardrailPolicy(t *testing.T) {
 				}
 			},
 		},
+		"flat sections": {
+			// The harness now reads flat root sections; the legacy `extensions:`
+			// fixtures around it keep pinning the read fallback for old files.
+			sections: `guardrail:
+  provider: jev
+  on_error: allow
+jev:
+  api_key: jev-secret
+`,
+			check: func(t *testing.T, got settingsGuardrailJSON) {
+				if !got.Guardrail.Configured || got.Guardrail.Provider != "jev" || !got.Guardrail.JEVConfigured {
+					t.Fatalf("flat = %+v", got.Guardrail)
+				}
+			},
+		},
 		"jev fail-open": {
 			sections: `extensions:
   guardrail:

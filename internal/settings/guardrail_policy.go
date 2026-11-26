@@ -5,22 +5,21 @@ package settings
 // The console has to be able to say whether tool admission is actually in
 // effect, whether a judge failure fails open, and whether a shadow rollout is
 // silently allowing everything. That answer lives in the operator's cyber.yaml
-// (`extensions.guardrail` + `extensions.jev`), which the control plane never
+// (the flat `guardrail` and `jev` sections), which the control plane never
 // edits: this file only reads it.
 //
 // The shape follows the harness fork's pluggable-judge configuration:
 //
-//	extensions:
-//	  guardrail:
-//	    provider: none|jev|llm|hybrid
-//	    mode: auto|safe
-//	    on_error: allow|review|block        # default review
-//	    shadow: false                       # judge+record, always allow
-//	    scope: [bash, subagent]             # empty = all tools
-//	    allow_prefixes: ["git status"]      # safe mode only
-//	    llm: { base_url, model, api_key, temperature, max_tokens }
-//	  jev:
-//	    api_key: ...                        # or TYPESAFE_API_KEY
+//	guardrail:
+//	  provider: none|jev|llm|hybrid
+//	  mode: auto|safe
+//	  on_error: allow|review|block        # default review
+//	  shadow: false                       # judge+record, always allow
+//	  scope: [bash, subagent]             # empty = all tools
+//	  allow_prefixes: ["git status"]      # safe mode only
+//	  llm: { base_url, model, api_key, temperature, max_tokens }
+//	jev:
+//	  api_key: ...                        # or TYPESAFE_API_KEY
 //
 // A missing section is "not configured" and a malformed one is reported as
 // configured=false with a short reason; neither may break the rest of the
@@ -36,8 +35,8 @@ import (
 )
 
 // GuardrailPolicyView is the read-only guardrail summary returned inside the
-// instance settings view. Configured is false when extensions.guardrail is
-// missing, has no provider, or would be rejected by the harness; Reason then
+// instance settings view. Configured is false when the `guardrail`
+// section is missing, has no provider, or would be rejected by the harness; Reason then
 // says why (one sentence, no secrets).
 type GuardrailPolicyView struct {
 	Configured bool   `json:"configured"`
@@ -89,33 +88,32 @@ func (s *Store) GuardrailPolicy() GuardrailPolicyView {
 		view.Reason = "无法读取 harness 配置，守门状态未知"
 		return view
 	}
-	extensions := mapGet(doc, "extensions")
-	guardrailNode := mapGet(extensions, "guardrail")
-	view.JEVConfigured = jevKeyConfigured(mapGet(extensions, "jev"))
+	guardrailNode := sectionNode(doc, "guardrail")
+	view.JEVConfigured = jevKeyConfigured(sectionNode(doc, "jev"))
 	if guardrailNode == nil {
-		view.Reason = "未配置 extensions.guardrail：工具审批未启用（默认 provider=none）"
+		view.Reason = "未配置 guardrail：工具审批未启用（默认 provider=none）"
 		return view
 	}
 	if guardrailNode.Kind != yaml.MappingNode {
-		view.Reason = "extensions.guardrail 必须是映射"
+		view.Reason = "guardrail 必须是映射"
 		return view
 	}
 	for i := 0; i+1 < len(guardrailNode.Content); i += 2 {
 		key := guardrailNode.Content[i].Value
 		if !guardrailSectionKeys[key] {
-			view.Reason = fmt.Sprintf("extensions.guardrail 含未知字段 %q，宿主会拒绝该配置", key)
+			view.Reason = fmt.Sprintf("guardrail 含未知字段 %q，宿主会拒绝该配置", key)
 			return view
 		}
 	}
 	provider := strings.ToLower(scalar(mapGet(guardrailNode, "provider")))
 	switch provider {
 	case "":
-		view.Reason = "extensions.guardrail.provider 为空（默认 none）：工具审批未启用"
+		view.Reason = "guardrail.provider 为空（默认 none）：工具审批未启用"
 		return view
 	case "none", "jev", "llm", "hybrid":
 		view.Provider = provider
 	default:
-		view.Reason = fmt.Sprintf("extensions.guardrail.provider=%q 不合法（只允许 none/jev/llm/hybrid）", provider)
+		view.Reason = fmt.Sprintf("guardrail.provider=%q 不合法（只允许 none/jev/llm/hybrid）", provider)
 		return view
 	}
 	mode := strings.ToLower(scalar(mapGet(guardrailNode, "mode")))
@@ -123,7 +121,7 @@ func (s *Store) GuardrailPolicy() GuardrailPolicyView {
 		mode = "auto"
 	}
 	if mode != "auto" && mode != "safe" {
-		view.Reason = fmt.Sprintf("extensions.guardrail.mode=%q 不合法（只允许 auto/safe）", mode)
+		view.Reason = fmt.Sprintf("guardrail.mode=%q 不合法（只允许 auto/safe）", mode)
 		return view
 	}
 	view.Mode = mode
@@ -132,14 +130,14 @@ func (s *Store) GuardrailPolicy() GuardrailPolicyView {
 		onError = "review"
 	}
 	if onError != "allow" && onError != "review" && onError != "block" {
-		view.Reason = fmt.Sprintf("extensions.guardrail.on_error=%q 不合法（只允许 allow/review/block）", onError)
+		view.Reason = fmt.Sprintf("guardrail.on_error=%q 不合法（只允许 allow/review/block）", onError)
 		return view
 	}
 	view.OnError = onError
 	if shadow := mapGet(guardrailNode, "shadow"); shadow != nil {
 		value, err := boolScalar(shadow)
 		if err != nil {
-			view.Reason = "extensions.guardrail.shadow 不是布尔值"
+			view.Reason = "guardrail.shadow 不是布尔值"
 			return view
 		}
 		view.Shadow = value
@@ -147,7 +145,7 @@ func (s *Store) GuardrailPolicy() GuardrailPolicyView {
 	if scope := mapGet(guardrailNode, "scope"); scope != nil {
 		tools, err := stringList(scope)
 		if err != nil {
-			view.Reason = "extensions.guardrail.scope 必须是工具名列表"
+			view.Reason = "guardrail.scope 必须是工具名列表"
 			return view
 		}
 		if tools != nil {
@@ -157,14 +155,14 @@ func (s *Store) GuardrailPolicy() GuardrailPolicyView {
 	if prefixes := mapGet(guardrailNode, "allow_prefixes"); prefixes != nil {
 		items, err := stringList(prefixes)
 		if err != nil {
-			view.Reason = "extensions.guardrail.allow_prefixes 必须是字符串列表"
+			view.Reason = "guardrail.allow_prefixes 必须是字符串列表"
 			return view
 		}
 		view.AllowPrefixesCount = len(items)
 	}
 	if llm := mapGet(guardrailNode, "llm"); llm != nil {
 		if llm.Kind != yaml.MappingNode {
-			view.Reason = "extensions.guardrail.llm 必须是映射"
+			view.Reason = "guardrail.llm 必须是映射"
 			return view
 		}
 		view.LLM = GuardrailLLMView{
@@ -176,7 +174,7 @@ func (s *Store) GuardrailPolicy() GuardrailPolicyView {
 	// A judge provider with no dedicated llm binding is still "configured" for
 	// the jev path; for llm/hybrid the console needs to know it cannot run.
 	if (view.Provider == "llm" || view.Provider == "hybrid") && !view.LLM.Configured {
-		view.Reason = fmt.Sprintf("provider=%s 但 extensions.guardrail.llm 未配置 base_url/model：裁判无法生效", view.Provider)
+		view.Reason = fmt.Sprintf("provider=%s 但 guardrail.llm 未配置 base_url/model：裁判无法生效", view.Provider)
 		return view
 	}
 	view.Configured = true
