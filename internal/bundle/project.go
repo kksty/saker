@@ -288,7 +288,7 @@ func CleanTransferRoot(dataDir string) error {
 			if err := os.RemoveAll(path); err != nil {
 				return err
 			}
-		case entry.Type().IsRegular() && strings.HasPrefix(name, "upload-") && (strings.HasSuffix(name, ".sakerproj") || strings.HasSuffix(name, ".twproj")):
+		case entry.Type().IsRegular() && strings.HasPrefix(name, "upload-") && (strings.HasSuffix(name, ".sakerproj")):
 			if err := os.Remove(path); err != nil {
 				return err
 			}

@@ -121,9 +121,9 @@ test('project export is a JSON POST and import uploads the archive as the body',
   }
   try {
     await api.exportProject('p-1')
-    // A legacy .twproj archive must go up untouched: the page never inspects the
-    // suffix, so an export made before the rename stays importable.
-    const archive = new File(['PK'], 'p-1.twproj', { type: 'application/zip' })
+    // Import uploads the archive byte-for-byte: the page never inspects the
+    // suffix, so the server stays the one place that validates the format.
+    const archive = new File(['PK'], 'p-1.sakerproj', { type: 'application/zip' })
     await api.importProject(archive)
     assert.deepEqual(calls.map(c => ({ url: c.url, method: c.method, type: c.type })), [
       { url: '/api/projects/p-1/export', method: 'POST', type: 'application/json' },

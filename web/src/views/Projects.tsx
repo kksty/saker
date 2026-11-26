@@ -125,7 +125,6 @@ export function Projects({
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState<ProjectInfo | null>(null)
   // Whole-project transfer: export downloads one .sakerproj; import uploads one.
-  // Archives exported before the rename carry .twproj and are still accepted.
   // Large files are streamed by the browser, never parsed in the page.
   const [exporting, setExporting] = useState('')
   const [importing, setImporting] = useState(false)
@@ -226,7 +225,7 @@ export function Projects({
           <input
             ref={fileInput}
             type="file"
-            accept=".sakerproj,.twproj,application/zip"
+            accept=".sakerproj,application/zip"
             className="hidden"
             aria-hidden="true"
             onChange={(e) => void importFile(e.target.files?.[0])}
@@ -398,7 +397,7 @@ export function Projects({
             导入、导出与删除说明
           </summary>
           <p className="text-caption leading-relaxed text-ink-2">
-            导出前请暂停项目并等运行结束。导出的 <span className="font-mono">.sakerproj</span> 包含项目清单、账本、状态笔记、运行日志、证据与登录材料；改名前的 <span className="font-mono">.twproj</span> 包仍可导入。导入会创建一个暂停的项目，允许同名。确认删除后会停止运行并清理项目图谱、工作区和运行日志。已镜像的漏洞条目与全局工具会保留。
+            导出前请暂停项目并等运行结束。导出的 <span className="font-mono">.sakerproj</span> 包含项目清单、账本、状态笔记、运行日志、证据与登录材料。导入会创建一个暂停的项目，允许同名。确认删除后会停止运行并清理项目图谱、工作区和运行日志。已镜像的漏洞条目与全局工具会保留。
           </p>
         </details>
       </div>

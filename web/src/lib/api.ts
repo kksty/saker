@@ -481,8 +481,7 @@ export const api = {
     ),
   // Whole-project transfer. Export refuses a running project server-side: the
   // archive must describe one committed state, so the button first tells the
-  // operator to pause. Import is an upload of the .sakerproj file (or a legacy
-  // .twproj archive, which the server still accepts).
+  // operator to pause. Import is an upload of the .sakerproj file.
   exportProject: (id: string) =>
     post<ProjectExportResult>(`/api/projects/${encodeURIComponent(id)}/export`),
   projectExportURL: (name: string) => `/api/exports/${encodeURIComponent(name)}`,

@@ -408,45 +408,22 @@ func corruptZipEntry(t *testing.T, path, name string, body []byte) {
 	writeZipEntries(t, path, entries)
 }
 
-// A renamed product must not orphan archives made before the rename: the export
-// suffix is new, and import still accepts the old one. This is the data-format
-// half of the rename, kept separate from display names.
-func TestLegacyTwprojArchiveStillImports(t *testing.T) {
-	dir, st, _ := seedProject(t)
-	archive := filepath.Join(t.TempDir(), "legacy-export.twproj")
-	if _, err := ExportProject(dir, st, archive, "test"); err != nil {
-		t.Fatalf("ExportProject: %v", err)
-	}
-	got, err := ImportProject(archive, t.TempDir())
-	if err != nil {
-		t.Fatalf("a .twproj archive was refused: %v", err)
-	}
-	if got.Project.ID != "p-test" {
-		t.Fatalf("imported id = %s", got.Project.ID)
-	}
-}
-
-// Boot sweep after an interrupted upload must clean both the new staging suffix
-// and the one a previous build left behind.
-func TestCleanTransferRootRemovesBothUploadSuffixes(t *testing.T) {
+// Boot sweep after an interrupted upload must clean the staging file a previous
+// build left behind.
+func TestCleanTransferRootRemovesAbandonedUpload(t *testing.T) {
 	data := t.TempDir()
 	root := filepath.Join(data, ".transfer")
 	if err := os.Mkdir(root, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	legacy := filepath.Join(root, "upload-old.twproj")
 	current := filepath.Join(root, "upload-new.sakerproj")
-	for _, p := range []string{legacy, current} {
-		if err := os.WriteFile(p, []byte("partial"), 0o600); err != nil {
-			t.Fatal(err)
-		}
+	if err := os.WriteFile(current, []byte("partial"), 0o600); err != nil {
+		t.Fatal(err)
 	}
 	if err := CleanTransferRoot(data); err != nil {
 		t.Fatal(err)
 	}
-	for _, p := range []string{legacy, current} {
-		if _, err := os.Stat(p); !os.IsNotExist(err) {
-			t.Fatalf("abandoned upload survived: %s: %v", p, err)
-		}
+	if _, err := os.Stat(current); !os.IsNotExist(err) {
+		t.Fatalf("abandoned upload survived: %s: %v", current, err)
 	}
 }
