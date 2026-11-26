@@ -2421,6 +2421,11 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 			log.Printf("run %s：归档任务书失败：%v", runID, err)
 		} else {
 			_, _ = s.Store.UpdateRun(runID, func(r *model.Run) { r.BriefPath = rel })
+			if in.Wait != nil {
+				if err := s.Store.MarkWaitDelivery(runID, model.WaitDeliveryArchived, rel); err != nil {
+					log.Printf("run %s：记录等待结果归档失败：%v", runID, err)
+				}
+			}
 		}
 	}
 	// A per-run identity is the collaboration credential: one token, one run,
@@ -2442,6 +2447,7 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 		}
 	}
 	modelRecorded := false
+	waitReceived := false
 	var executionObserved atomic.Bool
 	// Liveness (final-e2e I1): a weak model can emit "empty assistant reply ->
 	// llm_request" forever, which keeps the idle sweep from ever firing.
@@ -2461,6 +2467,15 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 		Eval:     in.Eval,
 		MaxTurns: in.MaxTurns,
 	}, func(ev executor.Event) {
+		// The first event is the confirmable node that proves the executor's
+		// session started this turn, including the wait results the archived
+		// brief carried. Before it, a crash leaves the delivery redeliverable.
+		if in.Wait != nil && !waitReceived {
+			waitReceived = true
+			if err := s.Store.MarkWaitDelivery(runID, model.WaitDeliveryReceived, ""); err != nil {
+				log.Printf("run %s：记录等待结果已送达失败：%v", runID, err)
+			}
+		}
 		if ev.Kind == executor.KindToolCall || ev.Kind == executor.KindToolResult || ev.NativeOperation != nil {
 			executionObserved.Store(true)
 		}
@@ -2497,6 +2512,16 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 			s.noteModelStall(runID)
 		}
 	})
+
+	// A turn that made at least one model call or produced a tool event has
+	// certainly received its prompt. Without this confirmation the next claim
+	// would redeliver results the executor already acted on.
+	if in.Wait != nil && !waitReceived && (executionObserved.Load() || res.UsageRequests > 0) {
+		waitReceived = true
+		if err := s.Store.MarkWaitDelivery(runID, model.WaitDeliveryReceived, ""); err != nil {
+			log.Printf("run %s：记录等待结果已送达失败：%v", runID, err)
+		}
+	}
 
 	status, reason := model.RunDone, ""
 	stopCleanup()
@@ -2556,7 +2581,8 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 	// here on OnFinish is the only writer, so its update-by-title cannot race
 	// with the watcher's add-by-title.
 	stopFacts()
-	declared := s.Ingest.OnFinish(runID, in.ID, s.CaseRoot, workDir, started)
+	settled := s.Ingest.Settle(runID, in.ID, s.CaseRoot, workDir, started)
+	declared := settled.Declared
 	// The finish ingest writes the authoritative fact set; route its changes
 	// before the run settles so related directions are notified promptly.
 	s.routeAndDeliver()

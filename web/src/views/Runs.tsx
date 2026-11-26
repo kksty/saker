@@ -777,6 +777,79 @@ export function Runs({
                   {/* What this run was dispatched against, frozen: premise claim
                       versions and the context record versions it actually saw. */}
                   <RunEvidenceView run={current} facts={facts.data ?? []} onSelectFact={openFactInGraph} />
+                  {/* The run's own outcome and its handoff delivery are two
+                      different states: a done run can still owe facts or
+                      evidence. Both are shown, with the exact declaration
+                      spans an offline idempotent repair needs. */}
+                  {current.ingest && (
+                    <div
+                      className={cn(
+                        'space-y-1 rounded-md border px-2.5 py-2',
+                        current.ingest.committed
+                          ? 'border-hairline bg-surface-2/30'
+                          : 'border-warning/25 bg-warning/[0.07]',
+                      )}
+                    >
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] font-medium">
+                        {current.ingest.committed ? (
+                          <ShieldCheck className="h-3.5 w-3.5 text-ink-3" />
+                        ) : (
+                          <TriangleAlert className="h-3.5 w-3.5 text-warning" />
+                        )}
+                        <span className={current.ingest.committed ? 'text-ink-2' : 'text-warning'}>
+                          交接入账：{current.ingest.committed ? '已全部落账' : '运行已结束，交付未入账'}
+                        </span>
+                        <span className="text-[11px] font-normal text-ink-3">
+                          声明 {fmtInt(current.ingest.declared)} 条 · 事实{' '}
+                          {fmtInt(current.ingest.persisted_facts)}/{fmtInt(current.ingest.facts)} ·
+                          证据 {fmtInt(current.ingest.persisted_evidence)} · 打法{' '}
+                          {fmtInt(current.ingest.persisted_playbooks)}/{fmtInt(current.ingest.playbooks)} ·
+                          游标 {fmtInt(current.ingest.cursor_before)}
+                          {current.ingest.committed
+                            ? ` → ${fmtInt(current.ingest.cursor_after)}`
+                            : `（停在 ${fmtInt(current.ingest.cursor_before)}）`}
+                        </span>
+                      </div>
+                      {!current.ingest.committed && (
+                        <>
+                          {(current.ingest.pending ?? []).slice(0, 8).map((p, i) => (
+                            <div key={`${p.declaration_id ?? p.location ?? i}`} className="saker-break text-[11px] leading-relaxed text-ink-2">
+                              <span className="font-mono text-ink-1">{p.declaration_id || p.title || '未命名声明'}</span>
+                              {p.location ? <span className="ml-1 font-mono text-ink-3">{p.location}</span> : null}
+                              {(p.reasons ?? []).length > 0 ? <span>：{(p.reasons ?? []).join('；')}</span> : null}
+                            </div>
+                          ))}
+                          {(current.ingest.pending ?? []).length > 8 && (
+                            <div className="text-[11px] text-ink-3">
+                              …还有 {(current.ingest.pending ?? []).length - 8} 条，见 run.ingest.pending
+                            </div>
+                          )}
+                          {(current.ingest.reasons ?? []).length > 0 && (
+                            <div className="saker-break text-[11px] leading-relaxed text-ink-3">
+                              {(current.ingest.reasons ?? []).join('；')}
+                            </div>
+                          )}
+                          <div className="text-[11px] text-ink-3">
+                            修复只按同一批声明幂等补写账本，不重跑执行者、不重做外部动作：先停止 saker 并暂停项目，再执行
+                            <span className="ml-1 font-mono">saker-repair --project &lt;项目&gt; --intent {current.intent_id} --ingest --commit</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {current.wait_delivery && (
+                    <div className="rounded-md border border-hairline bg-surface-2/30 px-2.5 py-1.5 text-[11px] text-ink-3">
+                      等待结果交付：
+                      {current.wait_delivery.status === 'received'
+                        ? '执行者已收到'
+                        : current.wait_delivery.status === 'archived'
+                          ? '输入已归档，等待执行者确认'
+                          : '结果已就绪，等待派发归档'}
+                      {current.wait_delivery.brief_path ? (
+                        <span className="ml-1 font-mono">{current.wait_delivery.brief_path}</span>
+                      ) : null}
+                    </div>
+                  )}
                   {(current.warnings?.length ?? 0) > 0 &&
                     (current.warnings_dismissed ? (
                       <div className="rounded-md border border-hairline bg-surface-2/40 px-2.5 py-2 text-[11px] text-ink-3">

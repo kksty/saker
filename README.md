@@ -86,19 +86,25 @@ data/       运行时实例目录（账本、项目、证据、console.token）�
 
 gate 的最后一步写 `.build/build-manifest.json`（步骤清单见 `cmd/saker-gate/main.go:10-25`）：源码身份（仓库根、commit、branch、dirty、工作树补丁 SHA-256）、harness 身份与提交、AOP 生成文件的聚合 fingerprint 与逐文件 SHA-256、协议版本、平台与工具链、模型连接与真实上游 model id、各二进制的 sha256 与 `--version` 输出。清单从不写 API key。
 
-## 离线修复交接游标
+## 离线修复交接与派发回执
 
-历史有效置信度、交接游标的修复都要求项目暂停且 `saker` 已停止，先预览、核对后再提交：
+历史有效置信度、交接游标、未完成入账和提议派发回执的修复都要求项目暂停且 `saker` 已停止，先预览、核对后再提交：
 
 ```powershell
 ./bin/saker-repair.exe --project <项目绝对目录> --confidence            # 预览
 ./bin/saker-repair.exe --project <项目绝对目录> --confidence --commit   # 先备份账本再写回
 ./bin/saker-repair.exe --project <项目绝对目录> --intent <精确意图ID>    # 预览该意图的交接游标
+./bin/saker-repair.exe --project <项目绝对目录> --intent <精确意图ID> --ingest          # 预览未完成入账
+./bin/saker-repair.exe --project <项目绝对目录> --intent <精确意图ID> --ingest --commit # 幂等补写该批声明
+./bin/saker-repair.exe --project <项目绝对目录> --proposals            # 预览历史缺回执的提议
+./bin/saker-repair.exe --project <项目绝对目录> --proposals --commit   # 只补归属明确的回执
 ```
 
 意图预览的 `persisted` 是本批中已与账本核对的声明数。`pending` 给出待核对声明的 ID、文件字节范围及原因。`skipped` 和 `truncated` 分别标识解析时跳过的行数和是否还有超出本批读取上限的内容。预览只读账本和交接文件。
 
-`--commit` 只写回能保留断言哈希的派生标签或与现存声明一致的游标，并保留修复前的游标、文件摘要与审计记录。
+`--ingest --commit` 从运行记录的结构化入账结果定位未提交批次，只重读 `facts.jsonl` 的同一批声明并幂等补写账本与消费游标，不启动执行者。`--proposals --commit` 只补「批准后该意图恰有一个可归属运行」的回执；多个候选或没有运行时保留原因，不改账本。
+
+`--commit` 只写回能保留断言哈希的派生标签、与现存声明一致的游标或已核对的入账批次，并保留修复前的备份与审计记录。
 
 ## 免责声明
 

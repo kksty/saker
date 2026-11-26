@@ -124,6 +124,8 @@ func detachRun(r model.Run) model.Run {
 	}
 	r.Warnings = append([]string(nil), r.Warnings...)
 	r.Infos = append([]string(nil), r.Infos...)
+	r.Ingest = detachIngestOutcome(r.Ingest)
+	r.WaitDelivery = detachWaitDelivery(r.WaitDelivery)
 	if r.DeclarationStart != nil {
 		v := *r.DeclarationStart
 		r.DeclarationStart = &v
@@ -141,6 +143,43 @@ func detachRun(r model.Run) model.Run {
 		r.LastTurnStartedAt = &v
 	}
 	return r
+}
+
+// detachIngestOutcome and detachWaitDelivery give run snapshots their own
+// aggregate state: UpdateRun edits the live row in place, and a caller may
+// marshal a run while settlement appends a pending declaration.
+func detachIngestOutcome(in *model.IngestOutcome) *model.IngestOutcome {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	out.Pending = append([]model.PendingDeclaration(nil), in.Pending...)
+	for i := range out.Pending {
+		out.Pending[i].Reasons = append([]string(nil), in.Pending[i].Reasons...)
+	}
+	out.Reasons = append([]string(nil), in.Reasons...)
+	return &out
+}
+
+func detachWaitDelivery(d *model.WaitDelivery) *model.WaitDelivery {
+	if d == nil {
+		return nil
+	}
+	out := *d
+	out.Wait = detachWait(d.Wait)
+	if d.ReadyAt != nil {
+		v := *d.ReadyAt
+		out.ReadyAt = &v
+	}
+	if d.ArchivedAt != nil {
+		v := *d.ArchivedAt
+		out.ArchivedAt = &v
+	}
+	if d.ReceivedAt != nil {
+		v := *d.ReceivedAt
+		out.ReceivedAt = &v
+	}
+	return &out
 }
 
 func copyVersions(v map[string]uint64) map[string]uint64 {

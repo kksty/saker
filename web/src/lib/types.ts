@@ -734,6 +734,48 @@ export interface Notebook {
   run_id?: string
 }
 
+/** One handoff line whose ledger write did not commit (Run.ingest.pending). */
+export interface PendingDeclaration {
+  declaration_id?: string
+  source_ref?: string
+  kind?: string
+  title?: string
+  /** Byte span in `.saker/facts.jsonl`, e.g. `.saker/facts.jsonl#bytes=120-180`. */
+  location?: string
+  reasons?: string[]
+}
+
+/** Structured result of one run's handoff settlement (`settled|partial|unavailable`). */
+export interface RunIngest {
+  status: 'settled' | 'partial' | 'unavailable' | string
+  declared: number
+  facts: number
+  playbooks: number
+  persisted_facts: number
+  persisted_evidence: number
+  persisted_playbooks: number
+  cursor_before: number
+  cursor_after: number
+  /** False while any pending declaration keeps the consumption cursor back. */
+  committed: boolean
+  truncated?: boolean
+  bad?: number
+  pending?: PendingDeclaration[]
+  /** Batch-level failures that cannot be attributed to one declaration. */
+  reasons?: string[]
+  recorded_at?: string
+}
+
+/** Where a satisfied wait's results stand in the delivery chain. */
+export interface WaitDelivery {
+  status: 'ready' | 'archived' | 'received' | string
+  wait?: IntentWait
+  brief_path?: string
+  ready_at?: string
+  archived_at?: string
+  received_at?: string
+}
+
 export interface Run {
   native_subagent_calls?: number
   native_subagent_active?: number
@@ -798,6 +840,11 @@ export interface Run {
   auto_resume_attempt?: number
   events: number
   declared_facts: number
+  /** Structured settlement of this run's handoff. Absent on old rows. */
+  ingest?: RunIngest
+  /** A satisfied wait this run was started to carry; it is redelivered after an
+   *  interrupted dispatch until the executor has confirmed receiving it. */
+  wait_delivery?: WaitDelivery
   stop_reason?: string
   tokens?: number
   log_path?: string
@@ -1282,6 +1329,20 @@ export interface BoardView {
   coverage?: CoverageItem[]
   /** Directions the operator/commander explicitly stopped. */
   held_intents?: BoardItem[]
+  /** Recent runs whose handoff settlement did not commit (bounded). */
+  ingest_pending?: IngestPendingItem[]
+}
+
+/** One incomplete handoff settlement as the board/commander sees it. */
+export interface IngestPendingItem {
+  run: string
+  intent_id?: string
+  at: string
+  status: string
+  persisted: number
+  declared: number
+  pending?: PendingDeclaration[]
+  reasons?: string[]
 }
 
 export interface CoverageItem {

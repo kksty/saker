@@ -426,6 +426,29 @@ export function Overview({
                     </div>
                   </Callout>
                 )}
+                {(board.ingest_pending?.length ?? 0) > 0 && (
+                  <Callout tone="warning" icon={<CircleAlert className="h-4 w-4" />}>
+                    <div className="space-y-1">
+                      <div className="text-[12.5px] font-medium text-ink">
+                        最近 <span className="font-mono saker-nums">{board.ingest_pending!.length}</span> 个 run 已结束但交接入账未完成（修复不重跑执行者）
+                      </div>
+                      {board.ingest_pending!.slice(0, 3).map((w) => (
+                        <div key={w.run} className="saker-break text-[11px] leading-relaxed text-ink-2">
+                          <span className="font-mono">{w.run}</span>
+                          {w.intent_id ? ` · ${w.intent_id}` : ''}：已入账 {w.persisted}/{w.declared} 条
+                          {w.pending?.[0]
+                            ? `；待补 ${w.pending[0].declaration_id || w.pending[0].title || '未命名声明'}${w.pending[0].location ? ` @ ${w.pending[0].location}` : ''}`
+                            : w.reasons?.[0]
+                              ? `；${w.reasons[0]}`
+                              : ''}
+                        </div>
+                      ))}
+                      {board.ingest_pending!.length > 3 && (
+                        <div className="text-[11px] text-ink-3">…更多见「运行」页每条 run 的交接入账状态</div>
+                      )}
+                    </div>
+                  </Callout>
+                )}
                 <ExecutorPanel
                   board={board}
                   runs={runList}

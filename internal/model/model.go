@@ -961,6 +961,109 @@ type Handoff struct {
 // stop here, so this is the one number; do not restate it in either package.
 const MaxRunWarnings = 20
 
+// Ingest status values. They describe the handoff settlement separately from the
+// run's own outcome: a run can be done while its declared facts/evidence are
+// still pending.
+const (
+	// IngestSettled means every parsed declaration was persisted and the
+	// consumption cursor advanced: the next run reads only newer lines.
+	IngestSettled = "settled"
+	// IngestPartial means at least one parsed declaration could not be persisted;
+	// the cursor stayed where it was so a replay can retry exactly that batch.
+	IngestPartial = "partial"
+	// IngestUnavailable means the handoff itself could not be read (or no run
+	// row exists), so the ledger cannot even name what is pending.
+	IngestUnavailable = "unavailable"
+)
+
+// PendingDeclaration locates one handoff line whose ledger write did not commit.
+// DeclarationID is the writer's identity when it supplied one; Location is the
+// byte span in .saker/facts.jsonl, so an operator can open the exact line
+// without replaying the executor.
+type PendingDeclaration struct {
+	DeclarationID string   `json:"declaration_id,omitempty"`
+	SourceRef     string   `json:"source_ref,omitempty"`
+	Kind          string   `json:"kind,omitempty"`
+	Title         string   `json:"title,omitempty"`
+	Location      string   `json:"location,omitempty"`
+	Reasons       []string `json:"reasons,omitempty"`
+}
+
+// IngestOutcome is the structured result of settling one run's handoff. It is
+// persisted on the run row, so the console and the commander can tell "the run
+// finished" apart from "its delivery was written" without reading the log.
+type IngestOutcome struct {
+	Status string `json:"status"`
+	// Declared is the number of valid lines read, the same contract metric as
+	// the run's declared_facts. Facts and Playbooks split it by destination.
+	Declared  int `json:"declared"`
+	Facts     int `json:"facts"`
+	Playbooks int `json:"playbooks"`
+	// Persisted* count the writes this settlement committed (an idempotent
+	// replay of an already written row still counts as persisted).
+	PersistedFacts     int `json:"persisted_facts"`
+	PersistedEvidence  int `json:"persisted_evidence"`
+	PersistedPlaybooks int `json:"persisted_playbooks"`
+	// CursorBefore is the offset the batch started at; CursorAfter is the
+	// committed offset (equal to CursorBefore when the batch is incomplete).
+	CursorBefore int64 `json:"cursor_before"`
+	CursorAfter  int64 `json:"cursor_after"`
+	// Committed means the consumption cursor advanced past this batch. It is
+	// false while any Pending declaration remains.
+	Committed bool `json:"committed"`
+	// Truncated/Bad mirror the handoff reader: the cap stopped before the tail,
+	// or the named number of lines could not be parsed (those lines were
+	// consumed and are not pending — they need a fresh declaration).
+	Truncated bool `json:"truncated,omitempty"`
+	Bad       int  `json:"bad,omitempty"`
+	// Pending locates every declaration that kept the cursor from advancing.
+	Pending []PendingDeclaration `json:"pending,omitempty"`
+	// Reasons are batch-level failures that cannot be tied to one declaration
+	// (handoff unreadable, cursor write failed, evidence harvest failed).
+	Reasons []string `json:"reasons,omitempty"`
+	// RecordedAt is when the settlement attempted the write.
+	RecordedAt time.Time `json:"recorded_at"`
+}
+
+// Wait delivery status values. The result set moves through confirmable nodes;
+// an interrupted dispatch is retried from the last confirmed node without
+// redoing the external action that produced the result.
+const (
+	// WaitDeliveryReady means the satisfied wait's results are bound to the run
+	// together with its creation, before any prompt is built.
+	WaitDeliveryReady = "ready"
+	// WaitDeliveryArchived means the turn's input (including the results) has
+	// been archived at run.BriefPath.
+	WaitDeliveryArchived = "archived"
+	// WaitDeliveryReceived means the executor's session produced evidence that
+	// it started the turn; the result no longer needs redelivery.
+	WaitDeliveryReceived = "received"
+)
+
+// WaitDelivery is the durable hand-off of one satisfied wait into a run. The
+// wait itself is consumed by the claim, so without this copy a crash between
+// the claim commit and the executor receiving the prompt lost the results.
+type WaitDelivery struct {
+	Status string `json:"status"`
+	// Wait is the consumed condition: results, mode, reason and (for an
+	// operator handoff) the request/response. It is copied, not referenced, so
+	// later ledger edits cannot change what this run was promised.
+	Wait *Wait `json:"wait,omitempty"`
+	// BriefPath is the archived prompt that carried the results; set when
+	// Status is archived or received.
+	BriefPath string `json:"brief_path,omitempty"`
+	// ReadyAt/ArchivedAt/ReceivedAt are the observed delivery nodes. Nil means
+	// that node was never confirmed.
+	ReadyAt    *time.Time `json:"ready_at,omitempty"`
+	ArchivedAt *time.Time `json:"archived_at,omitempty"`
+	ReceivedAt *time.Time `json:"received_at,omitempty"`
+}
+
+// Settled reports whether the delivery has reached the executor.
+func (d *WaitDelivery) Settled() bool {
+	return d == nil || d.Status == WaitDeliveryReceived
+}
+
 // Run is one executor invocation for one intent.
 type Run struct {
 	NativeSubagentCalls      int       `json:"native_subagent_calls,omitempty"`
@@ -1052,6 +1155,15 @@ type Run struct {
 	// never started a turn: nothing it carried could have been read.
 	LastTurnStartedAt *time.Time `json:"last_turn_started_at,omitempty"`
 	DeclaredFacts     int        `json:"declared_facts"`
+	// Ingest is the structured settlement of this run's handoff. A nil value is
+	// a run from before this field existed (or a purpose run with no handoff),
+	// not a claim that nothing was declared.
+	Ingest *IngestOutcome `json:"ingest,omitempty"`
+	// WaitDelivery is the satisfied wait this run was started to carry. It is
+	// written in the same claim transaction as the run row and advances through
+	// ready -> archived -> received, so a crash before the executor saw the
+	// prompt can redeliver exactly this result.
+	WaitDelivery *WaitDelivery `json:"wait_delivery,omitempty"`
 	// StopReason is the harness's own verdict on the turn (completed / canceled
 	// / error). It sits next to the exit code because a harness can exit 0 after
 	// a failed turn (docs/11-protocol.md).

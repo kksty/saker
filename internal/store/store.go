@@ -798,6 +798,40 @@ func (s *Store) UpdateRun(id string, fn func(*model.Run)) (model.Run, error) {
 	return model.Run{}, fmt.Errorf("run %s not found", id)
 }
 
+// RecordRunIngest stores one run's structured handoff settlement. It is not a
+// fact/intent graph change, so it uses flushNoRev and does not run UpdateRun's
+// action cleanup: replaying an old batch must not rewrite unrelated action rows.
+func (s *Store) RecordRunIngest(runID string, out model.IngestOutcome) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.db.Runs {
+		if s.db.Runs[i].ID != runID {
+			continue
+		}
+		s.db.Runs[i].Ingest = detachIngestOutcome(&out)
+		return s.flushNoRev("run")
+	}
+	return fmt.Errorf("run %s not found", runID)
+}
+
+// UpdateRunDiagnostics writes a run's diagnostic fields without treating the
+// run as settling: no action cleanup and no decider wake. Offline repair uses it
+// so replaying an old batch cannot rewrite unrelated action rows.
+func (s *Store) UpdateRunDiagnostics(id string, fn func(*model.Run)) (model.Run, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.db.Runs {
+		if s.db.Runs[i].ID != id {
+			continue
+		}
+		s.db.Runs[i] = detachRun(s.db.Runs[i])
+		fn(&s.db.Runs[i])
+		s.db.Runs[i] = detachRun(s.db.Runs[i])
+		return detachRun(s.db.Runs[i]), s.flushNoRev("run")
+	}
+	return model.Run{}, fmt.Errorf("run %s not found", id)
+}
+
 func (s *Store) GetRun(id string) (model.Run, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

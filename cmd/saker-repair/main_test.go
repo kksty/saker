@@ -191,6 +191,140 @@ func TestCursorPreviewLocatesFailedFactAfterPartialSettlement(t *testing.T) {
 	}
 }
 
+func TestIngestRepairReplaysOnlyTheUncommittedBatch(t *testing.T) {
+	dir := t.TempDir()
+	writeManifest(t, dir, map[string]any{"id": "p1", "name": "fixture", "paused": true})
+	path := filepath.Join(dir, "ledger.sqlite")
+	st, err := store.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in, err := st.CreateIntent(model.Intent{Title: "收口失败"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dispatchedRun, err := st.AddRun(model.Run{IntentID: in.ID, Node: "local"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	caseRoot := filepath.Join(dir, "cases")
+	work := filepath.Join(caseRoot, in.ID)
+	if err := os.MkdirAll(filepath.Join(work, ledger.HandoffDir), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	first := `{"declaration_id":"kept","kind":"note","title":"已写入"}` + "\n"
+	second := `{"declaration_id":"blocked","kind":"note","title":"待补写"}` + "\n"
+	if err := os.WriteFile(filepath.Join(work, ledger.HandoffDir, ledger.HandoffFile), []byte(first+second), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := raw.Exec(`CREATE TRIGGER fail_blocked_fact BEFORE INSERT ON objects
+		WHEN NEW.kind = 'fact' AND instr(CAST(NEW.payload AS TEXT), '"declaration_id":"blocked"') > 0
+		BEGIN SELECT RAISE(ABORT,'fixture write failure'); END`); err != nil {
+		t.Fatal(err)
+	}
+	outcome := (&ledger.Ingestor{Store: st, MaxEvidence: 200}).Settle(dispatchedRun.ID, in.ID, caseRoot, work, time.Now().Add(-time.Minute))
+	if outcome.Committed || len(outcome.Pending) != 1 {
+		t.Fatalf("seed settlement = %+v", outcome)
+	}
+	if _, err := raw.Exec("DROP TRIGGER fail_blocked_fact"); err != nil {
+		t.Fatal(err)
+	}
+	raw.Close()
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	var preview bytes.Buffer
+	if err := run([]string{"--project", dir, "--intent", in.ID, "--ingest"}, &preview); err != nil {
+		t.Fatalf("preview: %v", err)
+	}
+	if !strings.Contains(preview.String(), dispatchedRun.ID) || !strings.Contains(preview.String(), `"blocked"`) {
+		t.Fatalf("preview does not locate the pending run/declaration:\n%s", preview.String())
+	}
+	var committed bytes.Buffer
+	if err := run([]string{"--project", dir, "--intent", in.ID, "--ingest", "--commit"}, &committed); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+	if !strings.Contains(committed.String(), `"status": "settled"`) {
+		t.Fatalf("commit outcome:\n%s", committed.String())
+	}
+	after, err := store.ReadSnapshot(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(after.Runs) != 1 {
+		t.Fatalf("repair started another run: %+v", after.Runs)
+	}
+	var facts int
+	for _, f := range after.Facts {
+		if f.IntentID == in.ID {
+			facts++
+		}
+	}
+	if facts != 2 {
+		t.Fatalf("facts after repair = %d, want 2", facts)
+	}
+	if after.Runs[0].Ingest == nil || !after.Runs[0].Ingest.Committed || after.Runs[0].Ingest.Status != model.IngestSettled {
+		t.Fatalf("run ingest after repair = %+v", after.Runs[0].Ingest)
+	}
+	if consumed := ledger.Consumed(work); consumed != int64(len(first)+len(second)) {
+		t.Fatalf("cursor after repair = %d", consumed)
+	}
+}
+
+func TestProposalReceiptRepairFillsOnlyAttributableRun(t *testing.T) {
+	dir := t.TempDir()
+	writeManifest(t, dir, map[string]any{"id": "p1", "name": "fixture", "paused": true})
+	path := filepath.Join(dir, "ledger.sqlite")
+	st, err := store.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, _, err := st.CreateProposal(model.Proposal{
+		ID: "pr_1", Title: "历史派发", FromParticipantID: "pt_in_x",
+		IdempotencyKey: "k1", FromIntentID: "in_x",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, intent, err := st.DecideProposal(p.ID, p.Version, true, "", "commander")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, dispatchedRun, err := st.StartIntentRun(intent.ID, "local", "", model.Run{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	var preview bytes.Buffer
+	if err := run([]string{"--project", dir, "--proposals"}, &preview); err != nil {
+		t.Fatalf("preview: %v", err)
+	}
+	if !strings.Contains(preview.String(), `"status": "fill"`) || !strings.Contains(preview.String(), dispatchedRun.ID) {
+		t.Fatalf("preview:\n%s", preview.String())
+	}
+	if err := run([]string{"--project", dir, "--proposals", "--commit"}, &bytes.Buffer{}); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+	after, err := store.ReadSnapshot(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(after.Proposals) != 1 || after.Proposals[0].Status != model.ProposalDispatched || after.Proposals[0].RunID != dispatchedRun.ID {
+		t.Fatalf("proposal after repair = %+v", after.Proposals)
+	}
+	if backups, _ := filepath.Glob(filepath.Join(dir, "ledger-before-proposals-*.sqlite")); len(backups) != 1 {
+		t.Fatalf("backup = %v", backups)
+	}
+}
+
 func writeManifest(t *testing.T, dir string, content map[string]any) {
 	t.Helper()
 	raw, err := json.Marshal(content)
