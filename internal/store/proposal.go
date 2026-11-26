@@ -220,33 +220,7 @@ func (s *Store) WithdrawProposal(id string, expectedVersion uint64, by string) (
 	return model.Proposal{}, fmt.Errorf("%w：%s", ErrProposalNotFound, id)
 }
 
-// MarkProposalDispatched records the run that a separate dispatch started. It is
-// called after StartRun succeeded: the intent's atomic claim is what guarantees
-// a second dispatch cannot start a second run, and this row is the receipt. by
-// is the dispatching actor; the run row already records the executor, so the
-// dispatcher itself is not another field on the proposal.
-func (s *Store) MarkProposalDispatched(id string, expectedVersion uint64, runID, by string) (model.Proposal, error) {
-	runID = strings.TrimSpace(runID)
-	if runID == "" || strings.TrimSpace(by) == "" {
-		return model.Proposal{}, fmt.Errorf("%w：run_id 与派发人不能为空", ErrProposalInvalid)
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for i := range s.db.Proposals {
-		p := &s.db.Proposals[i]
-		if p.ID != id {
-			continue
-		}
-		if p.Status != model.ProposalApproved || p.Version != expectedVersion {
-			return model.Proposal{}, fmt.Errorf("%w：提议当前为 %s v%d（请求 v%d）",
-				ErrProposalConflict, p.Status, p.Version, expectedVersion)
-		}
-		now := time.Now()
-		p.Status = model.ProposalDispatched
-		p.RunID = runID
-		p.Version++
-		p.UpdatedAt = now
-		return detachProposal(*p), s.flush("proposal")
-	}
-	return model.Proposal{}, fmt.Errorf("%w：%s", ErrProposalNotFound, id)
-}
+// Dispatch commits its receipt through StartProposalRun (admission.go), in the
+// same transaction as the intent claim and run row. There is deliberately no
+// separate "mark dispatched" write: a second path is how a run could exist while
+// its proposal still read approved.

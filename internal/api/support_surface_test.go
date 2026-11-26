@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -89,7 +90,7 @@ func TestAgentCannotReadOrCancelASupportRun(t *testing.T) {
 	if err := os.MkdirAll(runsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(runsDir, reportRun.ID+".jsonl"), []byte(currentJournalLine(t, `{"kind":"message"}`) + "\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(runsDir, reportRun.ID+".jsonl"), []byte(currentJournalLine(t, `{"kind":"message"}`)+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -172,7 +173,7 @@ func TestAgentBoardHidesTheReviewQueue(t *testing.T) {
 	if got := read(httptest.NewRequest(http.MethodGet, "/api/board", nil)); !got.Paused {
 		t.Fatalf("operator board must show the review queue (paused=%v): %+v", got.Paused, got)
 	}
-	if got := read(agentRequest(s, http.MethodGet, "/api/board")); got != (reviewSummary{}) {
+	if got := read(agentRequest(s, http.MethodGet, "/api/board")); !reflect.DeepEqual(got, reviewSummary{}) {
 		t.Fatalf("agent board leaked the review queue: %+v", got)
 	}
 }
@@ -231,7 +232,7 @@ func TestCommanderProjectSurfaceHidesSupportRunsAndReviewQueue(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, id := range []string{verifyRun.ID, reportRun.ID, directionRun.ID} {
-		if err := os.WriteFile(filepath.Join(runsDir, id+".jsonl"), []byte(currentJournalLine(t, `{"kind":"message"}`) + "\n"), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(runsDir, id+".jsonl"), []byte(currentJournalLine(t, `{"kind":"message"}`)+"\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -263,7 +264,7 @@ func TestCommanderProjectSurfaceHidesSupportRunsAndReviewQueue(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &board); err != nil {
 		t.Fatal(err)
 	}
-	if board.Reviews != (reviewSummary{}) {
+	if !reflect.DeepEqual(board.Reviews, reviewSummary{}) {
 		t.Fatalf("commander board leaked the review queue: %+v", board.Reviews)
 	}
 }
@@ -390,7 +391,7 @@ func TestParticipantTailHidesSupportRuns(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, id := range []string{verifyRun.ID, directionRun.ID} {
-		if err := os.WriteFile(filepath.Join(runsDir, id+".jsonl"), []byte(currentJournalLine(t, `{"kind":"message"}`) + "\n"), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(runsDir, id+".jsonl"), []byte(currentJournalLine(t, `{"kind":"message"}`)+"\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -123,7 +123,8 @@ func TestLiveDeliveryPreventsRetractionAndPreservesEarlyAck(t *testing.T) {
 	for _, fail := range []bool{false, true} {
 		t.Run(map[bool]string{false: "accepted", true: "transport_error"}[fail], func(t *testing.T) {
 			f := newAgentFixture(t)
-			f.makeLive(t)
+			run := f.makeLive(t)
+			f.tgtID.RunID = run.ID
 			f.srv.Say = func(_ context.Context, _ model.Intent, _ aopexec.SessionInfo, _ string, _ bool) (string, error) {
 				m := f.p.Store.Messages(10)[0]
 				if m.Status != model.MessageSending {

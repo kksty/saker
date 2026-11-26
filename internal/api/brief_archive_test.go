@@ -232,9 +232,12 @@ func TestArchivedBriefRedactsKnownSecrets(t *testing.T) {
 	s := &Server{CaseRoot: t.TempDir()}
 	s.Secrets = func() []string { return []string{secret} }
 	workDir := filepath.Join(s.CaseRoot, "in_1")
-	rel, err := s.archiveBrief(workDir, "r_secret", "前 "+secret+" 后")
+	rel, digest, size, err := s.archiveBrief(workDir, "r_secret", "前 "+secret+" 后")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if digest == "" || size == 0 {
+		t.Fatalf("archive returned digest=%q size=%d", digest, size)
 	}
 	data, err := os.ReadFile(filepath.Join(s.CaseRoot, filepath.FromSlash(rel)))
 	if err != nil {
@@ -245,6 +248,80 @@ func TestArchivedBriefRedactsKnownSecrets(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "***") {
 		t.Fatalf("archived brief was not redacted: %s", data)
+	}
+}
+
+// An archive failure is a recorded state, not just a log line. A file that could
+// not be written and a file that was written but whose ledger path did not commit
+// are different operator problems and must stay distinguishable after the run.
+func TestBriefArchiveRecordsWriteFailureAndPathWritebackGap(t *testing.T) {
+	s, p := newBindingServer(t)
+	if err := p.SetNodeBinding([]string{"local"}, "local"); err != nil {
+		t.Fatal(err)
+	}
+	ex := &briefExec{}
+	s.Exec = ex
+	in, err := p.Store.CreateIntent(model.Intent{Title: "验证 /admin", Description: "只读"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make the briefs directory uncreatable: .saker exists, and "briefs" is a file.
+	caseDir := filepath.Join(p.CaseDir, in.ID)
+	if err := os.MkdirAll(filepath.Join(caseDir, ".saker"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(caseDir, ".saker", "briefs"), []byte("not a dir"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runID, err := s.StartRun(in.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitRun(t, p, runID)
+	run, _ := p.Store.GetRun(runID)
+	if run.BriefArchive == nil || run.BriefArchive.Status != model.BriefArchiveWriteFailed || run.BriefArchive.Error == "" {
+		t.Fatalf("write failure not recorded: %+v", run.BriefArchive)
+	}
+	if run.BriefPath != "" {
+		t.Fatalf("a failed archive claims a path: %q", run.BriefPath)
+	}
+
+	// Second run: the file writes, but the ledger path write fails. The run must
+	// keep the pending state even though the bytes are on disk.
+	s2, p2 := newBindingServer(t)
+	if err := p2.SetNodeBinding([]string{"local"}, "local"); err != nil {
+		t.Fatal(err)
+	}
+	s2.Exec = &briefExec{}
+	in2, err := p2.Store.CreateIntent(model.Intent{Title: "验证 /admin", Description: "只读"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := writeBriefArchivePath
+	writeBriefArchivePath = func(*Server, string, string, string, int) error {
+		return errors.New("ledger writeback unavailable")
+	}
+	defer func() { writeBriefArchivePath = old }()
+	runID2, err := s2.StartRun(in2.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitRun(t, p2, runID2)
+	run2, _ := p2.Store.GetRun(runID2)
+	if run2.BriefArchive == nil || run2.BriefArchive.Status != model.BriefArchivePending {
+		t.Fatalf("path writeback gap not recorded as pending: %+v", run2.BriefArchive)
+	}
+	if run2.BriefPath != "" {
+		t.Fatalf("a pending archive claims a committed path: %q", run2.BriefPath)
+	}
+	archived := filepath.Join(p2.CaseDir, in2.ID, ".saker", "briefs", runID2+".md")
+	if _, err := os.Stat(archived); err != nil {
+		t.Fatalf("the file the run actually read is missing from disk: %v", err)
+	}
+	// The console surface carries the state, not only the run row.
+	body := call(t, s2, http.MethodGet, "/api/runs", nil).Body.String()
+	if !strings.Contains(body, `"brief_archive"`) || !strings.Contains(body, model.BriefArchivePending) {
+		t.Fatalf("/api/runs does not expose the archive state: %s", body)
 	}
 }
 

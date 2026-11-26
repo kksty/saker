@@ -498,6 +498,13 @@ func (s *Service) ProjectCapacity() (running, limit int) {
 
 // ---- start ----
 
+// proposalClaim identifies the proposal row whose dispatch receipt commits with
+// the intent claim and run row. A nil claim is a normal start.
+type proposalClaim struct {
+	ID              string
+	ExpectedVersion uint64
+}
+
 // Start claims one direction and launches its run. It is the only admission
 // entry point: handlers and the scheduler both call it, so the closing/deleting/
 // paused gates, project/instance capacity, blocked premises, CAS claim
@@ -507,23 +514,45 @@ func (s *Service) ProjectCapacity() (running, limit int) {
 // wake or a replacement session all arrive here with the prompt already built
 // (keeping prompt assembly in the API).
 func (s *Service) Start(id, prompt, continuedFrom string, resume, keepPrompt bool, owner string) (string, error) {
-	return s.start(id, prompt, continuedFrom, resume, keepPrompt, owner, "")
+	_, runID, err := s.start(id, prompt, continuedFrom, resume, keepPrompt, owner, nil, "")
+	return runID, err
 }
 
 // StartAutoRedispatch records provenance on the same transaction as the new run.
 func (s *Service) StartAutoRedispatch(id, prompt, continuedFrom string, resume, keepPrompt bool, previousRun string) (string, error) {
-	return s.start(id, prompt, continuedFrom, resume, keepPrompt, "", previousRun)
+	_, runID, err := s.start(id, prompt, continuedFrom, resume, keepPrompt, "", nil, previousRun)
+	return runID, err
 }
 
-func (s *Service) start(id, prompt, continuedFrom string, resume, keepPrompt bool, owner, autoRedispatchedFrom string) (string, error) {
+// StartProposal is Start for a proposal dispatch. The proposal version check,
+// the intent claim, the run row and the dispatch receipt are committed by one
+// store transaction before the executor is launched; a retry after the response
+// was lost returns the recorded run instead of starting a second one.
+func (s *Service) StartProposal(proposalID string, expectedVersion uint64, id, prompt, continuedFrom string, resume, keepPrompt bool, owner string) (model.Proposal, string, error) {
+	// A completed dispatch is a receipt, not a new start. Check it before the
+	// admission gates: the intent may already have settled since, and a retry
+	// must still be answered with the original run.
+	if p, ok := s.o.Store.GetProposal(proposalID); ok && p.Status == model.ProposalDispatched {
+		if p.RunID == "" {
+			return model.Proposal{}, "", fmt.Errorf("%w：提议 %s 已派发但缺少运行回执", store.ErrProposalConflict, p.ID)
+		}
+		if run, found := s.o.Store.GetRun(p.RunID); !found || run.IntentID != p.IntentID {
+			return model.Proposal{}, "", fmt.Errorf("%w：提议 %s 的回执运行 %s 不在账本中", store.ErrProposalConflict, p.ID, p.RunID)
+		}
+		return p, p.RunID, nil
+	}
+	return s.start(id, prompt, continuedFrom, resume, keepPrompt, owner, &proposalClaim{ID: proposalID, ExpectedVersion: expectedVersion}, "")
+}
+
+func (s *Service) start(id, prompt, continuedFrom string, resume, keepPrompt bool, owner string, claim *proposalClaim, autoRedispatchedFrom string) (model.Proposal, string, error) {
 	if s.o.Gates.Closing.Load() {
-		return "", errors.New("控制台正在关闭：不能再派发")
+		return model.Proposal{}, "", errors.New("控制台正在关闭：不能再派发")
 	}
 	if s.o.Gates.Deleting.Load() {
-		return "", errors.New("项目正在删除：不能再派发")
+		return model.Proposal{}, "", errors.New("项目正在删除：不能再派发")
 	}
 	if s.o.Gates.Paused.Load() {
-		return "", errors.New("项目已暂停：点「继续」后再派发")
+		return model.Proposal{}, "", errors.New("项目已暂停：点「继续」后再派发")
 	}
 	// Concurrent starts are serialized so the cap is a real cap: two API calls
 	// arriving together must not both observe "one slot free".
@@ -538,30 +567,30 @@ func (s *Service) start(id, prompt, continuedFrom string, resume, keepPrompt boo
 
 	in, ok := s.o.Store.GetIntent(id)
 	if !ok {
-		return "", fmt.Errorf("intent %s 不存在", id)
+		return model.Proposal{}, "", fmt.Errorf("intent %s 不存在", id)
 	}
 	if resume && continuedFrom != "" && in.RunID != continuedFrom {
-		return "", fmt.Errorf("意图已切换运行，拒绝续接过期 run %s", continuedFrom)
+		return model.Proposal{}, "", fmt.Errorf("意图已切换运行，拒绝续接过期 run %s", continuedFrom)
 	}
 	if limit := s.o.ProjectLimit(); limit > 0 && s.o.RunningIntentCount() >= limit {
-		return "", fmt.Errorf("并发已到上限 %d：等一个 run 结束，或在「设置 → 项目并发」/ --max-runs 调大", limit)
+		return model.Proposal{}, "", fmt.Errorf("并发已到上限 %d：等一个 run 结束，或在「设置 → 项目并发」/ --max-runs 调大", limit)
 	}
 	if maxWorkers := s.o.MaxWorkers(); maxWorkers > 0 && s.o.GlobalRunning != nil {
 		if running := s.o.GlobalRunning(); running >= maxWorkers {
-			return "", fmt.Errorf("实例并发已到上限 %d（--max-workers）：等一个 run 结束再派发", maxWorkers)
+			return model.Proposal{}, "", fmt.Errorf("实例并发已到上限 %d（--max-workers）：等一个 run 结束再派发", maxWorkers)
 		}
 	}
 	// The graph is the memory: a direction whose from_facts are gone or were
 	// rejected is dead work, not queued work (D52).
 	if blocked := s.o.BlockedPremises(in); len(blocked) > 0 {
-		return "", fmt.Errorf("意图 %s 的前提事实不成立：%s", id, strings.Join(blocked, "；"))
+		return model.Proposal{}, "", fmt.Errorf("意图 %s 的前提事实不成立：%s", id, strings.Join(blocked, "；"))
 	}
 	if in.Status == model.StatusRunning || in.Status == model.StatusClaimed {
-		return "", fmt.Errorf("intent %s 已在运行", id)
+		return model.Proposal{}, "", fmt.Errorf("intent %s 已在运行", id)
 	}
 	run, nodeID, err := s.o.PlanRun(in, continuedFrom)
 	if err != nil {
-		return "", err
+		return model.Proposal{}, "", err
 	}
 
 	run.AutoRedispatchedFrom = autoRedispatchedFrom
@@ -571,12 +600,26 @@ func (s *Service) start(id, prompt, continuedFrom string, resume, keepPrompt boo
 	s.mu.Lock()
 	if s.o.Gates.Paused.Load() || s.o.Gates.Deleting.Load() || s.o.Gates.Closing.Load() {
 		s.mu.Unlock()
-		return "", errors.New("项目已暂停、正在删除或控制台关闭：不能再派发")
+		return model.Proposal{}, "", errors.New("项目已暂停、正在删除或控制台关闭：不能再派发")
 	}
-	claimed, run, err := s.o.Store.StartIntentRun(id, nodeID, owner, run)
+	var claimed model.Intent
+	var dispatched model.Proposal
+	created := false
+	if claim != nil {
+		dispatched, claimed, run, created, err = s.o.Store.StartProposalRun(claim.ID, claim.ExpectedVersion, nodeID, owner, run)
+	} else {
+		claimed, run, err = s.o.Store.StartIntentRun(id, nodeID, owner, run)
+		created = err == nil
+	}
 	if err != nil {
 		s.mu.Unlock()
-		return "", err
+		return model.Proposal{}, "", err
+	}
+	if !created {
+		// Another request committed this dispatch between our read and the
+		// transaction. The receipt is the answer; nothing is launched here.
+		s.mu.Unlock()
+		return dispatched, run.ID, nil
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancels[run.ID] = cancel
@@ -594,7 +637,7 @@ func (s *Service) start(id, prompt, continuedFrom string, resume, keepPrompt boo
 		}()
 		s.o.Dispatch(ctx, claimed, run.ID, nodeID, resume, prompt, keepPrompt)
 	}()
-	return run.ID, nil
+	return dispatched, run.ID, nil
 }
 
 // ---- settlement ----

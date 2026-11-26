@@ -30,14 +30,14 @@ func fixture(t *testing.T) (dir string, db fixtureDB) {
 	}
 
 	fact := model.Fact{
-		ID: "f_1", IntentID: "in_1", Kind: "vuln", Title: "/admin 越权",
+		ID: "f_1", IntentID: "in_1", Kind: "vuln", Title: "/admin 越权", ClaimVersion: 1,
 		Summary:     "普通用户可读全部订单",
 		EvidenceIDs: []string{"e_1"}, Status: "verified", CreatedAt: time.Now(),
 	}
 	ev := model.Evidence{ID: "e_1", URI: "in_1/admin.html", Name: "admin.html"}
 
 	write(EvidenceDir+"/e_1-admin.html", "HTTP/1.1 200 OK")
-	write(Findings, `[{"fact":"f_1","verdict":"confirmed","title":"/admin 越权",
+	write(Findings, `[{"fact":"f_1","fact_claim_version":1,"verdict":"confirmed","title":"/admin 越权",
 		"location":"http://t:18099/admin","preconditions":"普通用户会话","impact":"读取全部订单",
 		"trace":"GET /admin → 200","evidence":["`+EvidenceDir+`/e_1-admin.html"]}]`)
 	write(IndexFile, "# 报告\n\n- 结论：/admin 越权\n")
@@ -66,8 +66,8 @@ func validate(t *testing.T, dir string, fx fixtureDB) map[string]Check {
 func TestValidatePassesOnCompleteReport(t *testing.T) {
 	dir, fx := fixture(t)
 	checks := validate(t, dir, fx)
-	if len(checks) != 11 {
-		t.Fatalf("expected all 11 rules to run, got %d", len(checks))
+	if len(checks) != 12 {
+		t.Fatalf("expected all 12 rules to run, got %d", len(checks))
 	}
 	for rule, c := range checks {
 		if !c.OK {
@@ -106,7 +106,7 @@ func TestValidateRefusesOnlyOverReportedSeverity(t *testing.T) {
 	fx.db.Facts[0].Severity = model.SeverityMedium
 	writeSeverity := func(sev string) {
 		t.Helper()
-		body := `[{"fact":"f_1","verdict":"confirmed","title":"/admin 越权","severity":"` + sev + `",
+		body := `[{"fact":"f_1","fact_claim_version":1,"verdict":"confirmed","title":"/admin 越权","severity":"` + sev + `",
 			"location":"http://t:18099/admin","preconditions":"普通用户会话","impact":"读取全部订单",
 			"trace":"GET /admin → 200","evidence":["` + EvidenceDir + `/e_1-admin.html"]}]`
 		if err := os.WriteFile(filepath.Join(dir, Findings), []byte(body), 0o644); err != nil {
@@ -143,7 +143,7 @@ func TestValidateRefusesOnlyOverReportedSeverity(t *testing.T) {
 
 func TestValidateCatchesThinConfirmedFinding(t *testing.T) {
 	dir, fx := fixture(t)
-	body := `[{"fact":"f_1","verdict":"confirmed","title":"x","location":"http://t/a",
+	body := `[{"fact":"f_1","fact_claim_version":1,"verdict":"confirmed","title":"x","location":"http://t/a",
 		"preconditions":"","impact":"","trace":"","evidence":["evidence/e_1-admin.html"]}]`
 	_ = os.WriteFile(filepath.Join(dir, Findings), []byte(body), 0o644)
 	c := validate(t, dir, fx)["confirmed_fields"]
@@ -154,7 +154,7 @@ func TestValidateCatchesThinConfirmedFinding(t *testing.T) {
 
 func TestValidateCatchesEvidenceEscape(t *testing.T) {
 	dir, fx := fixture(t)
-	body := `[{"fact":"f_1","verdict":"confirmed","title":"x","location":"a","preconditions":"b",
+	body := `[{"fact":"f_1","fact_claim_version":1,"verdict":"confirmed","title":"x","location":"a","preconditions":"b",
 		"impact":"c","trace":"d","evidence":["../../etc/passwd"]}]`
 	_ = os.WriteFile(filepath.Join(dir, Findings), []byte(body), 0o644)
 	if c := validate(t, dir, fx)["evidence_inside"]; c.OK {
@@ -185,7 +185,7 @@ func TestValidateCatchesEvidenceOwnedByAnotherFact(t *testing.T) {
 	dir, fx := fixture(t)
 	// A path that exists but was copied for a different evidence id.
 	_ = os.WriteFile(filepath.Join(dir, EvidenceDir, "e_9-admin.html"), []byte("x"), 0o644)
-	body := `[{"fact":"f_1","verdict":"confirmed","title":"x","location":"a","preconditions":"b",
+	body := `[{"fact":"f_1","fact_claim_version":1,"verdict":"confirmed","title":"x","location":"a","preconditions":"b",
 		"impact":"c","trace":"d","evidence":["evidence/e_9-admin.html"]}]`
 	_ = os.WriteFile(filepath.Join(dir, Findings), []byte(body), 0o644)
 	c := validate(t, dir, fx)["evidence_inside"]
@@ -219,7 +219,7 @@ func TestRecentPassMakesAnOldFactFresh(t *testing.T) {
 	dir, fx := fixture(t)
 	fx.db.Facts[0].CreatedAt = time.Now().Add(-60 * 24 * time.Hour)
 	fx.db.Reviews = []model.Review{{
-		ID: "rv_1", FactID: "f_1", Verdict: "pass", CreatedAt: time.Now(),
+		ID: "rv_1", FactID: "f_1", Verdict: "pass", ClaimVersion: 1, CreatedAt: time.Now(),
 	}}
 	if c := validate(t, dir, fx)["freshness"]; !c.OK {
 		t.Fatalf("a fact re-tested today must not be stale: %+v", c)
@@ -232,7 +232,7 @@ func TestNeedsEvidenceDoesNotRefreshAFact(t *testing.T) {
 	dir, fx := fixture(t)
 	fx.db.Facts[0].CreatedAt = time.Now().Add(-60 * 24 * time.Hour)
 	fx.db.Reviews = []model.Review{{
-		ID: "rv_1", FactID: "f_1", Verdict: "needs_evidence", CreatedAt: time.Now(),
+		ID: "rv_1", FactID: "f_1", Verdict: "needs_evidence", ClaimVersion: 1, CreatedAt: time.Now(),
 	}}
 	if c := validate(t, dir, fx)["freshness"]; c.OK {
 		t.Fatal("needs_evidence is not a successful re-test")
@@ -252,7 +252,7 @@ func TestValidateCatchesRowForUnknownFact(t *testing.T) {
 	dir, fx := fixture(t)
 	// A row pointing at an id nobody recorded: ownership is skipped for facts
 	// that do not resolve, so this used to pass every other rule.
-	body := `[{"fact":"f_1","verdict":"confirmed","title":"x","location":"a","preconditions":"b",
+	body := `[{"fact":"f_1","fact_claim_version":1,"verdict":"confirmed","title":"x","location":"a","preconditions":"b",
 		"impact":"c","trace":"d","evidence":[]},
 		{"fact":"f_404","verdict":"candidate","title":"凭空"}]`
 	_ = os.WriteFile(filepath.Join(dir, Findings), []byte(body), 0o644)
@@ -275,7 +275,7 @@ func TestValidateCatchesRowForRejectedFact(t *testing.T) {
 func TestValidateOnlyAcceptsTwoVerdicts(t *testing.T) {
 	dir, fx := fixture(t)
 	for _, verdict := range []string{"dismissed", "inconclusive"} {
-		body := `[{"fact":"f_1","verdict":"` + verdict + `","title":"x"}]`
+		body := `[{"fact":"f_1","fact_claim_version":1,"verdict":"` + verdict + `","title":"x"}]`
 		_ = os.WriteFile(filepath.Join(dir, Findings), []byte(body), 0o644)
 		c := validate(t, dir, fx)["verdict_enum"]
 		if c.OK {

@@ -62,17 +62,23 @@ func (s *Server) handoffIntent(w http.ResponseWriter, r *http.Request) {
 	}
 	updated, handoff, runID, err := s.HandoffIntent(r.Context(), id, req.Profile, req.Note, req.ExpectedVersion)
 	if err != nil {
-		status := http.StatusBadRequest
 		switch {
 		case errors.Is(err, store.ErrHandoffConflict):
-			status = http.StatusConflict
+			// The caller's version is stale (another session handed the direction
+			// over). The console refreshes and keeps the typed note; the machine
+			// code is what tells it this is a version conflict, not a refusal.
+			writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "handoff_conflict"})
+			return
 		case errors.Is(err, store.ErrHandoffUnarchived):
-			status = http.StatusConflict
+			writeErr(w, http.StatusConflict, err.Error())
+			return
 		case strings.Contains(err.Error(), "已结束"):
-			status = http.StatusConflict
+			writeErr(w, http.StatusConflict, err.Error())
+			return
+		default:
+			writeErr(w, http.StatusBadRequest, err.Error())
+			return
 		}
-		writeErr(w, status, err.Error())
-		return
 	}
 	writeJSON(w, http.StatusAccepted, map[string]any{
 		"intent": updated, "handoff": handoff, "run_id": runID,
@@ -265,9 +271,14 @@ type handoffAuthorization struct {
 	SourceRun string
 	// SourceBrief is that run's archived dispatch text, empty when it has none.
 	SourceBrief string
+	// SourceArchiveStatus/Error say whether the path above is trustworthy. A
+	// half-written archive (file exists, ledger path did not commit) must not be
+	// presented as readable just because a path string was found.
+	SourceArchiveStatus string
+	SourceArchiveError  string
 }
 
-func handoffSection(db store.DB, in model.Intent, h model.Handoff, auth handoffAuthorization) string {
+func handoffSection(db store.DB, in model.Intent, h model.Handoff, auth handoffAuthorization, showUnverified bool) string {
 	byID := map[string]model.Fact{}
 	for _, f := range db.Facts {
 		byID[f.ID] = f
@@ -288,9 +299,26 @@ func handoffSection(db store.DB, in model.Intent, h model.Handoff, auth handoffA
 	b.WriteString("简报修订时间：" + revision + "。\n")
 	b.WriteString("\n### 原文出处\n")
 	if strings.TrimSpace(auth.SourceBrief) != "" {
-		fmt.Fprintf(&b, "- 被替换的 run：%s；它的下发全文归档：`%s`（按路径可回看当时逐字原文）\n", auth.SourceRun, auth.SourceBrief)
+		fmt.Fprintf(&b, "- 被替换的 run：%s；它的下发全文归档：`%s`（按路径可回看当时逐字原文）", auth.SourceRun, auth.SourceBrief)
+		switch auth.SourceArchiveStatus {
+		case model.BriefArchiveArchived:
+			b.WriteString("；归档状态：已归档\n")
+		case model.BriefArchivePending:
+			b.WriteString("；归档状态：未确认——文件可能已写，但账本路径未写回，不能当作可按引用读取\n")
+		case model.BriefArchiveWriteFailed:
+			fmt.Fprintf(&b, "；归档状态：写入失败（%s），这份原文无法回看\n", auth.SourceArchiveError)
+		default:
+			b.WriteString("；归档状态：旧记录未记录状态\n")
+		}
 	} else {
-		fmt.Fprintf(&b, "- 被替换的 run：%s；它没有下发归档，本节只能代表当前任务书的原文，上一任读到的那一份无法回看\n", auth.SourceRun)
+		switch auth.SourceArchiveStatus {
+		case model.BriefArchiveWriteFailed:
+			fmt.Fprintf(&b, "- 被替换的 run：%s；它没有下发归档：写入失败（%s），上一任读到的原文无法回看\n", auth.SourceRun, auth.SourceArchiveError)
+		case model.BriefArchivePending:
+			fmt.Fprintf(&b, "- 被替换的 run：%s；它没有可引用的下发归档：文件可能已写但账本路径未写回，上一任读到的原文无法按引用回看\n", auth.SourceRun)
+		default:
+			fmt.Fprintf(&b, "- 被替换的 run：%s；它没有下发归档，本节只能代表当前任务书的原文，上一任读到的那一份无法回看\n", auth.SourceRun)
+		}
 	}
 	if h.Note != "" {
 		b.WriteString("\n### 交接说明\n" + h.Note + "\n")
@@ -307,10 +335,21 @@ func handoffSection(db store.DB, in model.Intent, h model.Handoff, auth handoffA
 				fmt.Fprintf(&b, "- `%s`：交接时记录 v%d / 断言 v%d，当前断言 v%d（%s）；引用已过期，按 ID 重读后重新判断\n", id, h.FactVersions[id], version, f.ClaimVersion, f.Status)
 				continue
 			}
-			if version, known := h.FactVersions[id]; known {
-				fmt.Fprintf(&b, "  交接引用：记录 v%d / 断言 v%d\n", version, h.FactClaimVersions[id])
+			claim, claimKnown := h.FactClaimVersions[id]
+			record, recordKnown := h.FactVersions[id]
+			switch {
+			case !claimKnown:
+				fmt.Fprintf(&b, "- `%s`：交接时未记录断言版本；当前断言 v%d；按当前账本重读后判断：\n", id, f.ClaimVersion)
+			case recordKnown:
+				fmt.Fprintf(&b, "- `%s`：交接时记录 v%d / 断言 v%d；按当前账本状态展示：\n", id, record, claim)
+			default:
+				fmt.Fprintf(&b, "- `%s`：断言 v%d；按当前账本状态展示：\n", id, claim)
 			}
-			fmt.Fprintf(&b, "- `%s` 断言 v%d（%s）%s：%s\n", id, f.ClaimVersion, f.Status, f.Title, clipRunes(f.Summary, 240))
+			// Same display rule as an ordinary dispatch: the id, kind, status and
+			// evidence index are fixed, and the body follows the project's review
+			// configuration and the current claim version. A handoff snapshot must
+			// not expose more of an unverified assertion than a normal brief does.
+			b.WriteString(renderFact(f, showUnverified))
 		}
 	}
 	if len(h.Evidence) > 0 {

@@ -410,6 +410,23 @@ export function fmtDuration(from?: string, to?: string, now: number = Date.now()
   return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}m`
 }
 
+/** Seconds since `iso`, or null when the value is absent/unparseable. Kept
+ *  separate from fmtDuration because a caller that says "N 秒前" must fall back
+ *  to the unknown placeholder, never to NaN. */
+export function secondsSince(iso: string | undefined | null, now: number = Date.now()): number | null {
+  if (!iso) return null
+  const at = Date.parse(iso)
+  if (!Number.isFinite(at)) return null
+  return Math.max(0, Math.round((now - at) / 1000))
+}
+
+/** A known percentage (including a real 0) renders with its unit; a missing or
+ *  non-finite observation is "未上报", not "—%" or "0%". */
+export function fmtPercent(value?: number | null): string {
+  if (value === undefined || value === null || !Number.isFinite(value)) return '未上报'
+  return `${value}%`
+}
+
 /**
  * 相对时间，用于密集行：`刚刚` / `N 分钟前` /
  * `N 小时前`，超过一天就退回日期 `MM-DD`（绝对时刻仍由调用方放进 title）。

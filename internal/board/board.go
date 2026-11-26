@@ -73,12 +73,34 @@ type View struct {
 	// sent again" made observable, and unlike a bare run count it does not
 	// inflate on purpose runs (verifier/report), which never claim an intent.
 	Redispatch RedispatchStats `json:"redispatch"`
+	// IngestPending lists recent intent runs whose handoff settlement did not
+	// commit. It is separate from the run's own outcome: a done run can still
+	// owe facts/evidence, and the operator needs the declaration IDs and byte
+	// spans to repair the batch without rerunning the executor.
+	IngestPending []IngestPendingItem `json:"ingest_pending,omitempty"`
 	// PromptDigest is set only on the commander round prompt's copy of the view
 	// (ForPrompt). It labels the lists above as bounded top-N digests and gives
 	// the complete enumeration entries, so a model cannot read a 20-row list as
 	// the whole ledger. Build leaves it nil: the API/console board keeps its
 	// exact existing shape.
 	PromptDigest *PromptDigest `json:"prompt_digest,omitempty"`
+}
+
+// IngestPendingItem is one run with an incomplete handoff settlement.
+type IngestPendingItem struct {
+	Run      string    `json:"run"`
+	IntentID string    `json:"intent_id,omitempty"`
+	At       time.Time `json:"at"`
+	// Status is settled/partial/unavailable from the run's own settlement.
+	Status string `json:"status"`
+	// Persisted/Declared count declarations (facts + playbooks), not evidence
+	// objects: the board's X/Y must not exceed 1:1 because one fact preserved
+	// two files.
+	// Persisted is the number of persisted declarations; Pending locates the rest.
+	Persisted int                        `json:"persisted"`
+	Declared  int                        `json:"declared"`
+	Pending   []model.PendingDeclaration `json:"pending,omitempty"`
+	Reasons   []string                   `json:"reasons,omitempty"`
 }
 
 // RedispatchStats is how much re-dispatch a project has paid for. Directions
@@ -381,6 +403,17 @@ func ForSessionOpen(v View) View {
 func forSession(v View, open bool) View {
 	v.RecentFacts = decisionFacts(v.RecentFacts, open)
 	v.Coverage, v.Ports = nil, nil
+	// A pending declaration is not a ledger fact and carries no verification
+	// state. The session may see its identity, byte span and reason (that is how
+	// it locates the batch), but not the unverified prose title.
+	for i := range v.IngestPending {
+		pending := append([]model.PendingDeclaration(nil), v.IngestPending[i].Pending...)
+		for j := range pending {
+			pending[j].Title = ""
+			pending[j].Reasons = append([]string(nil), pending[j].Reasons...)
+		}
+		v.IngestPending[i].Pending = pending
+	}
 	return v
 }
 
@@ -479,6 +512,28 @@ func BuildFromDB(db store.DB, limit int) View {
 		Frontier:     []FrontierItem{},
 		Ports:        []PortGroup{},
 		Coverage:     []CoverageItem{},
+	}
+	// An incomplete settlement is a delivery state, not a run outcome: keep it
+	// separate from the intent lists and bounded like every other board digest.
+	settlementRuns := append([]model.Run(nil), db.Runs...)
+	sort.SliceStable(settlementRuns, func(i, j int) bool { return settlementRuns[i].StartedAt.After(settlementRuns[j].StartedAt) })
+	for _, r := range settlementRuns {
+		if r.Purpose != "" || r.Ingest == nil || r.Ingest.Committed {
+			continue
+		}
+		if len(v.IngestPending) >= 5 {
+			break
+		}
+		v.IngestPending = append(v.IngestPending, IngestPendingItem{
+			Run:       r.ID,
+			IntentID:  r.IntentID,
+			At:        r.StartedAt,
+			Status:    r.Ingest.Status,
+			Persisted: r.Ingest.PersistedFacts + r.Ingest.PersistedPlaybooks,
+			Declared:  r.Ingest.Declared,
+			Pending:   append([]model.PendingDeclaration(nil), r.Ingest.Pending...),
+			Reasons:   append([]string(nil), r.Ingest.Reasons...),
+		})
 	}
 
 	for _, in := range db.Intents {

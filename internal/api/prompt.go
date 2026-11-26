@@ -165,6 +165,7 @@ func buildPrompt(db store.DB, in model.Intent, scope, pocDir, kbDir string, budg
 		writePlaybooks(&b, db, in)
 		writeOwnHistory(&b, db, in)
 		writeHandoffWarnings(&b, db, in)
+		writeIngestPending(&b, db, in)
 		writeBrief(&b, db, in)
 		writeWorkerNote(&b, workerNoteFromPreviousRun, workerNote)
 	} else {
@@ -577,6 +578,61 @@ func writeHandoffWarnings(b *strings.Builder, db store.DB, in model.Intent) {
 		}
 		b.WriteString("- " + clipRunes(w, 200) + "\n")
 	}
+}
+
+// writeIngestPending carries the previous attempt's uncommitted handoff batch
+// into the next brief. Warnings say a path was wrong; this section says which
+// declaration still owes a ledger row, where its bytes are, and why. It is the
+// executor-side visibility of the same structured settlement the console shows;
+// the repair itself is an offline idempotent replay, not another run.
+func writeIngestPending(b *strings.Builder, db store.DB, in model.Intent) {
+	if in.RunID == "" {
+		return
+	}
+	var prev *model.Run
+	for i := range db.Runs {
+		if db.Runs[i].ID == in.RunID {
+			prev = &db.Runs[i]
+			break
+		}
+	}
+	if prev == nil || prev.Ingest == nil || prev.Ingest.Committed {
+		return
+	}
+	ing := prev.Ingest
+	if len(ing.Pending) == 0 && len(ing.Reasons) == 0 {
+		return
+	}
+	b.WriteString("\n## 上一轮未完成入账\n")
+	fmt.Fprintf(b, "上一轮 run `%s` 的运行已结束，但交接入账未提交：已持久化 %d 条事实、%d 条证据、%d 条打法；消费游标停在字节 %d。%s\n",
+		prev.ID, ing.PersistedFacts, ing.PersistedEvidence, ing.PersistedPlaybooks, ing.CursorBefore,
+		"恢复只按同一批声明幂等补写账本记录，不重跑执行者，也不重做外部动作。")
+	const maxShown = 10
+	for i, d := range ing.Pending {
+		if i >= maxShown {
+			b.WriteString("- …（其余见上一轮 run 的 ingest.pending）\n")
+			break
+		}
+		label := d.DeclarationID
+		if label == "" {
+			label = d.Title
+		}
+		location := d.Location
+		if location == "" {
+			location = "（无字节范围）"
+		}
+		reason := strings.Join(d.Reasons, "；")
+		fmt.Fprintf(b, "- %s @ %s：%s\n", clipRunes(label, 120), location, clipRunes(reason, 240))
+	}
+	if len(ing.Pending) == 0 {
+		for i, reason := range ing.Reasons {
+			if i >= 3 {
+				break
+			}
+			b.WriteString("- " + clipRunes(reason, 240) + "\n")
+		}
+	}
+	b.WriteString("这些行仍在 `.saker/facts.jsonl`；沿用同一结论时按实际位置修正后重新声明，不要把它们当作已入账。\n")
 }
 
 // writeBrief carries the bounded cross-direction coordination summary: parked

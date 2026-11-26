@@ -35,18 +35,28 @@ var errEvidenceStorage = errors.New("证据账本写入失败")
 // refreshes it instead of adding a duplicate.
 const derivedProductsNote = "本次产出文件"
 
-// OnFinish settles one run: declared facts, then evidence, then the derived
-// loot row. It returns how many lines the executor declared, which is the only
-// observable measure of "did it honour the handoff contract". A playbook line
-// counts: it is a valid declaration, just not a fact.
-//
-// Prose is deliberately not promoted to a fact. The run log already has it, and
-// a note called "执行者自述" made every failed or canceled attempt look like a
-// finding on the board (and a second, identical-looking node in the graph).
+// OnFinish retains the historical count-only view for callers that only care
+// about the handoff contract metric. The run path uses Settle, which returns and
+// persists the structured result (what committed, what is still pending).
 func (g *Ingestor) OnFinish(runID, intentID, caseRoot, workDir string, since time.Time) int {
+	return g.Settle(runID, intentID, caseRoot, workDir, since).Declared
+}
+
+// Settle settles one run: declared facts, then evidence, then the derived loot
+// row. It returns the structured settlement and stores it on the run row, so the
+// console and the commander can locate every declaration that did not commit
+// instead of reading a bare count. A failed batch keeps the consumption cursor,
+// which is what lets a later replay write exactly the same lines again without
+// running the executor.
+func (g *Ingestor) Settle(runID, intentID, caseRoot, workDir string, since time.Time) model.IngestOutcome {
+	out := model.IngestOutcome{
+		Status:       model.IngestSettled,
+		CursorBefore: Consumed(workDir),
+		CursorAfter:  Consumed(workDir),
+		RecordedAt:   time.Now(),
+	}
 	// A batch can be replayed after a partial commit. Do not consume any of it
 	// unless every durable declaration write succeeded; admissions are idempotent.
-	consumedBefore := Consumed(workDir)
 	committed := true
 	// failures names every item that kept the batch from being committed. The
 	// run must not say only "not fully persisted": the operator needs the
@@ -55,12 +65,40 @@ func (g *Ingestor) OnFinish(runID, intentID, caseRoot, workDir string, since tim
 	fail := func(format string, args ...any) {
 		failures = append(failures, fmt.Sprintf(format, args...))
 	}
+	// pending is keyed by declaration identity and ordered by the parsed batch,
+	// so the run row can point at the exact byte span without duplicating a
+	// fact that failed on several of its own evidence paths.
+	pending := make(map[string]*model.PendingDeclaration, 4)
+	var pendingOrder []string
+	pendingFor := func(df DeclaredFact) *model.PendingDeclaration {
+		key := df.DeclarationID
+		if key == "" {
+			key = df.Location
+		}
+		if p, ok := pending[key]; ok {
+			return p
+		}
+		p := &model.PendingDeclaration{
+			DeclarationID: df.DeclarationID,
+			SourceRef:     df.SourceRef,
+			Kind:          df.Kind,
+			Title:         clipRunes(df.Title, 120),
+			Location:      df.Location,
+		}
+		pending[key] = p
+		pendingOrder = append(pendingOrder, key)
+		return p
+	}
 	decl, err := ReadDeclaredSince(caseRoot, workDir)
 	if err != nil {
 		committed = false
+		out.Status = model.IngestUnavailable
 		fail("读交接文件失败：%v", err)
+		out.Reasons = append(out.Reasons, fmt.Sprintf("读交接文件失败：%v", err))
 		log.Printf("run %s：读交接文件失败（已落库的部分保留，下一轮会重读）：%v", runID, err)
 	}
+	out.Truncated = decl.Truncated
+	out.Bad = decl.Bad
 	if decl.Truncated {
 		// The cap is a per-run budget, not a silent delete: the unread tail stays
 		// in the handoff (Consumed stops before it) and the operator can see why
@@ -90,6 +128,8 @@ func (g *Ingestor) OnFinish(runID, intentID, caseRoot, workDir string, since tim
 		}
 		facts = append(facts, df)
 	}
+	out.Facts, out.Playbooks = len(facts), len(books)
+	out.Declared = len(facts) + len(books)
 
 	// Declared evidence is registered first: a fact's own proof must never lose
 	// the cap to a work dir full of scratch files, which is exactly what a
@@ -111,6 +151,8 @@ func (g *Ingestor) OnFinish(runID, intentID, caseRoot, workDir string, since tim
 				if errors.Is(err, errEvidenceStorage) {
 					committed = false
 					fail("证据「%s」无法写入账本：%v", clipRunes(rel, 120), err)
+					pendingFor(df).Reasons = append(pendingFor(df).Reasons,
+						"证据「"+clipRunes(rel, 120)+"」无法写入账本："+err.Error())
 				}
 				warnings = append(warnings, fmt.Sprintf(
 					"事实「%s」的证据「%s」无法登记：%v",
@@ -118,6 +160,7 @@ func (g *Ingestor) OnFinish(runID, intentID, caseRoot, workDir string, since tim
 				continue
 			}
 			byRel[rel] = id
+			out.PersistedEvidence++
 			declaredNames = append(declaredNames,
 				caseURI(caseRoot, filepath.Join(workDir, filepath.FromSlash(rel))))
 		}
@@ -127,7 +170,9 @@ func (g *Ingestor) OnFinish(runID, intentID, caseRoot, workDir string, since tim
 	if harvestFailure {
 		committed = false
 		fail("自动证据登记发生存储写入失败")
+		out.Reasons = append(out.Reasons, "自动证据登记发生存储写入失败")
 	}
+	out.PersistedEvidence += len(harvested)
 	warnings = append(warnings, harvestWarnings...)
 	g.recordWarnings(runID, warnings)
 	g.recordInfos(runID, infos)
@@ -140,7 +185,9 @@ func (g *Ingestor) OnFinish(runID, intentID, caseRoot, workDir string, since tim
 	warn := func(what string, err error) {
 		if err != nil {
 			committed = false
-			fail("%s：%v", what, err)
+			detail := fmt.Sprintf("%s：%v", what, err)
+			fail("%s", detail)
+			out.Reasons = append(out.Reasons, detail)
 			log.Printf("run %s：%s 失败：%v", runID, what, err)
 		}
 	}
@@ -165,6 +212,9 @@ func (g *Ingestor) OnFinish(runID, intentID, caseRoot, workDir string, since tim
 		}
 		if _, err := ApplyDeclaration(g.Store, intentID, runID, df, ids); err != nil {
 			warn("落事实 "+df.Title, err)
+			pendingFor(df).Reasons = append(pendingFor(df).Reasons, "落事实失败："+err.Error())
+		} else {
+			out.PersistedFacts++
 		}
 	}
 
@@ -243,6 +293,11 @@ func (g *Ingestor) OnFinish(runID, intentID, caseRoot, workDir string, since tim
 			IntentID:     intentID,
 		})
 		warn("落打法 "+df.Title, err)
+		if err != nil {
+			pendingFor(df).Reasons = append(pendingFor(df).Reasons, "落打法失败："+err.Error())
+		} else {
+			out.PersistedPlaybooks++
+		}
 		if err == nil && !pb.Confirmed(knownFacts) {
 			detail := pb.SourceProblem(knownFacts)
 			if detail != "" {
@@ -257,19 +312,45 @@ func (g *Ingestor) OnFinish(runID, intentID, caseRoot, workDir string, since tim
 	// The offset is the last line actually read; a truncated handoff leaves its
 	// tail for the next run instead of skipping it forever.
 	if committed {
-		warn("记录交接游标", CommitDeclared(workDir, decl.Consumed))
+		if err := CommitDeclared(workDir, decl.Consumed); err != nil {
+			warn("记录交接游标", err)
+		} else {
+			out.CursorAfter = decl.Consumed
+		}
 	}
 	if !committed {
+		if out.Status != model.IngestUnavailable {
+			out.Status = model.IngestPartial
+		}
 		detail := clipRunes(strings.Join(failures, "；"), 1800)
 		if detail == "" {
 			detail = "未知写入失败"
 		}
 		g.recordWarnings(runID, []string{fmt.Sprintf(
-			"交接未全部持久化：%s；保留消费游标 %d（修复后幂等重读本批声明）", detail, consumedBefore)})
+			"交接未全部持久化：%s；保留消费游标 %d（修复后幂等重读本批声明）", detail, out.CursorBefore)})
+	}
+	out.Committed = committed
+	for _, key := range pendingOrder {
+		out.Pending = append(out.Pending, *pending[key])
 	}
 	// Playbooks count as handoff lines: a run that only wrote one still honoured
 	// the contract, and declared_facts is the only measure of that.
-	return len(facts) + len(books)
+	out.Declared = len(facts) + len(books)
+	g.recordIngestOutcome(runID, out)
+	return out
+}
+
+// recordIngestOutcome persists the structured settlement on the run row. A
+// failure here is logged rather than swallowed: the console's ability to locate
+// a pending batch depends on this row, but the cursor and the ledger writes it
+// describes are already durable.
+func (g *Ingestor) recordIngestOutcome(runID string, out model.IngestOutcome) {
+	if g.Store == nil || runID == "" {
+		return
+	}
+	if err := g.Store.RecordRunIngest(runID, out); err != nil {
+		log.Printf("run %s：写入账结果失败：%v", runID, err)
+	}
 }
 
 // harvest records the files a run left in its work dir as evidence and returns
@@ -451,7 +532,7 @@ func (g *Ingestor) recordWarnings(runID string, warnings []string) {
 	for _, w := range warnings {
 		log.Printf("run %s：交接告警：%s", runID, w)
 	}
-	if _, err := g.Store.UpdateRun(runID, func(r *model.Run) {
+	if _, err := g.Store.UpdateRunDiagnostics(runID, func(r *model.Run) {
 		r.Warnings = mergeWarnings(r.Warnings, warnings)
 	}); err != nil {
 		log.Printf("run %s：写交接告警失败：%v", runID, err)
@@ -469,7 +550,7 @@ func (g *Ingestor) recordInfos(runID string, infos []string) {
 	for _, info := range infos {
 		log.Printf("run %s：交接提示：%s", runID, info)
 	}
-	if _, err := g.Store.UpdateRun(runID, func(r *model.Run) {
+	if _, err := g.Store.UpdateRunDiagnostics(runID, func(r *model.Run) {
 		r.Infos = mergeWarnings(r.Infos, infos)
 	}); err != nil {
 		log.Printf("run %s：写交接提示失败：%v", runID, err)

@@ -313,7 +313,7 @@ func TestExecutorToolDeclarationIsStoredVerbatim(t *testing.T) {
 	if snapshot.Note != note {
 		t.Fatalf("handoff note rewritten: %q", snapshot.Note)
 	}
-	section := handoffSection(st.Snapshot(), intent, snapshot, handoffAuthorization{})
+	section := handoffSection(st.Snapshot(), intent, snapshot, handoffAuthorization{}, false)
 	if !strings.Contains(section, note) {
 		t.Fatalf("handoff brief lost the declaration: %q", section)
 	}

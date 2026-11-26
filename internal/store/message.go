@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/kksty/saker/internal/model"
@@ -33,6 +34,11 @@ var (
 	// confirmed and take it out of the queue for good, so the sender would see
 	// "acknowledged" for a message the model never received.
 	ErrMessageNotDelivered = errors.New("消息还没有投递到收件会话，不能确认")
+	// ErrMessageDeliveryMismatch means the receipt names a different delivery
+	// attempt (or a different receiving run) than the one currently in flight.
+	// Accepting it would let a late ack for the previous session confirm a
+	// redelivery the model has not seen.
+	ErrMessageDeliveryMismatch = errors.New("回执对应的投递轮次与当前投递不一致")
 )
 
 // RetractMessage removes a message while it is still queued and unclaimed by
@@ -336,9 +342,17 @@ func (s *Store) MessagesForBox(participant string, after uint64, limit int, box 
 
 // BeginMessageDelivery claims the queued row durably before any bytes leave.
 // Retract and sweep cannot remove it while the transport is in flight.
-func (s *Store) BeginMessageDelivery(id string) (model.Message, bool, error) {
+//
+// The optional receiving run is recorded now, before the transport call, so an
+// acknowledgement that arrives first ("the model already answered") can still be
+// checked against this attempt instead of the previous one.
+func (s *Store) BeginMessageDelivery(id string, receivingRun ...string) (model.Message, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	runID := ""
+	if len(receivingRun) > 0 {
+		runID = strings.TrimSpace(receivingRun[0])
+	}
 	for i := range s.db.Messages {
 		m := &s.db.Messages[i]
 		if m.ID != id {
@@ -352,7 +366,10 @@ func (s *Store) BeginMessageDelivery(id string) (model.Message, bool, error) {
 			m.EventID = m.ID
 		}
 
-		m.Status, m.UpdatedAt = model.MessageSending, time.Now()
+		now := time.Now()
+		m.Status, m.UpdatedAt = model.MessageSending, now
+		m.CurrentDeliveryRunID = runID
+		m.Deliveries = append(m.Deliveries, model.MessageDelivery{RunID: runID, At: now})
 		if err := s.flushNoRev("message"); err != nil {
 			return model.Message{}, false, err
 		}
@@ -374,15 +391,42 @@ func (s *Store) FinishMessageDelivery(id, deliveryID, runID, path, errText strin
 		if m.Status != model.MessageSending && m.Status != model.MessageConfirmed {
 			return *m, nil
 		}
+		now := time.Now()
 		m.DeliveryID, m.DeliveredRunID, m.DeliveryPath, m.Error = deliveryID, runID, path, errText
+		// Update the attempt opened by Begin, not a new one: one transport call
+		// is one delivery round.
+		updated := false
+		for j := len(m.Deliveries) - 1; j >= 0; j-- {
+			d := &m.Deliveries[j]
+			if d.RunID != runID || d.DeliveryID != "" {
+				continue
+			}
+			d.DeliveryID, d.Path, d.Error, d.At = deliveryID, path, errText, now
+			updated = true
+			break
+		}
+		if !updated {
+			m.Deliveries = append(m.Deliveries, model.MessageDelivery{
+				DeliveryID: deliveryID, RunID: runID, Path: path, Error: errText, At: now,
+			})
+		}
+		m.CurrentDeliveryRunID = ""
 		if m.AckedAt != nil || m.Status == model.MessageConfirmed {
 			m.Status = model.MessageConfirmed
+			// An early receipt had no transport id when it arrived; fill it in
+			// without touching the first confirmation time.
+			if m.AckedDeliveryID == "" {
+				m.AckedDeliveryID = deliveryID
+			}
+			if m.AckedRunID == "" {
+				m.AckedRunID = runID
+			}
 		} else if errText != "" {
 			m.Status = model.MessageUnknown
 		} else {
 			m.Status = model.MessageAccepted
 		}
-		m.UpdatedAt = time.Now()
+		m.UpdatedAt = now
 		if err := s.flushNoRev("message"); err != nil {
 			return model.Message{}, err
 		}
@@ -473,8 +517,18 @@ func (s *Store) MessagesPageWhere(limit int, keep func(model.Message) bool) ([]m
 // confirming one would take it out of the queue while the sender believes it
 // was read. Confirmed rows are idempotent.
 func (s *Store) AckMessage(id string) (model.Message, error) {
+	return s.AckMessageDelivery(id, "", "")
+}
+
+// AckMessageDelivery records a receipt against the current delivery attempt.
+// deliveryID and runID are optional (an older client knows only the message id),
+// but when supplied they must match the attempt in flight. An early receipt
+// (before FinishMessageDelivery) is legal and keeps its first AckedAt; Finish
+// later fills in the transport id without rewriting the receipt.
+func (s *Store) AckMessageDelivery(id, deliveryID, runID string) (model.Message, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	deliveryID, runID = strings.TrimSpace(deliveryID), strings.TrimSpace(runID)
 	for i := range s.db.Messages {
 		m := &s.db.Messages[i]
 		if m.ID != id {
@@ -484,8 +538,37 @@ func (s *Store) AckMessage(id string) (model.Message, error) {
 		case model.MessageQueued, model.MessageUnknown:
 			return *m, ErrMessageNotDelivered
 		}
+		if m.Status == model.MessageConfirmed {
+			// Repeated acknowledgement of the same delivery returns the original
+			// receipt and never moves the first confirmation time.
+			if deliveryID != "" && m.AckedDeliveryID != "" && deliveryID != m.AckedDeliveryID {
+				return *m, ErrMessageDeliveryMismatch
+			}
+			if runID != "" && m.AckedRunID != "" && runID != m.AckedRunID {
+				return *m, ErrMessageDeliveryMismatch
+			}
+			return *m, nil
+		}
+		currentRun := m.CurrentDeliveryRunID
+		if currentRun == "" {
+			currentRun = m.DeliveredRunID
+		}
+		if runID != "" && currentRun != "" && runID != currentRun {
+			return *m, fmt.Errorf("%w（回执 run %s，当前投递 run %s）", ErrMessageDeliveryMismatch, runID, currentRun)
+		}
+		if deliveryID != "" && m.DeliveryID != "" && deliveryID != m.DeliveryID {
+			return *m, fmt.Errorf("%w（回执 %s，当前投递 %s）", ErrMessageDeliveryMismatch, deliveryID, m.DeliveryID)
+		}
 		now := time.Now()
 		m.Status, m.AckedAt, m.UpdatedAt = model.MessageConfirmed, &now, now
+		m.AckedDeliveryID = deliveryID
+		if m.AckedDeliveryID == "" {
+			m.AckedDeliveryID = m.DeliveryID
+		}
+		m.AckedRunID = runID
+		if m.AckedRunID == "" {
+			m.AckedRunID = currentRun
+		}
 		if err := s.flushNoRev("message"); err != nil {
 			return model.Message{}, err
 		}

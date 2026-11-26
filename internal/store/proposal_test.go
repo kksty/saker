@@ -148,7 +148,7 @@ func TestProposalDecisionCASAndRejection(t *testing.T) {
 	if _, err := s.WithdrawProposal(p.ID, rejected.Version, "pt_in_x"); !errors.Is(err, ErrProposalConflict) {
 		t.Fatalf("withdraw after reject: err = %v, want ErrProposalConflict", err)
 	}
-	if _, err := s.MarkProposalDispatched(p.ID, rejected.Version, "r_1", "operator"); !errors.Is(err, ErrProposalConflict) {
+	if _, _, _, _, err := s.StartProposalRun(p.ID, rejected.Version, "local", "", model.Run{}); !errors.Is(err, ErrProposalConflict) {
 		t.Fatalf("dispatch after reject: err = %v, want ErrProposalConflict", err)
 	}
 }
@@ -196,16 +196,18 @@ func TestProposalApprovalCreatesPendingIntentInOneTransaction(t *testing.T) {
 	if _, _, err := s.DecideProposal(p.ID, approved.Version, true, "", "commander"); !errors.Is(err, ErrProposalConflict) {
 		t.Fatalf("second approval: err = %v, want ErrProposalConflict", err)
 	}
-	// Dispatch records the run and is itself one-shot.
-	dispatched, err := s.MarkProposalDispatched(p.ID, approved.Version, "r_1", "operator")
-	if err != nil {
-		t.Fatal(err)
+	// Dispatch records the run in the same transaction as the claim, and a
+	// retry returns that same receipt instead of starting another run.
+	dispatched, _, run, created, err := s.StartProposalRun(p.ID, approved.Version, "local", "", model.Run{})
+	if err != nil || !created {
+		t.Fatalf("dispatch: created=%v err=%v", created, err)
 	}
-	if dispatched.Status != model.ProposalDispatched || dispatched.RunID != "r_1" || dispatched.Version != 3 {
+	if dispatched.Status != model.ProposalDispatched || dispatched.RunID != run.ID || dispatched.Version != 3 {
 		t.Fatalf("dispatched = %+v", dispatched)
 	}
-	if _, err := s.MarkProposalDispatched(p.ID, dispatched.Version, "r_2", "operator"); !errors.Is(err, ErrProposalConflict) {
-		t.Fatalf("second dispatch mark: err = %v, want ErrProposalConflict", err)
+	again, _, againRun, created, err := s.StartProposalRun(p.ID, dispatched.Version, "local", "", model.Run{})
+	if err != nil || created || again.RunID != run.ID || againRun.ID != run.ID {
+		t.Fatalf("dispatch retry: created=%v err=%v proposal=%+v run=%+v", created, err, again, againRun)
 	}
 }
 

@@ -29,3 +29,13 @@ test('the latest run line and the collapsible warnings are wired', () => {
   assert.match(panel, /<details className="group rounded-lg border border-warning\/25/)
   assert.match(panel, /group-open:hidden/)
 })
+
+// A stale handoff version is not a generic failure: refresh the intent and the
+// handoff record, keep the operator's note, and submit again only after review.
+test('a handoff version conflict refreshes the record and keeps the input', () => {
+  assert.match(panel, /code === 'handoff_conflict'/)
+  assert.match(panel, /const fresh = await api\.intent\(intent\.id\)/)
+  assert.match(panel, /setHandoffVersion\(latest\)/)
+  assert.match(panel, /说明已保留/)
+  assert.match(panel, /setHandoffOpen\(true\)/)
+})

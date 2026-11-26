@@ -80,7 +80,7 @@ func writeCompleteReport(t *testing.T, workDir, factID, evidenceRel string) {
 		}
 	}
 	findings, err := json.Marshal([]Finding{{
-		Fact: factID, Verdict: VerdictConfirmed, Title: "/admin 越权",
+		Fact: factID, FactClaimVersion: 1, Verdict: VerdictConfirmed, Title: "/admin 越权",
 		Location: "http://target/admin", Preconditions: "普通用户会话",
 		Impact: "读取全部订单", Trace: "GET /admin → 200",
 		Evidence: []string{evidenceRel},
@@ -431,7 +431,7 @@ func TestReportDeliveryByReviewState(t *testing.T) {
 					}
 				}
 				if mode != "verified" {
-					rows = append(rows, Finding{Fact: candidate.ID, Verdict: VerdictCandidate, Title: "Synthetic observation"})
+					rows = append(rows, Finding{Fact: candidate.ID, FactClaimVersion: candidate.ClaimVersion, Verdict: VerdictCandidate, Title: "Synthetic observation"})
 				}
 				if mode == "unverified" {
 					if err := os.WriteFile(filepath.Join(req.WorkDir, IndexFile), []byte("# Synthetic report"), 0600); err != nil {

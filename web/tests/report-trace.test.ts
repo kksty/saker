@@ -46,23 +46,28 @@ test('the unreported list keeps the server rows, caps and the two named lists', 
       total: 25,
       limit: 20,
       items: [
-        { fact: 'f_a', title: 'A' },
+        { fact: 'f_a', title: 'A', previous: [{ report: 'rep_1', claim_version: 1 }] },
         { fact: 'f_b', title: '' },
         { fact: '', title: 'dropped: no id' },
       ],
       note: '边界说明',
       unreadable: ['rep_1'],
       uncounted: ['rep_2', ''],
+      unknown_version_reports: ['rep_legacy'],
     },
   }))
   assert.equal(view.present, true)
-  assert.deepEqual(view.items, [{ fact: 'f_a', title: 'A' }, { fact: 'f_b', title: '' }])
+  assert.deepEqual(view.items, [
+    { fact: 'f_a', title: 'A', previous: [{ report: 'rep_1', claimVersion: 1 }] },
+    { fact: 'f_b', title: '', previous: [] },
+  ])
   assert.equal(view.total, 25)
   assert.equal(view.hidden, 23)
   assert.equal(view.limit, 20)
   assert.equal(view.note, '边界说明')
   assert.deepEqual(view.unreadable, ['rep_1'])
   assert.deepEqual(view.uncounted, ['rep_2'])
+  assert.deepEqual(view.unknownVersionReports, ['rep_legacy'])
 })
 
 test('an empty unreported list is a real answer, distinct from a missing block', () => {

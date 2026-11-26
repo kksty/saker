@@ -248,7 +248,7 @@ type Status struct {
 	Stalled            int                     `json:"stalled"`
 	ContextTokens      int                     `json:"context_tokens,omitempty"`
 	ContextWindow      int                     `json:"context_window,omitempty"`
-	ContextPercent     int                     `json:"context_percent,omitempty"`
+	ContextPercent     *int                    `json:"context_percent,omitempty"`
 	Compacted          bool                    `json:"compacted,omitempty"`
 	HandoffMissing     int                     `json:"handoff_missing,omitempty"`
 	HandoffReleased    bool                    `json:"handoff_released,omitempty"`
@@ -330,7 +330,7 @@ func (r *Runner) Status() Status {
 		Stalled:         r.stalled,
 		ContextTokens:   r.lastContext,
 		ContextWindow:   r.windowLocked(),
-		ContextPercent:  (ContextStatus{Used: r.lastContext, Window: r.windowLocked()}).Percent(),
+		ContextPercent:  (ContextStatus{Used: r.lastContext, Window: r.windowLocked()}).PercentPtr(),
 		Compacted:       r.lastCompacted,
 		HandoffMissing:  r.handoffMissing,
 		HandoffReleased: r.handoffBypassed,
@@ -1309,7 +1309,7 @@ func (r *Runner) Run(ctx context.Context, wake string, force bool) *Decision {
 	if d.ContextWindow == 0 {
 		d.ContextWindow = ctxStatus.Window
 	}
-	d.ContextPercent = (ContextStatus{Used: d.ContextTokens, Window: d.ContextWindow}).Percent()
+	d.ContextPercent = (ContextStatus{Used: d.ContextTokens, Window: d.ContextWindow}).PercentPtr()
 	d.NewFacts = len(r.Store.ListFacts("", 0)) - b.Facts.Total
 	timedOut := errors.Is(context.Cause(roundCtx), ErrRoundTimeout)
 	d.MS = time.Since(start).Milliseconds()

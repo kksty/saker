@@ -7,12 +7,14 @@ import assert from 'node:assert/strict'
 import {
   cancelCauseText,
   fmtAgo,
+  fmtPercent,
   hasBrokenPremise,
   purposeLabel,
   runCancelDetail,
   runCancelReason,
   runStatusLabel,
   runMatchesFilter,
+  secondsSince,
 } from '../src/lib/format.ts'
 import type { FrontierItem, Intent, Run } from '../src/lib/types.ts'
 
@@ -164,4 +166,19 @@ test('fmtAgo: minutes, hours, then a date past a day — the absolute time stays
   assert.equal(fmtAgo('2026-11-22T09:00:00+08:00', now), '11-22')
   assert.equal(fmtAgo(undefined, now), '—')
   assert.equal(fmtAgo('not-a-time', now), 'not-a-time')
+})
+
+// A missing observation is not zero, and a malformed time is unknown, not NaN.
+test('unknown percentages and zero are distinct', () => {
+  assert.equal(fmtPercent(undefined), '未上报')
+  assert.equal(fmtPercent(null), '未上报')
+  assert.equal(fmtPercent(Number.NaN), '未上报')
+  assert.equal(fmtPercent(0), '0%')
+  assert.equal(fmtPercent(37), '37%')
+})
+
+test('an unparseable timestamp falls back to unknown', () => {
+  assert.equal(secondsSince('not-a-date', 1000), null)
+  assert.equal(secondsSince(undefined, 1000), null)
+  assert.equal(secondsSince('2026-01-01T00:00:00Z', Date.parse('2026-01-01T00:00:05Z')), 5)
 })

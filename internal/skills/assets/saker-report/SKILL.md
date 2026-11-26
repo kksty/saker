@@ -114,10 +114,11 @@ description: 报告体例：固定产物、固定章节与顺序、固定写法�
 数组，一条可报告事实一个对象，字段顺序固定：
 
 ```json
-{"fact":"f_x","verdict":"confirmed","title":"…","severity":"medium","location":"…",
+{"fact":"f_x","fact_claim_version":2,"verdict":"confirmed","title":"…","severity":"medium","location":"…",
  "preconditions":"…","impact":"…","trace":"…","evidence":["evidence/e_x-name"]}
 ```
 
+- `fact_claim_version` 从 `snapshot.json` 里这条事实的 `claim_version` 原样抄；报告引用因此绑定事实 ID 和断言版本，不能用当前版本补写旧报告。
 - `verdict` 只有两种：`confirmed`（事实在图谱里 `status=verified`）与 `candidate`（未复核）。
 - `severity` 只写 `snapshot.json` 里这条事实的等级（`critical`/`high`/`medium`/`low`），不自行评估、不升降；`snapshot.json` 里该字段为空就不要写这个键，正文也不得补一个等级。
 - `confirmed` 的 severity / location / preconditions / impact / trace / evidence 六项一处不能空（`snapshot.json` 里等级为空时 severity 按上一条省略）；`candidate` 也尽量写全，写不了的就在 `trace` 里说明还差什么。

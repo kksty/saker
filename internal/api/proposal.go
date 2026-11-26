@@ -20,6 +20,7 @@ import (
 	"github.com/kksty/saker/internal/collab"
 	"github.com/kksty/saker/internal/executor"
 	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/retrieval"
 	"github.com/kksty/saker/internal/store"
 )
 
@@ -374,6 +375,28 @@ func (s *Server) getProposal(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"proposal": p})
 }
 
+// relatedProposalIntents lists existing directions that share a recorded premise
+// or entity with this proposal. It is decision support for the commander: the
+// candidates, their acceptance criteria and their run states are read from the
+// ledger; whether to merge/continue/reject/approve is still the commander's
+// judgement, and this route has no side effects.
+func (s *Server) relatedProposalIntents(w http.ResponseWriter, r *http.Request) {
+	if !proposalDecisionAllowed(r) {
+		writeJSON(w, http.StatusForbidden, map[string]any{
+			"error": "只有指挥官或操作员可以查看提议的相关意图",
+			"code":  "proposal_forbidden",
+		})
+		return
+	}
+	id := r.PathValue("id")
+	p, ok := s.Store.GetProposal(id)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "提议不存在：" + id, "code": "proposal_not_found"})
+		return
+	}
+	writeJSON(w, http.StatusOK, retrieval.RelatedIntentsFor(s.Store.Snapshot(), p, 20))
+}
+
 // proposalDecisionReq is the CAS body of every decision route. expected_version
 // is mandatory: deciding from an unread version is how two sessions produce two
 // opposite verdicts on one suggestion.
@@ -514,7 +537,8 @@ func (s *Server) dispatchProposal(w http.ResponseWriter, r *http.Request) {
 		writeProposalError(w, fmt.Errorf("%w：已批准的提议没有对应意图，状态不一致，请重新审批", store.ErrProposalConflict))
 		return
 	}
-	runID, err := s.StartRun(current.IntentID)
+	actor := proposalActor(r)
+	dispatched, runID, err := s.Lifecycle.StartProposal(current.ID, req.ExpectedVersion, current.IntentID, "", "", false, false, "")
 	if err != nil {
 		s.pumpMu.Unlock()
 		// The proposal stays approved: the dispatch was refused by admission, not
@@ -524,15 +548,13 @@ func (s *Server) dispatchProposal(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	actor := proposalActor(r)
-	dispatched, err := s.Store.MarkProposalDispatched(current.ID, current.Version, runID, actor)
 	s.pumpMu.Unlock()
-	if err != nil {
-		// The run exists; the receipt write did not. Never pretend the dispatch
-		// didn't happen and never start another run: say exactly what happened.
-		log.Printf("提议 %s 已起 run %s，但派发回写失败：%v", current.ID, runID, err)
+	if dispatched.Status != model.ProposalDispatched || dispatched.RunID == "" || dispatched.RunID != runID {
+		// The store's transaction must return the same receipt it committed. A
+		// mismatch is a ledger inconsistency, not a successful dispatch.
+		log.Printf("提议 %s 派发后回执不一致：proposal=%+v run=%s", current.ID, dispatched, runID)
 		writeJSON(w, http.StatusInternalServerError, map[string]any{
-			"error": "run 已启动（" + runID + "），但提议的派发状态回写失败：" + err.Error() + "；不要重复派发，先GET提议核对",
+			"error": "派发事务已提交，但返回的提议回执与运行不一致；先 GET 提议核对，不要重复派发",
 			"code":  "proposal_dispatch_incomplete",
 		})
 		return
