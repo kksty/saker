@@ -844,7 +844,7 @@ func (h *Host) childEnv(extra []string) []string {
 	if hasExe(path, "ls.exe") {
 		return env
 	}
-	dir := coreutilsDir()
+	dir := coreutilsDir(path)
 	if dir == "" {
 		h.cfg.Logf("host: 警告：宿主的 PATH 里没有 ls/grep（agent 的 shell 需要 coreutils）；装 Git for Windows，或把它的 usr\\bin 加进 PATH。否则 agent 会用 cmd 兜底，可能卡住")
 		return env
@@ -870,7 +870,16 @@ func withExcludeTools(env []string, value string) []string {
 }
 
 // coreutilsDir finds a Git for Windows installation that carries ls.exe.
-func coreutilsDir() string {
+func coreutilsDir(path string) string {
+	for _, dir := range filepath.SplitList(path) {
+		if !filepath.IsAbs(dir) || !hasExe(dir, "git.exe") {
+			continue
+		}
+		candidate := filepath.Join(dir, "..", "usr", "bin")
+		if hasExe(candidate, "ls.exe") {
+			return candidate
+		}
+	}
 	var candidates []string
 	if pf := os.Getenv("ProgramFiles"); pf != "" {
 		candidates = append(candidates, filepath.Join(pf, "Git", "usr", "bin"))
