@@ -101,7 +101,7 @@ func TestClosedIntentCountsAsProgress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if obs.Rounds != 1 || obs.NewIntents != 1 || obs.Directions != 1 {
+	if obs.Rounds != 1 || obs.NewIntents != 1 || obs.Opened != 1 {
 		t.Fatalf("new direction = %+v, want a counted dry round (opening is not progress)", obs)
 	}
 	if _, err := st.UpdateIntent(in.ID, func(i *model.Intent) { i.Status = model.StatusDone }); err != nil {
@@ -111,7 +111,7 @@ func TestClosedIntentCountsAsProgress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if obs.Rounds != 0 || obs.ClosedIntents != 1 || obs.Directions != 0 {
+	if obs.Rounds != 0 || obs.ClosedIntents != 1 || obs.Opened != 0 {
 		t.Fatalf("closed direction = %+v, want progress on the close and a reset", obs)
 	}
 	// Editing a finished direction (not its status) is bookkeeping, not progress.
@@ -142,7 +142,7 @@ func TestNewDirectionIsNotProgress(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if obs.Rounds != i || obs.Directions != i || obs.NewFacts != 0 {
+		if obs.Rounds != i || obs.Opened != i || obs.NewFacts != 0 {
 			t.Fatalf("round %d with only a new direction = %+v", i, obs)
 		}
 		if want := i == 3; obs.Escalate != want {
@@ -157,7 +157,7 @@ func TestNewDirectionIsNotProgress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if obs.Rounds != 4 || obs.Directions != 4 || obs.Escalate {
+	if obs.Rounds != 4 || obs.Opened != 4 || obs.Escalate {
 		t.Fatalf("round after the alert = %+v, want count 4, four directions, no repeat", obs)
 	}
 }
@@ -191,7 +191,91 @@ func TestStallCounterSurvivesReopen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if obs.Rounds != 3 || obs.Directions != 3 || !obs.Escalate {
+	if obs.Rounds != 3 || obs.Opened != 3 || !obs.Escalate {
 		t.Fatalf("first round after reopen = %+v, want the episode (and its direction count) to continue", obs)
+	}
+}
+
+// Parking, failure and review failure in the sixth dry round must not suppress
+// its alert.
+func TestStallCountsIntentTransitionsWithoutReset(t *testing.T) {
+	st := openProgressStore(t, filepath.Join(t.TempDir(), "ledger.json"))
+	defer st.Close()
+	for i := 0; i < 5; i++ {
+		if _, err := st.ObserveDecisionRound(6); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, status := range []string{model.StatusFailed, model.StatusReviewFailed, model.StatusParked} {
+		in, err := st.CreateIntent(model.Intent{Title: status})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.UpdateIntent(in.ID, func(in *model.Intent) { in.Status = status }); err != nil {
+			t.Fatal(err)
+		}
+	}
+	obs, err := st.ObserveDecisionRound(6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if obs.Rounds != 6 || !obs.Escalate || obs.Opened != 3 || obs.Parked != 1 || obs.Failed != 1 || obs.ReviewFailed != 1 {
+		t.Fatalf("sixth round with intent changes: %+v", obs)
+	}
+}
+
+// Only the first valid receipt for the assertion that is current at the
+// checkpoint is progress. A repeat verdict or proof superseded before the
+// checkpoint must not erase a dry episode.
+func TestStallResetsOnFirstCurrentProof(t *testing.T) {
+	st := openProgressStore(t, filepath.Join(t.TempDir(), "ledger.json"))
+	defer st.Close()
+	e, err := st.AddEvidence(model.Evidence{URI: "fixture/result.txt", Name: "result.txt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := st.AddFact(model.Fact{Kind: "artifact", Origin: model.OriginDeclared, Title: "fixture", EvidenceIDs: []string{e.ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	observe := func() RoundProgress {
+		t.Helper()
+		got, err := st.ObserveDecisionRound(6)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	review := func(verifier string) {
+		t.Helper()
+		if _, err := st.ReviewFact(model.Review{FactID: f.ID, Verdict: "pass", VerifierRun: verifier}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rewrite := func(summary string) {
+		t.Helper()
+		if _, err := st.UpdateFact(f.ID, func(f *model.Fact) { f.Summary = summary }); err != nil {
+			t.Fatal(err)
+		}
+	}
+	observe() // Consume the new fact.
+	for i := 0; i < 5; i++ {
+		observe()
+	}
+	review("verifier-v1")
+	rewrite("v2")
+	if obs := observe(); obs.NewProofs != 0 || !obs.Escalate {
+		t.Fatalf("superseded proof counted: %+v", obs)
+	}
+	review("verifier-v2")
+	if obs := observe(); obs.NewProofs != 1 || obs.Rounds != 0 || obs.Escalate {
+		t.Fatalf("first current proof did not reset: %+v", obs)
+	}
+	for i := 0; i < 5; i++ {
+		observe()
+	}
+	review("verifier-repeat")
+	if obs := observe(); obs.NewProofs != 0 || !obs.Escalate {
+		t.Fatalf("repeated proof counted: %+v", obs)
 	}
 }

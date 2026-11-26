@@ -1596,11 +1596,22 @@ func (r *Runner) observeStall(d *Decision) {
 	r.stalled = obs.Rounds
 	r.mu.Unlock()
 	if obs.Escalate {
-		detail := "没有新增事实、也没有关闭意图"
-		if obs.Directions > 0 {
-			detail = fmt.Sprintf("期间新增 %d 条意图、零新增事实，也没有关闭意图", obs.Directions)
+		var changes []string
+		for _, item := range []struct {
+			label string
+			count int
+		}{
+			{"新开", obs.Opened}, {"停放", obs.Parked}, {"失败", obs.Failed}, {"复核未通过", obs.ReviewFailed},
+		} {
+			if item.count > 0 {
+				changes = append(changes, fmt.Sprintf("%s %d 条", item.label, item.count))
+			}
 		}
-		d.Notes = append(d.Notes, fmt.Sprintf("看门狗：意图连续 %d 轮没有进展（%s）；只提示，不自动停意图、不改变派发。", obs.Rounds, detail))
+		note := fmt.Sprintf("看门狗：连续 %d 个计入的决策轮没有新增事实、有效核验或意图完成。", obs.Rounds)
+		if len(changes) > 0 {
+			note += "期间" + strings.Join(changes, "、") + "。"
+		}
+		d.Notes = append(d.Notes, note)
 	}
 }
 

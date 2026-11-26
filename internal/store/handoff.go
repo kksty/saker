@@ -185,19 +185,21 @@ func handoffOwnerMatches(in *model.Intent, owner string) bool {
 func (s *Store) RecoverHandoffs() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	changed := false
+	var affected []string
 	for i := range s.db.Intents {
 		in := &s.db.Intents[i]
 		if in.HandoffOperation == "" {
 			continue
 		}
+		affected = append(affected, in.ID+"（"+in.HandoffOperation+"）")
 		in.HandoffOperation, in.ClaimedBy = "", ""
 		in.Status, in.Hold = model.StatusFailed, true
 		in.UpdatedAt = time.Now()
-		changed = true
 	}
-	if changed {
-		return s.flush("intent")
+	if len(affected) > 0 {
+		if err := s.flush("intent"); err != nil {
+			return fmt.Errorf("意图及交接操作 %v：%w", affected, err)
+		}
 	}
 	return nil
 }

@@ -434,7 +434,7 @@ export function Overview({
                   onNavigate={onNavigate}
                   className="h-auto"
                 />
-                <GuardPanel board={board} runs={runList} onNavigate={onNavigate} className="h-auto" active={diagnosticsOpen} />
+                <GuardPanel board={board} runs={runList} onNavigate={onNavigate} onOpenRun={onOpenRun} className="h-auto" active={diagnosticsOpen} />
               </div>
             </details>
           </>
@@ -1002,12 +1002,14 @@ function GuardPanel({
   board,
   runs,
   onNavigate,
+  onOpenRun,
   className,
   active = true,
 }: {
   board: BoardResponse
   runs: Run[]
   onNavigate?: (view: string) => void
+  onOpenRun?: (runID: string) => void
   className?: string
   /** The diagnostics expander is collapsed: a 1 Hz clock under it only burns
    *  renders. The panel keeps its last numbers instead of ticking them. */
@@ -1016,9 +1018,12 @@ function GuardPanel({
   const now = useNow(active)
   const dec = board.decider
   const guard = board.guard
-  const interval = guard?.interval_seconds ?? 30
-  const lastTick = guard?.last_tick_at ? Math.max(0, Math.round((now - new Date(guard.last_tick_at).getTime()) / 1000)) : null
-  const freshTick = lastTick !== null && lastTick <= interval * 3
+  const interval = guard?.interval_seconds
+  const completedAt = guard?.completed_at
+  const completedAgo = completedAt ? Math.max(0, Math.round((now - Date.parse(completedAt)) / 1000)) : null
+  const lastCompleted = !completedAt || completedAgo === null ? '—'
+    : interval && completedAgo <= interval * 3 ? `${completedAgo}s 前`
+    : new Date(completedAt).toLocaleString()
   const loopStatus = !dec?.enabled ? 'error' : dec?.paused ? 'warning' : 'success'
   const loopLabel = !dec?.enabled ? '未启用' : dec?.paused ? '已暂停' : '运行中'
   const lastRoundAt = dec?.last_round_at
@@ -1026,17 +1031,17 @@ function GuardPanel({
     : null
   // Three full passes over the run list per render; the clock made that happen
   // once a second. The list only changes when polling delivers a new one.
-  const { quiet, recovered, recoveries, failed, stalled } = useMemo(() => {
-    const watchdogRuns = runs.filter((r) => r.cancel_cause === 'watchdog')
-    const sorted = [...watchdogRuns].sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at))
+  const { quiet, failed, stalled } = useMemo(() => {
     return {
       quiet: (board.running_intents ?? []).filter((it) => (it.pulse?.idle_seconds ?? 0) >= QUIET_SECONDS),
-      recovered: sorted.slice(0, 3),
-      recoveries: watchdogRuns.length,
       failed: runs.filter((r) => r.status === 'failed').length,
       stalled: dec?.stalled ?? 0,
     }
   }, [board.running_intents, runs, dec?.stalled])
+
+  const runLink = (id: string) => onOpenRun
+    ? <button type="button" className="font-mono underline" onClick={() => onOpenRun(id)}>{id}</button>
+    : <span className="font-mono">{id}</span>
 
   return (
     <Panel
@@ -1044,7 +1049,7 @@ function GuardPanel({
       extra={
         <div className="flex items-center gap-1.5">
           <StatusIndicator compact status={loopStatus} label={loopLabel} />
-          <StatusIndicator compact status={freshTick ? 'success' : 'idle'} label={freshTick ? '巡检中' : '待巡检'} />
+          <StatusIndicator compact status={guard?.in_progress ? 'success' : 'idle'} label={guard?.in_progress ? '巡检中' : '待巡检'} />
         </div>
       }
       className={'flex min-h-0 flex-col ' + (className ?? '')}
@@ -1057,45 +1062,58 @@ function GuardPanel({
         <Row label="上次决策" value={lastRoundAt === null ? '—' : `${fmtIdle(lastRoundAt)} 前`} />
         <Row label="上次唤醒" value={dec?.last_wake || '—'} />
         <Row label="已运行" value={fmtUptime(dec?.uptime_seconds)} />
-        <Row label="轮次 / 无新事实" value={`${fmtInt(dec?.rounds ?? 0)} / ${fmtInt(stalled)}`} />
+        <Row label="轮次 / 无进展" value={`${fmtInt(dec?.rounds ?? 0)} / ${fmtInt(stalled)}`} />
       </div>
 
       <div className="mt-3 border-t border-hairline pt-3">
         <div className="saker-eyebrow">巡检 · 重派</div>
         <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2.5 sm:grid-cols-3">
-          <Row label="巡检周期" value={`${interval}s`} />
+          <Row label="巡检周期" value={interval ? `${interval}s` : '—'} />
           <Row label="静默阈值" value={guard?.idle_timeout_seconds ? fmtSeconds(guard.idle_timeout_seconds) : '关闭'} />
-          <Row label="上次巡检" value={lastTick === null ? '—' : `${lastTick}s 前`} />
-          <Row label="自动重派" value={fmtInt(recoveries)} />
+          <Row label="上次完成" value={lastCompleted} />
+          <Row label="守卫取消" value={guard ? fmtInt(guard.guard_canceled) : '—'} />
+          <Row label="自动重派" value={guard ? fmtInt(guard.auto_redispatched) : '—'} />
           <Row label="失败运行" value={fmtInt(failed)} />
           <Row label="静默 >5m" value={fmtInt(quiet.length)} />
         </div>
       </div>
 
-      {quiet.length > 0 && (
-        <Callout tone="warning" className="mt-3" icon={<CircleAlert className="h-4 w-4" />}>
-          <div className="text-[12px] font-semibold text-ink">有 run 长时间没有事件</div>
-          <div className="mt-1 space-y-0.5">
-            {quiet.slice(0, 2).map((it) => (
-              <div key={it.id} className="truncate text-[11px]">
-                {it.title} · 静默 {fmtIdle(it.pulse?.idle_seconds ?? 0)}
+      {!!guard?.activity?.length && (
+        <SubSection label="在途意图">
+          {guard.activity.map((signal) => {
+            const intent = board.running_intents.find((it) => it.id === signal.intent_id)
+            const host = signal.host_online === undefined ? '宿主状态未知'
+              : signal.host_online ? '宿主在线' : '宿主离线'
+            const activity = signal.turn_ended ? '已收到回合结束回执'
+              : signal.open_tools ? `${signal.open_tools} 个工具调用待回执` : 'harness 活动未知'
+            return (
+              <div key={signal.intent_id} className="py-1 text-[11px]">
+                <div className="font-medium text-ink">{intent?.title ?? signal.intent_id}</div>
+                <div className="text-ink-2">{host} · {activity} · {fmtInt(signal.facts)} 条账本事实
+                  {intent?.pulse && <> · 静默 {fmtIdle(intent.pulse.idle_seconds)}</>}
+                </div>
               </div>
-            ))}
-          </div>
-        </Callout>
+            )
+          })}
+        </SubSection>
       )}
 
-      {recovered.length > 0 && (
-        <SubSection label="最近自动重派">
+      {!!guard?.recent?.length && (
+        <SubSection label="最近守卫记录">
           <div className="divide-y divide-hairline/70">
-            {recovered.map((r) => (
-              <div key={r.id} className="flex items-center gap-2 py-1.5 text-[11px]">
-                <span className="shrink-0 font-mono saker-nums text-ink-3">{r.id.slice(-6)}</span>
-                <span className="min-w-0 flex-1 truncate text-ink-2" title={r.exit_reason}>
-                  {r.exit_reason || '运行守卫超时'}
-                </span>
-              </div>
-            ))}
+            {guard.recent.map((r) => {
+              const label = r.successor_run_id ? '自动重派'
+                : r.disposition?.state === 'failed' ? '重派启动失败'
+                : r.disposition?.state === 'skipped' ? '跳过重派' : '守卫取消'
+              return (
+                <div key={r.successor_run_id ?? r.run_id} className="py-1.5 text-[11px]">
+                  <div>{label} · {runLink(r.run_id)}
+                    {r.successor_run_id && <> → {runLink(r.successor_run_id)}</>}
+                  </div>
+                  <div className="text-ink-2">{r.disposition?.reason ?? r.reason}</div>
+                </div>
+              )
+            })}
           </div>
         </SubSection>
       )}

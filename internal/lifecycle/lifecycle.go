@@ -507,6 +507,15 @@ func (s *Service) ProjectCapacity() (running, limit int) {
 // wake or a replacement session all arrive here with the prompt already built
 // (keeping prompt assembly in the API).
 func (s *Service) Start(id, prompt, continuedFrom string, resume, keepPrompt bool, owner string) (string, error) {
+	return s.start(id, prompt, continuedFrom, resume, keepPrompt, owner, "")
+}
+
+// StartAutoRedispatch records provenance on the same transaction as the new run.
+func (s *Service) StartAutoRedispatch(id, prompt, continuedFrom string, resume, keepPrompt bool, previousRun string) (string, error) {
+	return s.start(id, prompt, continuedFrom, resume, keepPrompt, "", previousRun)
+}
+
+func (s *Service) start(id, prompt, continuedFrom string, resume, keepPrompt bool, owner, autoRedispatchedFrom string) (string, error) {
 	if s.o.Gates.Closing.Load() {
 		return "", errors.New("控制台正在关闭：不能再派发")
 	}
@@ -554,6 +563,8 @@ func (s *Service) Start(id, prompt, continuedFrom string, resume, keepPrompt boo
 	if err != nil {
 		return "", err
 	}
+
+	run.AutoRedispatchedFrom = autoRedispatchedFrom
 
 	// Publish a cancel handle before returning the admitted run. A pause/cancel
 	// racing goroutine startup must not miss a run already in the ledger.
@@ -735,70 +746,67 @@ func (s *Service) redeliverPossiblyUnread(intentID, runID string) {
 // that pause and lets the interrupted directions continue; an operator pause or a
 // commander stop is left alone. It is idempotent and returns the number of rows
 // it repaired; a second call returns 0.
-func (s *Service) ReconcileAfterRestart() int {
+func (s *Service) ReconcileAfterRestart() (int, error) {
 	now := time.Now()
 	settled := 0
 	for _, r := range s.o.Store.Runs() {
-		if r.Status != model.RunRunning {
-			continue
-		}
-		settled++
-		_, _ = s.o.Store.UpdateRun(r.ID, func(x *model.Run) {
-			x.Status = model.RunCanceled
-			x.CancelCause = model.CancelCauseRestart
-			x.EndedAt = &now
-			// StopReason is the harness's own verdict on the turn. This process
-			// was not there to observe a new one, so it stays exactly as the dead
-			// process left it — a synthesized verdict would be a fabricated fact.
-			reason := "进程重启对账：上个进程退出时该运行仍在执行，已收敛为取消；意图保持可重试，未重放外部动作"
-			if x.ExitReason != "" {
-				reason = "进程重启对账：" + x.ExitReason
-			}
-			x.ExitReason = reason
-		})
-		if r.Purpose == "commander" {
-			if _, err := s.o.Store.RedeliverPossiblyUnread(collab.CommanderID, r.ID, time.Time{}); err != nil {
-				log.Printf("恢复指挥官未确认输入失败：%v", err)
-			}
-			continue
-		}
-		// Repair only the intent still pointing at this run: an older run must
-		// not reset a replacement direction's state.
-		if in, ok := s.o.Store.GetIntent(r.IntentID); ok && in.RunID == r.ID {
-			if in.Status == model.StatusRunning || in.Status == model.StatusClaimed {
-				if _, _, err := s.recoverInterruptedIntent(in, true); err != nil {
-					log.Printf("恢复意图 %s 失败：%v", in.ID, err)
+		changed := false
+		switch {
+		case r.Status == model.RunRunning:
+			if _, err := s.o.Store.UpdateRun(r.ID, func(x *model.Run) {
+				x.Status = model.RunCanceled
+				x.CancelCause = model.CancelCauseRestart
+				x.EndedAt = &now
+				if x.ExitReason == "" {
+					x.ExitReason = "上个进程退出时该运行仍在执行"
 				}
+				x.ExitReason = "进程重启对账：" + x.ExitReason
+			}); err != nil {
+				return settled, fmt.Errorf("重启对账写入运行 %s：%w", r.ID, err)
 			}
+			settled++
+			changed = true
+			s.restarted.Store(true)
+		case r.Status == model.RunCanceled && r.CancelCause == model.CancelCauseRestart:
+			// The previous attempt may have persisted the run before its intent.
+		default:
+			continue
+		}
+		if r.Purpose == "commander" {
+			n, err := s.o.Store.RedeliverPossiblyUnread(collab.CommanderID, r.ID, time.Time{})
+			if err != nil {
+				return settled, fmt.Errorf("重启对账恢复指挥官运行 %s 的未确认输入：%w", r.ID, err)
+			}
+			if n > 0 && !changed {
+				settled++
+			}
+			continue
+		}
+		in, ok := s.o.Store.GetIntent(r.IntentID)
+		if !ok || in.RunID != r.ID || (in.Status != model.StatusRunning && in.Status != model.StatusClaimed) {
+			continue
+		}
+		_, applied, err := s.recoverInterruptedIntent(in, true)
+		if err != nil {
+			return settled, fmt.Errorf("重启对账修复运行 %s 的意图 %s：%w", r.ID, in.ID, err)
+		}
+		if applied && !changed {
+			settled++
+			s.restarted.Store(true)
 		}
 	}
-	// Waiting directions survive a restart: their condition is in the ledger.
-	if settled > 0 {
-		s.restarted.Store(true)
-	}
-	return settled
+	return settled, nil
 }
 
-// Recover repairs what a crash leaves behind. At startup no goroutine owns any
-// run, so a run recorded as running is necessarily an orphan. It is the boot
-// sequence: message/handoff repair, the idempotent run reconciliation above, then
-// a scheduler wake (the pump only advances already-durable waits/children; it
-// never re-sends external work).
-func (s *Service) Recover() {
+// Recover repairs durable state left by the previous process.
+func (s *Service) Recover() (int, error) {
 	if err := s.o.Store.RecoverMessageDeliveries(); err != nil {
-		log.Printf("恢复消息投递失败：%v", err)
-		return
+		return 0, fmt.Errorf("重启对账恢复消息投递：%w", err)
 	}
 	if err := s.o.Store.RecoverHandoffs(); err != nil {
-		log.Printf("恢复交接失败：%v", err)
-		return
+		return 0, fmt.Errorf("重启对账恢复交接：%w", err)
 	}
-	if n := s.ReconcileAfterRestart(); n > 0 {
-		log.Printf("重启对账：收敛 %d 个上个进程遗留的运行（意图保持可重试）", n)
-	}
-	if s.o.Pump != nil {
-		go s.o.Pump()
-	}
+	return s.ReconcileAfterRestart()
 }
 
 // ReapOrphans returns a running intent run whose dispatcher vanished to
@@ -822,12 +830,15 @@ func (s *Service) ReapOrphans() {
 		if r.Status != model.RunRunning || active[r.ID] || now.Sub(r.StartedAt) < 2*time.Minute {
 			continue
 		}
-		_, _ = s.o.Store.UpdateRun(r.ID, func(x *model.Run) {
+		if _, err := s.o.Store.UpdateRun(r.ID, func(x *model.Run) {
 			x.Status = model.RunCanceled
 			x.CancelCause = model.CancelCauseWatchdog
 			x.EndedAt = &now
-			x.ExitReason = "调度丢失，守卫回收"
-		})
+			x.ExitReason = "守卫回收：未找到该运行的调度句柄"
+		}); err != nil {
+			log.Printf("守卫回收运行 %s 失败：%v", r.ID, err)
+			continue
+		}
 		if in, ok := s.o.Store.GetIntent(r.IntentID); ok && in.RunID == r.ID {
 			if in.Status == model.StatusRunning || in.Status == model.StatusClaimed {
 				_, applied, err := s.recoverInterruptedIntent(in, true)
@@ -872,7 +883,10 @@ func (s *Service) ReapIdle(idleTimeout time.Duration) {
 		if !ok || in.RunID != r.ID || (in.Status != model.StatusRunning && in.Status != model.StatusClaimed) {
 			continue
 		}
-		reason := fmt.Sprintf("静默 %s（疑似卡死）：守卫取消并 hold", idleTimeout)
+		reason := fmt.Sprintf("守卫取消：距最近运行事件（或运行开始）已 %s，静默阈值 %s", idle.Round(time.Second), idleTimeout)
+		if n := len(r.OpenToolCalls); n > 0 {
+			reason += fmt.Sprintf("，%d 个工具调用尚未收到结果", n)
+		}
 		if _, applied, err := s.o.Store.UpdateIntentIfCurrent(in.ID, in.Status, r.ID, func(i *model.Intent) {
 			i.Hold = true
 			i.HeldBy = model.HoldActorWatchdog

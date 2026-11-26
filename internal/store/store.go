@@ -719,6 +719,10 @@ func (s *Store) AddRun(r model.Run) (model.Run, error) {
 // prompt, so it must stay a glance, not a transcript. The run_events tool
 // carries the tail for the rounds that need to look closer (D57, D71).
 func (s *Store) NoteEvent(id string, at time.Time, kind, tool, text string) {
+	s.NoteHarnessEvent(id, at, kind, tool, text, "")
+}
+
+func (s *Store) NoteHarnessEvent(id string, at time.Time, kind, tool, text, callID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i := range s.db.Runs {
@@ -727,6 +731,25 @@ func (s *Store) NoteEvent(id string, at time.Time, kind, tool, text string) {
 		}
 		s.db.Runs[i].LastEventAt = &at
 		s.db.Runs[i].Events++
+		run := &s.db.Runs[i]
+		switch kind {
+		case "turn_started":
+			run.HarnessTurnEnded = false
+		case "turn_ended", "session_ended":
+			run.HarnessTurnEnded = true
+			run.OpenToolCalls = nil
+		case "tool_call", "tool_result":
+			if callID != "" && !run.HarnessTurnEnded {
+				if kind == "tool_call" {
+					if run.OpenToolCalls == nil {
+						run.OpenToolCalls = make(map[string]bool)
+					}
+					run.OpenToolCalls[callID] = true
+				} else {
+					delete(run.OpenToolCalls, callID)
+				}
+			}
+		}
 		if kind == "turn_started" {
 			// Persisted by the run's finish (which overwrites/flushes the row).
 			// Redelivery uses it as "messages from this instant on may be

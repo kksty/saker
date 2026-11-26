@@ -24,6 +24,7 @@ const (
 // sentence, not a rule: copy may be re-worded, the code may not.
 const (
 	reasonOK                  = "ok"
+	reasonRestartRecovery     = "restart_recovery_failed"
 	reasonAlreadyPaused       = "already_paused"
 	reasonAlreadyRunning      = "already_running"
 	reasonCloseoutInProgress  = "closeout_in_progress"
@@ -138,6 +139,8 @@ func (s *Server) resumeActionLocked(st projectState, facts ProjectFacts) Project
 		return ProjectAction{ID: actionResume, Enabled: false, ReasonCode: reasonDeleting, Reason: "项目正在删除"}
 	case facts.Closeout:
 		return ProjectAction{ID: actionResume, Enabled: false, ReasonCode: reasonCloseoutInProgress, Reason: "指挥官正在收口：等本轮结束，或先暂停取消"}
+	case st.RecoveryError != "":
+		return ProjectAction{ID: actionResume, Enabled: true, ReasonCode: reasonRestartRecovery, Reason: "重新执行启动对账：" + st.RecoveryError}
 	case !st.Paused:
 		return ProjectAction{ID: actionResume, Enabled: false, ReasonCode: reasonAlreadyRunning, Reason: "项目没有暂停"}
 	case st.Kind == pauseKindProviderFault:
@@ -179,6 +182,9 @@ func (s *Server) appendGoalActionLocked(facts ProjectFacts) ProjectAction {
 // flight; a single status word would hide one of them.
 func projectNotes(st projectState, f ProjectFacts) []ProjectNote {
 	var notes []ProjectNote
+	if st.RecoveryError != "" {
+		notes = append(notes, ProjectNote{Code: reasonRestartRecovery, Text: st.RecoveryError})
+	}
 	closed := f.HasLedger && f.GoalsActive > 0 && f.GoalsOpen == 0 && f.GoalsStale == 0
 	switch {
 	case closed && (f.Pending > 0 || f.Unread > 0):

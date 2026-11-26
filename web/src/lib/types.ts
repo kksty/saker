@@ -1402,7 +1402,24 @@ export interface BoardResponse extends BoardView {
   guard?: {
     interval_seconds: number
     idle_timeout_seconds?: number
-    last_tick_at?: string
+    started_at?: string
+    completed_at?: string
+    in_progress: boolean
+    guard_canceled: number
+    auto_redispatched: number
+    activity?: {
+      intent_id: string
+      host_online?: boolean
+      turn_ended?: boolean
+      open_tools?: number
+      facts: number
+    }[]
+    recent?: {
+      run_id: string
+      successor_run_id?: string
+      reason?: string
+      disposition?: { state: 'skipped' | 'failed'; reason: string }
+    }[]
   }
 
   /** Re-dispatch beyond a direction's first attempt (retry/wake/steer/handoff). */
@@ -1451,7 +1468,7 @@ export interface ProjectNote {
 }
 
 export interface ProjectActions {
-  state: { paused: boolean; kind: string; reason?: string }
+  state: { paused: boolean; kind: string; reason?: string; restart_recovery_error?: string }
   facts: ProjectActionFacts
   actions: ProjectAction[]
   notes?: ProjectNote[]

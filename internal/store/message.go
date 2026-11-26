@@ -400,18 +400,20 @@ func (s *Store) RecoverMessageDeliveries() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now()
-	changed := false
+	var affected []string
 	for i := range s.db.Messages {
 		m := &s.db.Messages[i]
 		if m.Status != model.MessageSending {
 			continue
 		}
+		affected = append(affected, m.ID)
 		m.Error = "进程重启：投递结果未知，已按重投入队"
 		requeueMessage(m, now)
-		changed = true
 	}
-	if changed {
-		return s.flushNoRev("message")
+	if len(affected) > 0 {
+		if err := s.flushNoRev("message"); err != nil {
+			return fmt.Errorf("消息 %v：%w", affected, err)
+		}
 	}
 	return nil
 }
