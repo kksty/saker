@@ -124,3 +124,20 @@ Hub、scan 和控制面的分工由当前构建的协议契约确定。节点由
 当前账本采用新版本，不提供原地迁移：旧版项目账本保留在原目录供归档，新版本使用新的数据目录或新建项目。旧项目包按同一版本规则检查，版本不符时拒绝导入。运行中的项目和原始证据由操作员安排备份。
 
 本地测试覆盖账本事务、前提、消息回执、交接与控制台渲染。宿主间协议、跨机运行和实际工具行为需要相应环境验证。项目目录隔离状态与证据，部署的进程和网络边界由运行环境提供。
+
+## 10. 工具审批
+
+工具审批由 harness 在工具执行前完成，策略来自 `cyber.yaml` 的 `guardrail` 段，由执行工具的 scan 节点加载。控制面不实现判定：设置页读取同一份文件，展示 provider、mode、JEV 端点与凭据状态、LLM 绑定以及识别到的配置问题，并按 harness 的规则校验字段。
+
+| provider | 当前判定 |
+| --- | --- |
+| `none` | 默认，不判定，直接执行 |
+| `jev` | JEV 首判；`auto` 模式对被标记调用再做一次后果判定；需要 JEV 凭据 |
+| `llm` | OpenAI 兼容 `/chat/completions` 裁判；需要 `guardrail.llm.base_url` 与 `model` |
+| `hybrid` | 先由 LLM 判定，仅明确的 `REVIEW` 再交 JEV 复核；需要两套配置与 JEV 凭据 |
+
+`mode` 决定被标记调用的去向。`auto`（默认）不等待人工：provider 带后果阶段时先做后果判定，放行则执行，否则拦截并把非终止错误返回给执行者；`safe` 暂停该调用，等待操作员在 `review_timeout`（默认 5m）内批准或拒绝，批准后执行；`shadow` 只记录判定并始终放行。`scope` 限定参与判定的工具，空表示全部；`allow_prefixes` 只在 `safe` 下按命令字面前缀跳过人工。`on_error` 只适用于 `llm`/`hybrid`，默认 `review`，处理裁判调用失败；模型“判断不确定”不算失败。`guardrail.llm` 的 `base_url`、`model`、`api_key` 或非零 `temperature` 只在 `llm`/`hybrid` 下允许，其他 provider 下会被拒绝，设置页按此校验。
+
+LLM 提示词只要求 `ALLOW` 或 `BLOCK`，不确定一律 `ALLOW`；`REVIEW` 仅作为异常输出的兼容解析存在。显式 confidence ≥ 0.7 的 `REVIEW` 才保留；低置信的 `REVIEW`/`BLOCK` 按不确定放行，未写 confidence 的 `REVIEW` 也按不确定放行，未写 confidence 的 `BLOCK` 仍是 `BLOCK`。`hybrid` 中 `ALLOW`/`BLOCK` 是最终结果；只有高置信 `REVIEW` 升级到 JEV，JEV `record` 放行、`block` 拒绝、仍 `review` 时在 `safe` 转人工、在 `auto` 拦截。LLM 调用失败按 `on_error` 处理并作为最终结果，不再交 JEV 复核。
+
+判定结果按 AOP 事件记录，用量按 emitter 分开上报；`hybrid` 的 LLM 与 JEV 各用自己的 emitter，只有真正升级到 JEV 时才出现 JEV 事件。审批不改变意图派发与账本事实，控制面只展示配置和运行信号。
