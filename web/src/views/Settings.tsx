@@ -67,7 +67,7 @@ export function SettingsPage() {
       <ModelConnection settings={settings} />
       <div className="min-w-0 space-y-4">
        <ExtensionsPanel settings={settings} />
-       {settings.data?.gateway && <GatewayStatus gateway={settings.data.gateway} />}
+       {settings.data?.gateway && <GatewayPanel settings={settings} />}
       </div>
      </div>
     </section>
@@ -98,23 +98,129 @@ export function SettingsPage() {
  </Page>
 }
 
-function GatewayStatus({ gateway }: { gateway: NonNullable<SettingsView['gateway']> }) {
- return (
-  <Panel title="工具 API 网关" extra={<Badge variant="outline" size="sm">已保存配置 · 只读</Badge>}>
-   {gateway.reason ? <Callout tone="warning">{gateway.reason}</Callout> : (
-    <dl className="grid grid-cols-1 gap-3 text-[12px] sm:grid-cols-2">
-     <div>
-      <dt className="text-ink-3">网关实例</dt>
-      <dd className="text-ink-2">{gateway.instances === 0 ? '未配置' : `${gateway.instances} 个实例，${gateway.enabled} 个启用`}</dd>
-     </div>
-     <div>
-      <dt className="text-ink-3">Cyberhub 代理（工具出站）</dt>
-      <dd className="text-ink-2">{gateway.proxy_configured ? '已配置' : '未指定'}</dd>
-     </div>
-    </dl>
-   )}
-  </Panel>
- )
+/**
+ * 工具 API 网关: the scan node's in-process bindings from its own tools to
+ * external APIs (`gateway.<instance>` + `cyberhub.proxy`).
+ *
+ * It is edited as YAML because the harness owns the service schemas and every
+ * instance differs (base_url/key, office url/refresh/strategy, shodan-idb
+ * enabled only). A row editor would still serialise back to the same shape.
+ * The secret semantics are the server's: key/url/proxy read back as "***" and a
+ * save keeps the stored value. The scan reads this section at process start, so
+ * a changed save reports the restart instead of claiming it is already live.
+ */
+function GatewayPanel({ settings }: { settings: AsyncState<SettingsView> }) {
+ const gateway = settings.data?.gateway
+ const editable = !!gateway?.editable
+ const baseline = useRef<string>()
+ const [draft,setDraft] = useState('')
+ const [busy,setBusy] = useState(false)
+ const [error,setError] = useState('')
+ const [apply,setApply] = useState<{tone:'success'|'warning'|'info';text:string}|null>(null)
+ const lock = useRef(false)
+ const uid = useId()
+ const docID = `${uid}-gateway`
+ const hintID = `${uid}-gateway-hint`
+ const errorID = `${uid}-gateway-error`
+ useEffect(()=>{
+  if(!gateway) return
+  const next = gateway.document ?? ''
+  const old = baseline.current
+  baseline.current = next
+  setDraft(current => (old === undefined || current === old) ? next : current)
+ },[gateway])
+ const dirty = baseline.current !== undefined && draft !== baseline.current
+ useEffect(()=>{if(!dirty)return; const prevent=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue=''}; window.addEventListener('beforeunload',prevent); return()=>window.removeEventListener('beforeunload',prevent)},[dirty])
+ function acceptSaved(next: SettingsView) {
+  settings.setData(next)
+  const saved = next.gateway?.document ?? ''
+  baseline.current = saved
+  setDraft(saved)
+ }
+ async function save(){
+  if(lock.current || !dirty || !editable) return
+  lock.current=true;setBusy(true);setError('');setApply(null)
+  try{
+   const next = await api.saveGateway({ document: draft })
+   acceptSaved(next)
+   setApply(settingsApplyNotice(next) ?? { tone: 'info', text: '配置与已保存内容一致。' })
+  }catch(e){
+   const message = e instanceof Error ? e.message : String(e)
+   if (e instanceof ApiError && e.code === 'settings_saved_apply_failed' &&
+       e.body && typeof e.body === 'object' && 'settings' in e.body) {
+    acceptSaved(e.body.settings as SettingsView)
+    setApply({ tone: 'warning', text: message })
+   } else {
+    setError(message)
+   }
+  }finally{
+   lock.current=false;setBusy(false)
+  }
+ }
+ return <Panel
+  title="工具 API 网关"
+  extra={<Badge variant="outline" size="sm">{editable ? '已保存配置 · 可编辑' : '已保存配置 · 只读'}</Badge>}
+  bodyClassName="@container space-y-3"
+  data-testid="gateway-settings"
+ >
+  <p className="text-body text-ink-2">
+   外部 API 的进程内绑定：按实例名配置测绘源、搜索与代理的上游地址、kind 和凭据，<code className="rounded bg-surface-2 px-1 font-mono text-caption">cyberhub.proxy</code> 选择代理实例或填写代理 URL。
+  </p>
+  {gateway?.reason ? <Callout tone="warning">{gateway.reason}</Callout> : (
+   <dl className="grid grid-cols-1 gap-3 text-[12px] sm:grid-cols-2">
+    <div>
+     <dt className="text-ink-3">网关实例</dt>
+     <dd className="text-ink-2">{!gateway || gateway.instances === 0 ? '未配置' : `${gateway.instances} 个实例，${gateway.enabled} 个启用`}</dd>
+    </div>
+    <div>
+     <dt className="text-ink-3">Cyberhub 代理（工具出站）</dt>
+     <dd className="text-ink-2">{gateway?.proxy_configured ? '已配置' : '未指定'}</dd>
+    </div>
+   </dl>
+  )}
+  {editable ? (
+   <form noValidate onSubmit={(event) => { event.preventDefault(); void save() }} className="space-y-3">
+    <div className="block space-y-1.5">
+     <label htmlFor={docID} className="block text-[12px] font-medium leading-4 text-ink-2">gateway 与 cyberhub.proxy（YAML）</label>
+     <Textarea
+      id={docID}
+      aria-label="工具 API 网关配置"
+      aria-describedby={[hintID, error ? errorID : ''].filter(Boolean).join(' ')}
+      aria-invalid={error ? true : undefined}
+      data-user-invalid={error ? 'true' : undefined}
+      rows={10}
+      spellCheck={false}
+      autoComplete="off"
+      className="font-mono text-caption"
+      value={draft}
+      onChange={(e) => { setDraft(e.target.value); setError('') }}
+      placeholder={'gateway:\n  fofa:\n    base_url: https://gateway.example/fofa\n    key: "***"\ncyberhub:\n  proxy: office'}
+     />
+     {error ? (
+      <span id={errorID} className="flex items-start gap-1 text-[11px] leading-4 text-destructive">
+       <TriangleAlert aria-hidden="true" className="mt-0.5 h-3 w-3 shrink-0" />
+       <span className="saker-break">{error}</span>
+      </span>
+     ) : (
+      <span id={hintID} className="block text-[11px] leading-4 text-ink-3">
+       只接受 gateway 与 cyberhub.proxy 两段。key、url、proxy 读回为 ***，保存时保留已保存的值；删除整行即清除。保存前由执行节点做离线校验；有变更时会重启本机宿主并结束其当前会话。
+      </span>
+     )}
+    </div>
+    <div className="saker-settings-actions flex flex-wrap items-center gap-2">
+     <Button type="button" onClick={() => void save()} disabled={busy || !dirty} aria-busy={busy}>
+      {busy && <Spinner size="sm" />}
+      保存并应用网关配置
+     </Button>
+     {dirty && <span className="text-caption text-ink-3">有未保存的修改</span>}
+    </div>
+   </form>
+  ) : <p className="text-[11px] text-ink-3">配置由操作员直接写在 cyber.yaml。</p>}
+  <div aria-live="polite" className="space-y-2">
+   {apply && <Callout tone={apply.tone}>{apply.text}</Callout>}
+   {settings.error && <Callout tone="destructive">读取设置失败：{settings.error}</Callout>}
+  </div>
+ </Panel>
 }
 
 /**

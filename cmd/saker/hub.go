@@ -871,6 +871,8 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.serveSettings(w, r)
 	case r.URL.Path == "/api/settings/guardrail":
 		h.serveGuardrailSettings(w, r)
+	case r.URL.Path == "/api/settings/gateway":
+		h.serveGatewaySettings(w, r)
 	case r.URL.Path == "/api/runtime-settings":
 		h.serveRuntimeSettings(w, r)
 	case r.URL.Path == "/api/models":

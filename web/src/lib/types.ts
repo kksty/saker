@@ -2119,7 +2119,28 @@ export interface SettingsView {
   /** Read-only judge summary (absent on servers that predate the projection). */
   guardrail?: SettingsGuardrailSummary
   guardrail_editable?: boolean
-  gateway?: { instances: number; enabled: number; proxy_configured: boolean; reason?: string }
+  gateway?: SettingsGatewayView
+}
+
+/**
+ * The tool API gateway as the settings panel reads it. The document is the
+ * masked YAML for the `gateway` section plus `cyberhub.proxy`: the harness's
+ * secret fields read back as "***" and a save that posts the placeholder keeps
+ * the stored value.
+ */
+export interface SettingsGatewayView {
+  instances: number
+  enabled: number
+  proxy_configured: boolean
+  /** A saved shape the console cannot render/edit; the file must be fixed by hand. */
+  reason?: string
+  /** The panel may save the section: the operator file exists and parses. */
+  editable?: boolean
+  document?: string
+}
+
+export interface SettingsGatewayInput {
+  document: string
 }
 
 /** Instance-level knobs that live beside the model profile: the auxiliary gate

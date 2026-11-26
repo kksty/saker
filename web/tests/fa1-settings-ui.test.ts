@@ -75,6 +75,51 @@ test('settings shows saved gateway and proxy configuration', async () => {
   assert.match(page, /已保存配置 · 只读/)
 })
 
+test('the gateway panel edits masked YAML and applies it', async () => {
+  // The card used to be read-only while the harness section could only be
+  // changed by hand-editing cyber.yaml. Exercise the editor and the save
+  // outcome: a changed gateway section is read at scan start, so the notice
+  // must be the restart, not a false "online".
+  const document = "gateway:\n  fofa:\n    base_url: https://gw.test/fofa\n    key: '***'\ncyberhub:\n  proxy: office\n"
+  const original = await mountSettings({
+    gateway: { instances: 1, enabled: 1, proxy_configured: true, editable: true, document },
+  })
+  const field = () => renderer!.root.findAllByProps({ 'aria-label': '工具 API 网关配置' }).find(node => typeof node.type === 'string')!
+  assert.equal(field().props.value, document)
+  assert.match(JSON.stringify(renderer!.toJSON()), /已保存配置 · 可编辑/)
+
+  const writes: { document: string }[] = []
+  const edited = document.replace('https://gw.test/fofa', 'https://new.test/fofa')
+  api.saveGateway = async (body: { document: string }) => {
+    writes.push(body)
+    return {
+      ...original,
+      gateway: { ...original.gateway, document: body.document },
+      applied: 'saved',
+      requires_restart: true,
+      restart_reason: '工具 API 网关只在 scan 启动时读取',
+    }
+  }
+  await act(async () => { field().props.onChange({ target: { value: edited } }) })
+  await act(async () => { await button('保存并应用网关配置').props.onClick() })
+  assert.deepEqual(writes, [{ document: edited }])
+  assert.equal(field().props.value, edited, 'the draft is reconciled with the saved document')
+  const page = JSON.stringify(renderer!.toJSON())
+  assert.match(page, /需要重启后生效/)
+  assert.match(page, /工具 API 网关只在 scan 启动时读取/)
+})
+
+test('a rejected gateway document shows the server reason', async () => {
+  const document = "gateway:\n  fofa:\n    key: '***'\ncyberhub:\n  proxy: ''\n"
+  await mountSettings({ gateway: { instances: 1, enabled: 1, proxy_configured: false, editable: true, document } })
+  api.saveGateway = async () => { throw new ApiError(400, '工具 API 网关配置无效：gateway.fofa.enabled 必须是 true 或 false') }
+  const field = () => renderer!.root.findAllByProps({ 'aria-label': '工具 API 网关配置' }).find(node => typeof node.type === 'string')!
+  await act(async () => { field().props.onChange({ target: { value: document.replace("key: '***'", "enabled: 'false'") } }) })
+  await act(async () => { await button('保存并应用网关配置').props.onClick() })
+  assert.equal(field().props['aria-invalid'], true)
+  assert.match(JSON.stringify(renderer!.toJSON()), /enabled 必须是 true 或 false/)
+})
+
 test('guardrail settings can save a judge and display the saved outcome', async () => {
   // The settings page previously exposed only the read-only summary even when
   // the operator needed to enable a judge. Exercise the form and API boundary.

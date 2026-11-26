@@ -37,6 +37,8 @@ func TestSessionWriteAllowlistIsDefaultDeny(t *testing.T) {
 		{"POST", "/p/p1/api/proposals", false},
 		{"POST", "/p/p1/api/proposals/pr_1/withdraw", false},
 		{"PUT", "/api/settings", false},
+		{"PUT", "/api/settings/gateway", false},
+		{"PUT", "/api/settings/guardrail", false},
 		{"POST", "/p/p1/api/instructions", false},
 		{"PUT", "/p/p1/api/instructions/instruction_1", false},
 		{"DELETE", "/p/p1/api/playbooks/pb_1", false},

@@ -82,6 +82,7 @@ import type {
   SettingsCheck,
   SettingsView,
   SettingsGuardrailInput,
+  SettingsGatewayInput,
   ToolsResponse,
   RuntimeToolsResponse,
   UsageSummary,
@@ -400,6 +401,9 @@ export const api = {
   settings: () => get<SettingsView>('/api/settings'),
   saveSettings: (body: Partial<SettingsView>) => put<SettingsView>('/api/settings', body),
   saveGuardrail: (body: SettingsGuardrailInput) => put<SettingsView>('/api/settings/guardrail', body),
+  // The tool API gateway: the `gateway` section plus `cyberhub.proxy` as YAML.
+  // Secrets read back masked; a changed save needs the host restart.
+  saveGateway: (body: SettingsGatewayInput) => put<SettingsView>('/api/settings/gateway', body),
   // The instance-level gate shared by verifier and report runs. It is not a
   // project setting: one value bounds every project's auxiliary calls.
   runtimeSettings: () => get<RuntimeSettings>('/api/runtime-settings'),
