@@ -2,11 +2,15 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kksty/saker/internal/ledger"
 	"github.com/kksty/saker/internal/model"
@@ -116,6 +120,74 @@ func TestConfidenceRepairPreviewsWithoutWriting(t *testing.T) {
 	}
 	if backups, err := filepath.Glob(filepath.Join(dir, "ledger-before-confidence-*.sqlite")); err != nil || len(backups) != 0 {
 		t.Fatalf("preview wrote a backup: %v (%v)", backups, err)
+	}
+}
+
+func TestCursorPreviewLocatesFailedFactAfterPartialSettlement(t *testing.T) {
+	dir := t.TempDir()
+	writeManifest(t, dir, map[string]any{"id": "p1", "name": "fixture", "paused": true})
+	path := filepath.Join(dir, "ledger.sqlite")
+	intentID := seedLedger(t, path)
+	st, err := store.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	caseRoot := filepath.Join(dir, "cases")
+	work := filepath.Join(caseRoot, intentID)
+	handoff := filepath.Join(work, ledger.HandoffDir)
+	if err := os.MkdirAll(handoff, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(work, "proof.txt"), []byte("fixture evidence"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	first := `{"declaration_id":"kept","kind":"note","title":"observation with evidence","evidence":["proof.txt"]}` + "\n"
+	second := `{"declaration_id":"missing","kind":"note","title":"uncommitted observation"}` + "\n"
+	if err := os.WriteFile(filepath.Join(handoff, ledger.HandoffFile), []byte(first+second), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	// Interrupt settlement after one fact and its original are persisted. The
+	// preview must isolate the missing declaration without consuming either line.
+	_, err = db.Exec(`CREATE TRIGGER fail_fixture_fact BEFORE INSERT ON objects
+		WHEN NEW.kind = 'fact' AND instr(CAST(NEW.payload AS TEXT), '"declaration_id":"missing"') > 0
+		BEGIN SELECT RAISE(ABORT,'fixture write failure'); END`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	(&ledger.Ingestor{Store: st}).OnFinish("fixture-run", intentID, caseRoot, work, time.Now().Add(time.Hour))
+	before, err := store.ReadSnapshot(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	if err := run([]string{"--project", dir, "--intent", intentID}, &out); err != nil {
+		t.Fatal(err)
+	}
+	var plan ledger.CursorRepair
+	if err := json.Unmarshal(out.Bytes(), &plan); err != nil {
+		t.Fatal(err)
+	}
+	if plan.Persisted != 1 || plan.Matched != 1 || plan.Before != 0 || plan.Through != int64(len(first)+len(second)) || len(plan.Pending) != 1 {
+		t.Fatalf("incorrect partial batch: %+v", plan)
+	}
+	pending := plan.Pending[0]
+	wantLocation := fmt.Sprintf(".saker/facts.jsonl#bytes=%d-%d", len(first), len(first)+len(second))
+	if pending.DeclarationID != "missing" || pending.Location != wantLocation || len(pending.Reasons) != 1 || !strings.Contains(pending.Reasons[0], "匹配 0") {
+		t.Fatalf("incorrect pending declaration: %+v", pending)
+	}
+	if _, err := os.Stat(filepath.Join(handoff, ledger.HandoffOffset)); !os.IsNotExist(err) {
+		t.Fatalf("preview wrote a cursor: %v", err)
+	}
+	after, err := store.ReadSnapshot(path)
+	if err != nil || !reflect.DeepEqual(before, after) {
+		t.Fatalf("preview changed the ledger: %v", err)
 	}
 }
 

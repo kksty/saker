@@ -96,6 +96,8 @@ gate 的最后一步写 `.build/build-manifest.json`（步骤清单见 `cmd/sake
 ./bin/saker-repair.exe --project <项目绝对目录> --intent <精确意图ID>    # 预览该意图的交接游标
 ```
 
+意图预览的 `persisted` 是本批中已与账本核对的声明数。`pending` 给出待核对声明的 ID、文件字节范围及原因。`skipped` 和 `truncated` 分别标识解析时跳过的行数和是否还有超出本批读取上限的内容。预览只读账本和交接文件。
+
 `--commit` 只写回能保留断言哈希的派生标签或与现存声明一致的游标，并保留修复前的游标、文件摘要与审计记录。
 
 ## 免责声明
