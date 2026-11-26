@@ -10,15 +10,15 @@ import (
 
 func TestSessionToolEnvMatchesCaseState(t *testing.T) {
 	dir := t.TempDir()
-	saker := filepath.Join(dir, ".saker")
-	if err := os.MkdirAll(saker, 0o700); err != nil {
+	sakerDir := filepath.Join(dir, ".saker")
+	if err := os.MkdirAll(sakerDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(saker, "identity.json"), []byte(
+	if err := os.WriteFile(filepath.Join(sakerDir, "identity.json"), []byte(
 		`{"api_base":"http://127.0.0.1:8080/","project_id":"p-1","intent_id":"in-9"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(saker, "auth"),
+	if err := os.WriteFile(filepath.Join(sakerDir, "auth"),
 		[]byte("Authorization: Bearer tok-xyz\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}

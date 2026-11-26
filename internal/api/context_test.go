@@ -29,12 +29,12 @@ func TestRunContextReadsCase(t *testing.T) {
 	}
 
 	dir := filepath.Join(root, in.ID)
-	saker := filepath.Join(dir, ".saker")
-	if err := os.MkdirAll(saker, 0o755); err != nil {
+	sakerDir := filepath.Join(dir, ".saker")
+	if err := os.MkdirAll(sakerDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	write := func(name, body string) {
-		if err := os.WriteFile(filepath.Join(saker, name), []byte(body), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(sakerDir, name), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}

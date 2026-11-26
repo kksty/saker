@@ -62,11 +62,11 @@ func (s *Server) runContext(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	dir := filepath.Join(s.CaseRoot, in.ID)
-	saker := filepath.Join(dir, ".saker")
+	sakerDir := filepath.Join(dir, ".saker")
 
-	prompt := readCapped(filepath.Join(saker, "prompt.txt"), contextPromptMax)
+	prompt := readCapped(filepath.Join(sakerDir, "prompt.txt"), contextPromptMax)
 	steer := []string{}
-	if files, _ := filepath.Glob(filepath.Join(saker, "steer-*.txt")); len(files) > 0 {
+	if files, _ := filepath.Glob(filepath.Join(sakerDir, "steer-*.txt")); len(files) > 0 {
 		sort.Strings(files)
 		for _, p := range files {
 			if text := readCapped(p, contextPromptMax); text != "" {
@@ -78,8 +78,8 @@ func (s *Server) runContext(w http.ResponseWriter, r *http.Request) {
 	out["prompt"] = prompt
 	out["steer"] = steer
 	out["graph"] = readRunGraph(dir, run.ID)
-	out["declared"] = readJSONLines(filepath.Join(saker, "facts.jsonl"), contextLinesMax, contextGraphMax)
-	out["asks"] = readJSONLines(filepath.Join(saker, "ask.jsonl"), contextLinesMax, 256<<10)
+	out["declared"] = readJSONLines(filepath.Join(sakerDir, "facts.jsonl"), contextLinesMax, contextGraphMax)
+	out["asks"] = readJSONLines(filepath.Join(sakerDir, "ask.jsonl"), contextLinesMax, 256<<10)
 	out["files"] = listCaseFiles(dir)
 	writeJSON(w, http.StatusOK, out)
 }
@@ -160,8 +160,8 @@ func listCaseFiles(dir string) []contextFile {
 			add("", e.Name(), info.Size())
 		}
 	}
-	if saker, err := os.ReadDir(filepath.Join(dir, ".saker")); err == nil {
-		for _, e := range saker {
+	if sakerDir, err := os.ReadDir(filepath.Join(dir, ".saker")); err == nil {
+		for _, e := range sakerDir {
 			if e.IsDir() {
 				continue
 			}
