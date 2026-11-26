@@ -66,8 +66,8 @@ export function CommanderCard({ board, onOpen }: { board?: BoardResponse; onOpen
         title={open ? '收起指挥官状态' : '展开指挥官状态'}
       >
         <Bot className="h-4 w-4 shrink-0 text-ai" />
-        <span className="tw-section-title">指挥官</span>
-        <span className="tw-nums ml-auto flex min-w-0 items-center gap-1.5 truncate text-[11px] text-ink-3">
+        <span className="saker-section-title">指挥官</span>
+        <span className="saker-nums ml-auto flex min-w-0 items-center gap-1.5 truncate text-[11px] text-ink-3">
           {!open && <span className={`size-1.5 shrink-0 rounded-full ${dot}`} />}
           {open && dec?.rounds ? `第 ${fmtInt(dec.rounds)} 轮` : PHASE_LABEL[phase] ?? phase}
         </span>
@@ -84,10 +84,10 @@ export function CommanderCard({ board, onOpen }: { board?: BoardResponse; onOpen
             <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
             <span className="text-[12px] font-medium text-ink">{PHASE_LABEL[phase] ?? phase}</span>
             {active && since > 0 && (
-              <span className="tw-nums font-mono text-[11px] text-ink-3">{elapsed}s</span>
+              <span className="saker-nums font-mono text-[11px] text-ink-3">{elapsed}s</span>
             )}
             {!active && dec?.uptime_seconds ? (
-              <span className="tw-nums ml-auto font-mono text-[11px] text-ink-3">
+              <span className="saker-nums ml-auto font-mono text-[11px] text-ink-3">
                 已跑 {fmtUptime(dec.uptime_seconds)}
               </span>
             ) : null}
@@ -103,7 +103,7 @@ export function CommanderCard({ board, onOpen }: { board?: BoardResponse; onOpen
 
           <div className="flex items-center gap-1.5 text-[11px] text-ink-3">
             {activity?.wake && (
-              <span className="tw-nums shrink-0 rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-ink-2">
+              <span className="saker-nums shrink-0 rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-ink-2">
                 {activity.wake}
               </span>
             )}
@@ -116,7 +116,7 @@ export function CommanderCard({ board, onOpen }: { board?: BoardResponse; onOpen
             <div className="space-y-1.5 border-t border-hairline pt-2">
               <div className="flex items-center justify-between text-[11px] text-ink-3">
                 <span>
-                  在跑 <span className="tw-nums font-mono font-semibold text-ink-2">{running.length}</span>
+                  在跑 <span className="saker-nums font-mono font-semibold text-ink-2">{running.length}</span>
                 </span>
                 {dec?.model && <span className="truncate normal-case tracking-normal">{dec.model}</span>}
               </div>
@@ -132,7 +132,7 @@ export function CommanderCard({ board, onOpen }: { board?: BoardResponse; onOpen
                       <span className="truncate text-ink-2" title={item.title}>
                         {item.title}
                       </span>
-                      <span className="tw-nums ml-auto shrink-0 font-mono text-[11px] text-ink-3">
+                      <span className="saker-nums ml-auto shrink-0 font-mono text-[11px] text-ink-3">
                         静默 {idle}s · {events} 事件
                       </span>
                     </div>
@@ -153,7 +153,7 @@ export function CommanderCard({ board, onOpen }: { board?: BoardResponse; onOpen
               lives on the graph page header; this card keeps the decider's own
               measured spend and the way to its log. */}
           <div className="flex items-center gap-1.5 border-t border-hairline pt-2 text-[11px] text-ink-3">
-            <span className="tw-nums font-mono">决策 {fmtInt(dec?.tokens_total)} tok</span>
+            <span className="saker-nums font-mono">决策 {fmtInt(dec?.tokens_total)} tok</span>
             <button
               type="button"
               className="ml-auto rounded text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"

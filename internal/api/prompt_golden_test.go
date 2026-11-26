@@ -41,12 +41,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/board"
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/contract"
-	"github.com/kksty/tianwu/internal/decider"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/board"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/contract"
+	"github.com/kksty/saker/internal/decider"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 var updatePromptGolden = flag.Bool("update-prompt-golden", false, "regenerate internal/api/testdata/prompt-golden/dispatch-and-commander.json")
@@ -191,7 +191,7 @@ var dispatchMarkers = []struct{ ID, Marker string }{
 
 // commanderMarkers are the versioned anchors of one commander round prompt.
 var commanderMarkers = []struct{ ID, Marker string }{
-	{"identity", "你是天吴项目的指挥官："},
+	{"identity", "你是Saker项目的指挥官："},
 	{"priority", strings.TrimSpace(contract.OperatorPriority)},
 	{"constraints", "## 约束"},
 	{"start", "## 起点"},
@@ -262,7 +262,7 @@ func buildGolden(t *testing.T) goldenDoc {
 		scenarios[i].Anchors = extractAnchors(t, scenarios[i].Prompt, markers[scenarios[i].ID])
 	}
 	return goldenDoc{
-		Schema:         "tw.prompt-golden/v1",
+		Schema:         "saker.prompt-golden/v1",
 		Version:        4,
 		Description:    "P0-5 提示词/日志金样：固定夹具下的派发任务书与指挥官回合提示词版本化段落、预算常量与日志锚点。",
 		Normalization:  []string{"统一换行到 \\n", "唯一动态数据「当前时间：<RFC3339>」整行替换为「当前时间：<normalized-time>」", "夹具不含绝对路径、随机 id 或平台相关路径"},

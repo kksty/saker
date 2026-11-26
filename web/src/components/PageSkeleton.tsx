@@ -20,7 +20,7 @@ export function PageSkeleton() {
     <div className="flex h-full min-h-0 flex-col" aria-busy="true" aria-label="页面加载中">
       {/* Header strip: the title row's three placeholder lines and the action
           block, at the sizes <Page> uses. */}
-      <div className={cn('tw-page-header flex shrink-0 items-center gap-3 border-b border-hairline py-3 sm:py-5', pageGutter)}>
+      <div className={cn('saker-page-header flex shrink-0 items-center gap-3 border-b border-hairline py-3 sm:py-5', pageGutter)}>
         <div className="min-w-0 space-y-2">
           <Skeleton className="h-3 w-24" />
           <Skeleton className="h-7 w-28" />

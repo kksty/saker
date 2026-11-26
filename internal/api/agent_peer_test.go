@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/project"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/project"
 )
 
 // openPolicyFixture is the default: no manifest policy, so every participant may

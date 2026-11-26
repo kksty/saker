@@ -1,7 +1,7 @@
 package metrics
 
 // P3-H capability-use metric tests. They build the parsed journal/capture rows
-// directly (the caller in cmd/tw-metrics owns the file IO), so no test touches a
+// directly (the caller in cmd/saker-metrics owns the file IO), so no test touches a
 // project directory. Every metric gets a positive case, its no-signal boundary,
 // and the rules the task calls out by name: "not judged is not failed", old data
 // missing the new structured fields, and structured-field-only derivation.
@@ -10,8 +10,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 func boolPtr(v bool) *bool { return &v }

@@ -132,9 +132,9 @@ function PreviewBody({ file }: { file: PreviewFile }) {
   return (
     <>
       <SheetHeader className="shrink-0 space-y-2 border-b border-hairline px-5 py-4 pr-12 text-left">
-        <div className="tw-eyebrow">证据预览</div>
+        <div className="saker-eyebrow">证据预览</div>
         <div className="flex items-start gap-3">
-          <SheetTitle className="tw-break min-w-0 flex-1 font-mono text-[15px] leading-6 text-ink">
+          <SheetTitle className="saker-break min-w-0 flex-1 font-mono text-[15px] leading-6 text-ink">
             {file.name}
           </SheetTitle>
           <Button asChild size="xs" variant="outline" className="shrink-0">
@@ -143,22 +143,22 @@ function PreviewBody({ file }: { file: PreviewFile }) {
             </a>
           </Button>
         </div>
-        <div className="tw-break font-mono text-[11px] leading-4 text-ink-3">{file.uri}</div>
+        <div className="saker-break font-mono text-[11px] leading-4 text-ink-3">{file.uri}</div>
         <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px] leading-4 text-ink-3">
           <div className="flex items-center gap-1">
             <dt className="sr-only">类型</dt>
-            <dd className="tw-break">{mime || '未知类型'}</dd>
+            <dd className="saker-break">{mime || '未知类型'}</dd>
           </div>
           {size !== undefined && (
             <div className="flex items-center gap-1">
               <dt className="sr-only">大小</dt>
-              <dd className="tw-nums">{fmtBytes(size)}</dd>
+              <dd className="saker-nums">{fmtBytes(size)}</dd>
             </div>
           )}
           {file.createdAt && (
             <div className="flex items-center gap-1">
               <dt className="sr-only">时间</dt>
-              <dd className="tw-nums">{fmtTime(file.createdAt)}</dd>
+              <dd className="saker-nums">{fmtTime(file.createdAt)}</dd>
             </div>
           )}
           {file.intentID && (
@@ -201,7 +201,7 @@ function PreviewBody({ file }: { file: PreviewFile }) {
         )}
 
         {preview.state === 'image' && (
-          <div className="tw-inset flex h-full min-h-[240px] items-center justify-center overflow-auto overscroll-contain rounded-lg p-2 [scrollbar-width:thin]">
+          <div className="saker-inset flex h-full min-h-[240px] items-center justify-center overflow-auto overscroll-contain rounded-lg p-2 [scrollbar-width:thin]">
             <img
               src={file.contentURL}
               alt={file.name || file.uri}
@@ -217,7 +217,7 @@ function PreviewBody({ file }: { file: PreviewFile }) {
           <iframe
             title={file.name || file.uri}
             src={file.contentURL}
-            className="tw-inset h-full min-h-[60vh] w-full rounded-lg"
+            className="saker-inset h-full min-h-[60vh] w-full rounded-lg"
           />
         )}
 
@@ -229,8 +229,8 @@ function PreviewBody({ file }: { file: PreviewFile }) {
                 {size !== undefined ? `（共 ${fmtBytes(size)}）` : ''}；完整内容请下载原文件。
               </Callout>
             )}
-            <ScrollArea className="tw-inset min-h-0 flex-1 rounded-lg">
-              <pre className="tw-mono tw-break whitespace-pre-wrap p-3 text-[12px] leading-relaxed text-ink-2">
+            <ScrollArea className="saker-inset min-h-0 flex-1 rounded-lg">
+              <pre className="saker-mono saker-break whitespace-pre-wrap p-3 text-[12px] leading-relaxed text-ink-2">
                 {preview.text || '（空文件）'}
               </pre>
             </ScrollArea>

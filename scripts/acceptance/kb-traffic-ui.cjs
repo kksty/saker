@@ -1,5 +1,5 @@
 // Offline browser acceptance: mocked HTTP only, no application/model startup.
-// Run with node scripts/acceptance/kb-traffic-ui.cjs; TW_CHROME overrides Chrome.
+// Run with node scripts/acceptance/kb-traffic-ui.cjs; SAKER_CHROME overrides Chrome.
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
@@ -8,7 +8,7 @@ const root = path.resolve(__dirname, '../..');
 const out = path.join(root, '.build/ui-qa');
 fs.mkdirSync(out, { recursive: true });
 const profile = fs.mkdtempSync(path.join(out, 'chrome-'));
-const chrome = spawn(process.env.TW_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe', ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--user-data-dir=' + profile, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
+const chrome = spawn(process.env.SAKER_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe', ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--user-data-dir=' + profile, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const now = '2026-11-07T00:00:00Z';
 const project = { id: 'fixture', name: '本地界面回归', scope: '本地界面测试', paused: true, max_runs_effective: 0 };
@@ -80,7 +80,7 @@ async function api(url,request){
     const click=async label=>evalJS('[...document.querySelectorAll("button")].find(b=>b.textContent.trim()==='+JSON.stringify(label)+').click()');
     const fill=async(label,value)=>evalJS('(()=>{const l=[...document.querySelectorAll("label")].find(l=>l.childNodes[0]?.textContent.trim()==='+JSON.stringify(label)+');const e=l.querySelector("input,textarea");Object.getOwnPropertyDescriptor(e.tagName==="INPUT"?HTMLInputElement.prototype:HTMLTextAreaElement.prototype,"value").set.call(e,'+JSON.stringify(value)+');e.dispatchEvent(new Event("input",{bubbles:true}));})()');
     await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
-    await call('Page.navigate',{url:'http://tianwu.test/g/?view=kb'});await waitText('已有通用事实');
+    await call('Page.navigate',{url:'http://saker.test/g/?view=kb'});await waitText('已有通用事实');
     await click('编辑候选');await waitText('为什么可以跨项目复用');
     await fill('为什么可以跨项目复用','协议事实与目标无关');
     await evalJS("fetch('/api/fixture/advance').then(r=>r.json())");await click('刷新列表');await pause(200);
@@ -88,14 +88,14 @@ async function api(url,request){
     checks.push({name:'pending save locks the editor and navigation',passed:await evalJS('document.querySelector("form input").matches(":disabled") && [...document.querySelectorAll("button")].find(b=>b.textContent.trim()==="已发布知识").disabled')});
     await waitText('候选已保存');
     checks.push({name:'edit carries the version originally read',passed:posted.base_revision==='revision-1',actual:posted.base_revision});
-    await call('Page.navigate',{url:'http://tianwu.test/p/fixture/?view=traffic'});await waitText('packet-body-1');
+    await call('Page.navigate',{url:'http://saker.test/p/fixture/?view=traffic'});await waitText('packet-body-1');
     await pause(12200);
     checks.push({name:'slow polling joins the existing request',passed:maxActiveLists===1,actual:maxActiveLists});
     checks.push({name:'new traffic does not replace selected packet',passed:await evalJS("Array.from(document.links).some(a=>new URL(a.href).searchParams.get('ref')==='r_fixture/1')")});
     await click('下一页');await waitText('packet-body-3');
     checks.push({name:'page navigation selects its own packet',passed:await evalJS("Array.from(document.links).some(a=>new URL(a.href).searchParams.get('ref')==='r_fixture/3')")});
 
-    await call('Page.navigate',{url:'http://tianwu.test/p/fixture/?view=playbooks'});await waitText('项目战场样例');
+    await call('Page.navigate',{url:'http://saker.test/p/fixture/?view=playbooks'});await waitText('项目战场样例');
     await click('提名知识');await waitText('为什么可以跨项目复用');
     checks.push({name:'playbook promotion leaves the world fact body blank for a human',passed:await evalJS('[...document.querySelectorAll("label")].find(l=>l.childNodes[0]?.textContent.trim()==="事实正文").querySelector("textarea").value===""')});
     await fill('稳定 ID','world-human');await fill('标题','人工提取世界事实');await fill('摘要','通用条件');await fill('事实正文','人工核对的事实');await fill('来源说明','规范来源');await fill('为什么可以跨项目复用','不依赖现场');
@@ -110,7 +110,7 @@ async function api(url,request){
     await evalJS("[...document.querySelectorAll('[role=dialog] button,[role=alertdialog] button')].find(b=>b.textContent.trim()==='删除').click()");await waitText('知识已从当前实例移除');
     checks.push({name:'human world deletion removes the published entry',passed:!humanPublished&&deletedRevision==='deleted-1'});
     const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(out,'knowledge-curation-desktop.png'),Buffer.from(shot.data,'base64'));
-    await call('Page.navigate',{url:'http://tianwu.test/p/fixture/?view=playbooks'});await waitText('项目战场样例');
+    await call('Page.navigate',{url:'http://saker.test/p/fixture/?view=playbooks'});await waitText('项目战场样例');
     await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await pause(100);
     const mobile=await evalJS('({width:innerWidth,scroll:document.documentElement.scrollWidth})');checks.push({name:'playbook curation fits a mobile viewport',passed:mobile.scroll<=mobile.width});
     await click('删除');await waitText('删除这条打法？');

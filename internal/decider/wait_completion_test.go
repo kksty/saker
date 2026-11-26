@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // F7 regression in combination: every shape of explicit wait keeps the project

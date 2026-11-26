@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 // blockingExec stands in for a running harness: it records the request and then
@@ -79,7 +79,10 @@ func newSteerServer(t *testing.T) (*Server, *blockingExec, model.Intent) {
 	return s, ex, in
 }
 
-func waitFor(t *testing.T, d time.Duration, cond func() bool) {
+// waitFor waits for a side effect the event only starts. detail, when given,
+// describes the last state observed so a timeout names what was actually seen
+// instead of only "not reached".
+func waitFor(t *testing.T, d time.Duration, cond func() bool, detail ...func() string) {
 	t.Helper()
 	deadline := time.Now().Add(d)
 	for time.Now().Before(deadline) {
@@ -87,6 +90,9 @@ func waitFor(t *testing.T, d time.Duration, cond func() bool) {
 			return
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+	if len(detail) > 0 && detail[0] != nil {
+		t.Fatalf("condition not reached in time: %s", detail[0]())
 	}
 	t.Fatal("condition not reached in time")
 }

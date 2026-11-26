@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/model"
 )
 
 // A dangling intent whose run already reached RunDone is Finish's crash-recovery

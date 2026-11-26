@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 // The proposal surface is the only structured way an executor can ask for the

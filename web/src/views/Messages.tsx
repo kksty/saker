@@ -159,7 +159,7 @@ export function Messages() {
   const [sender, setSender] = useState('all')
   const [recipient, setRecipient] = useState('all')
   useEffect(() => {
-    window.dispatchEvent(new Event('tw:operator-messages-read'))
+    window.dispatchEvent(new Event('saker:operator-messages-read'))
   }, [])
   const messages = usePoll(api.messages, 4000)
   const rows = messages.data ?? []
@@ -283,10 +283,10 @@ export function Messages() {
           </div>
         </WorkspaceSidebar>
 
-        <section className="tw-panel flex min-h-min min-w-0 flex-1 flex-col overflow-hidden rounded-xl @3xl:min-h-0">
-          <header className="tw-panel-header flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline px-3 py-2">
-            <div className="tw-section-title">对话</div>
-            <span className="tw-nums font-mono text-[11px] text-ink-3">{timeline.length} 条</span>
+        <section className="saker-panel flex min-h-min min-w-0 flex-1 flex-col overflow-hidden rounded-xl @3xl:min-h-0">
+          <header className="saker-panel-header flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline px-3 py-2">
+            <div className="saker-section-title">对话</div>
+            <span className="saker-nums font-mono text-[11px] text-ink-3">{timeline.length} 条</span>
             <Button
               size="icon-xs"
               variant="ghost"
@@ -531,7 +531,7 @@ function DayDivider({ day }: { day: string }) {
   return (
     <div className="my-3 flex items-center gap-2 text-[10px] text-ink-3">
       <span className="h-px flex-1 bg-hairline" />
-      <span className="rounded-full bg-surface-2/60 px-2 py-0.5 font-mono tw-nums">{day}</span>
+      <span className="rounded-full bg-surface-2/60 px-2 py-0.5 font-mono saker-nums">{day}</span>
       <span className="h-px flex-1 bg-hairline" />
     </div>
   )
@@ -559,7 +559,7 @@ function InstructionNoticeLine({ entry }: { entry: Extract<TimelineEntry, { kind
           </span>
         )}
         <span>· 通知 {entry.recipients} 人</span>
-        <time className="font-mono tw-nums">{fmtTime(entry.notice.created_at).slice(6)}</time>
+        <time className="font-mono saker-nums">{fmtTime(entry.notice.created_at).slice(6)}</time>
       </div>
     </div>
   )
@@ -627,7 +627,7 @@ function ChatMessage({
             </span>
           )}
           <span className="ml-auto flex shrink-0 items-center gap-1.5">
-            <time className="font-mono tw-nums" title={message.created_at}>{fmtTime(message.created_at).slice(6)}</time>
+            <time className="font-mono saker-nums" title={message.created_at}>{fmtTime(message.created_at).slice(6)}</time>
             <Badge size="sm" variant={deliveryVariant(message.status)} title={deliveryLabel(message.status)}>
               {deliveryShortLabel(message.status)}
             </Badge>
@@ -635,7 +635,7 @@ function ChatMessage({
         </div>
         <div
           className={cn(
-            'tw-break min-w-0 max-w-full whitespace-pre-wrap break-words rounded-2xl border px-3 py-2 text-[12.5px] leading-relaxed',
+            'saker-break min-w-0 max-w-full whitespace-pre-wrap break-words rounded-2xl border px-3 py-2 text-[12.5px] leading-relaxed',
             outgoing
               ? 'rounded-br-md border-primary/25 bg-primary/[0.13] text-ink'
               : 'rounded-bl-md border-hairline bg-surface-2/70 text-ink-2',
@@ -713,12 +713,12 @@ function MechanicalNotice({
             {message.kind === 'fact_notice' ? '共享发现通知' : messageKindLabel(message.kind)}
           </Badge>
         )}
-        <time className="ml-auto font-mono tw-nums" title={message.created_at}>{fmtTime(message.created_at).slice(6)}</time>
+        <time className="ml-auto font-mono saker-nums" title={message.created_at}>{fmtTime(message.created_at).slice(6)}</time>
         <Badge size="sm" variant={deliveryVariant(message.status)} title={deliveryLabel(message.status)}>
           {deliveryShortLabel(message.status)}
         </Badge>
       </div>
-      <p className="tw-break mt-1 whitespace-pre-wrap text-[11.5px] leading-relaxed text-ink-3">{message.text}</p>
+      <p className="saker-break mt-1 whitespace-pre-wrap text-[11.5px] leading-relaxed text-ink-3">{message.text}</p>
       {notice && (
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10.5px] leading-4 text-ink-3">
           <span>事实 <span className="font-mono text-ink-2">{notice.factId}</span></span>
@@ -785,7 +785,7 @@ function AlignedFooter({
       >
         <Terminal className="h-3 w-3 shrink-0" />
         <span className="font-medium text-ink-2">未匹配当前账本（{unaligned.length}）</span>
-        <span className="tw-nums ml-auto shrink-0 font-mono">
+        <span className="saker-nums ml-auto shrink-0 font-mono">
           {matched} / {total} 已对上
         </span>
         <span className="shrink-0">{open ? '收起' : '展开'}</span>
@@ -834,7 +834,7 @@ function CommunicationBacklog({ status, error, people, onRetry }: {
         </Callout>
       )}
       <p className="text-[12px] leading-5 text-ink-2">
-        排队 <span className="tw-nums font-mono">{summary.queued}</span> 条 · <span className="tw-nums font-mono">{fmtBytes(summary.bytes)}</span> · <span className="tw-nums font-mono">{summary.recipients}</span> 个收件人
+        排队 <span className="saker-nums font-mono">{summary.queued}</span> 条 · <span className="saker-nums font-mono">{fmtBytes(summary.bytes)}</span> · <span className="saker-nums font-mono">{summary.recipients}</span> 个收件人
         {summary.deferred > 0 && (
           <> · <span className="text-warning">{summary.deferred} 个队列延后待发</span></>
         )}
@@ -875,7 +875,7 @@ function QueueRow({ q, limits, people }: {
         {pressure && !q.deferred && (
           <Badge size="sm" variant="primary" title="接近容量上限">接近上限</Badge>
         )}
-        <span className="tw-nums ml-auto shrink-0 font-mono text-[11px] text-ink-3">
+        <span className="saker-nums ml-auto shrink-0 font-mono text-[11px] text-ink-3">
           {q.pending} 条 · {fmtBytes(q.bytes)}
         </span>
       </div>
@@ -912,7 +912,7 @@ function NativeRecords({ people }: { people: Participant[] }) {
         <ul className="mt-1 space-y-0.5 pl-0.5">
           <li><span className="text-ink-2">一条卡片 = IOA 里的一次投递原始记录</span>；「记录详情」里是 IOA 消息 id、发送节点和原始会话 id。</li>
           <li><span className="text-ink-2">意图</span>：左边是来源、右边是接收方，标题已还原成会话/参与者名称；名字下面一行写明地址来源。显示「控制台直投」表示控制台经 IOA 直接送进对方会话，IOA 记录里没有来源会话，发送方以消息头的 <code>from=</code> 为准，不是丢数据。</li>
-          <li><span className="text-ink-2">寻址头</span>：天吴注入的 <code>[collab]</code>（同伴协作）、<code>[消息]</code>（控制台下投）、<code>[机械通知]</code>（账本通知）都已拆成字段，正文从换行之后开始；前面的 <code>[重投]</code> 表示这条是失败运行后重新入队。</li>
+          <li><span className="text-ink-2">寻址头</span>：Saker注入的 <code>[collab]</code>（同伴协作）、<code>[消息]</code>（控制台下投）、<code>[机械通知]</code>（账本通知）都已拆成字段，正文从换行之后开始；前面的 <code>[重投]</code> 表示这条是失败运行后重新入队。</li>
           <li><span className="text-ink-2">会话短串</span>（如 <code>9da4e9bb76…</code>）：接收方 harness 会话 id 前 10 位，只用于和「运行」页核对，<em>不是</em>消息编号；消息编号是 <code>m_xxxxxxxx</code>。</li>
         </ul>
       </details>
@@ -1019,14 +1019,14 @@ function NativeMessage({ rec, maps, defer, fresh }: { rec: IOARecord; maps: Reco
       {view.sameSession && <Badge size="sm" variant="warning">来源与目标为同一会话</Badge>}
       {env?.interrupt && <Badge size="sm" variant="warning" title="要求中断对方当前模型请求后立即投递">中断式投递</Badge>}
       {env?.status && <Badge size="sm" variant="muted" title="harness 报告的投递状态">{env.status}</Badge>}
-      <time className="tw-nums ml-auto shrink-0 font-mono text-[11px] text-ink-3" title={rec.created_at || rec.observed_at}>{fmtTime(rec.created_at || rec.observed_at)}</time>
+      <time className="saker-nums ml-auto shrink-0 font-mono text-[11px] text-ink-3" title={rec.created_at || rec.observed_at}>{fmtTime(rec.created_at || rec.observed_at)}</time>
     </div>
     <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 px-3 pt-1 text-[11px] text-ink-3">
       {chips.map((chip, i) => (
         <span key={chip.key} className="flex items-center gap-1.5">{i > 0 && <span aria-hidden className="text-ink-3/50">·</span>}{chip.node}</span>
       ))}
     </div>
-    <div data-ioa-body className="tw-break mx-3 my-2 whitespace-pre-wrap rounded-r-md border-l-2 border-info/50 bg-surface-2/40 px-3 py-2 text-[12.5px] leading-relaxed text-ink-2">{view.body || '（无正文）'}</div>
+    <div data-ioa-body className="saker-break mx-3 my-2 whitespace-pre-wrap rounded-r-md border-l-2 border-info/50 bg-surface-2/40 px-3 py-2 text-[12.5px] leading-relaxed text-ink-2">{view.body || '（无正文）'}</div>
     <details data-ioa-details className="border-t border-hairline px-3 py-1.5 text-[11px] text-ink-3">
       <summary className="cursor-pointer select-none hover:text-ink">记录详情（原始 id 与时间）</summary>
       <div className="mt-1 space-y-0.5">
@@ -1048,7 +1048,7 @@ function DetailLine({ label, value, hint }: { label: string; value: string; hint
   return (
     <div className="flex gap-2">
       <span className="w-16 shrink-0 text-ink-3/80">{label}</span>
-      <span className="tw-break min-w-0 flex-1 font-mono" title={hint ?? value}>{value}</span>
+      <span className="saker-break min-w-0 flex-1 font-mono" title={hint ?? value}>{value}</span>
     </div>
   )
 }
@@ -1066,7 +1066,7 @@ function ParticipantRow({ p }: { p: Participant }) {
         />
         <span className="min-w-0 truncate text-[12px] font-medium text-ink">{p.title}</span>
         {p.kind === 'commander' && <Badge size="sm" variant="secondary">指挥官</Badge>}
-        <span className="tw-nums ml-auto shrink-0 font-mono text-[11px] text-ink-3">#{p.generation ?? 0}</span>
+        <span className="saker-nums ml-auto shrink-0 font-mono text-[11px] text-ink-3">#{p.generation ?? 0}</span>
       </div>
       <div className="mt-0.5 truncate font-mono text-[11px] text-ink-3">{p.id}</div>
       <div className="flex flex-wrap gap-1.5 font-mono text-[11px] text-ink-3">

@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/aop/tool"
-	"github.com/kksty/tianwu/internal/artifact"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/aop/tool"
+	"github.com/kksty/saker/internal/artifact"
+	"github.com/kksty/saker/internal/store"
 )
 
 func TestNativeResultsOnlyBecomeEvidenceWhenExplicitlyCited(t *testing.T) {

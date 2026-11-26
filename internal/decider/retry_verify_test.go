@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/state"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/state"
+	"github.com/kksty/saker/internal/store"
 )
 
 const verifyNoteMarker = "VERIFIER-ONLY-NOTE-9f3：下一步验 /admin"

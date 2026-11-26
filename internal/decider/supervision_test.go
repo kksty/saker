@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/board"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/board"
+	"github.com/kksty/saker/internal/model"
 )
 
 func TestHeartbeatSupervisesNewFailuresAndSilenceOnlyOnce(t *testing.T) {

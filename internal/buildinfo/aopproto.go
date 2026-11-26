@@ -2,7 +2,7 @@ package buildinfo
 
 // Vendored AOP generated-code drift guard.
 //
-// tianwu does not own the AOP wire protocol: the generated files under
+// saker does not own the AOP wire protocol: the generated files under
 // internal/aop/{pb,pty,traffic,tool,command,operation,guardrail} are copies of
 // the cyber-harness generated files, with only the import paths (and one
 // package clause) rewritten for the internal/aop layout. A silent difference
@@ -17,9 +17,9 @@ package buildinfo
 //     lines move whenever either checkout is regenerated with a different
 //     protoc toolchain;
 //   - the package clause is renamed for the vendored layout (types -> command);
-//   - imports point at github.com/kksty/tianwu/internal/aop/... instead of
+//   - imports point at github.com/kksty/saker/internal/aop/... instead of
 //     github.com/chainreactors/cyber/aop/...;
-//   - tianwu occasionally adds a local comment explaining why a file is
+//   - saker occasionally adds a local comment explaining why a file is
 //     vendored.
 //
 // Comments (including those generator header version lines) and blank lines are
@@ -65,12 +65,12 @@ type AOPProtoRewrite struct {
 const (
 	harnessAOPProto      = "github.com/chainreactors/cyber/aop"
 	harnessAOPOperation  = harnessAOPProto + "/operation"
-	vendoredAOPProto     = "github.com/kksty/tianwu/internal/aop/pb"
-	vendoredAOPOperation = "github.com/kksty/tianwu/internal/aop/operation"
+	vendoredAOPProto     = "github.com/kksty/saker/internal/aop/pb"
+	vendoredAOPOperation = "github.com/kksty/saker/internal/aop/operation"
 )
 
 // aopProtoImportRewrites is shared by every vendored file: the generated code
-// imports the sibling protocol packages, and tianwu's copies must resolve them
+// imports the sibling protocol packages, and saker's copies must resolve them
 // inside internal/aop instead of the harness module.
 var aopProtoImportRewrites = []AOPProtoRewrite{
 	{Harness: harnessAOPOperation, Vendored: vendoredAOPOperation},
@@ -85,7 +85,7 @@ type AOPProtoFile struct {
 	Name string
 	// HarnessPath is the generated file in the cyber-harness checkout.
 	HarnessPath string
-	// VendoredPath is the copy in the tianwu checkout.
+	// VendoredPath is the copy in the saker checkout.
 	VendoredPath string
 	// VendoredPackage renames the generated package clause when vendoring moved
 	// a file into a differently named package (core/types -> aop/command).
@@ -120,7 +120,7 @@ var AOPProtoFiles = []AOPProtoFile{
 type AOPProtoMismatch struct {
 	Path        string `json:"path"`
 	HarnessPath string `json:"harness_path"`
-	TianwuLine  int    `json:"tianwu_line,omitempty"`
+	SakerLine   int    `json:"saker_line,omitempty"`
 	HarnessLine int    `json:"harness_line,omitempty"`
 	Detail      string `json:"detail"`
 }
@@ -143,7 +143,7 @@ type AOPProtoInfo struct {
 	// Reason explains a skipped status (harness source absent).
 	Reason *string `json:"reason,omitempty"`
 	// HarnessDir is the compared harness checkout, repository-relative when it
-	// lives inside the tianwu root (slash-separated either way).
+	// lives inside the saker root (slash-separated either way).
 	HarnessDir string `json:"harness_dir,omitempty"`
 	// HarnessCommit is the harness commit when the checkout is a git tree; a
 	// source tarball legitimately has none.
@@ -167,7 +167,7 @@ type canonicalAOPProtoLine struct {
 
 // canonicalAOPProtoLines reduces a generated file to the lines that carry the
 // wire contract. Comments and blank lines are dropped: the generator header
-// (including its protoc version lines), proto doc comments and tianwu's local
+// (including its protoc version lines), proto doc comments and saker's local
 // notes are all generated-file noise, while the descriptors that define the
 // wire format live in code. Import paths are folded back to the harness form and
 // the package clause is compared name-independently. CRLF is normalized first so
@@ -227,21 +227,21 @@ func compareAOPProtoFiles(vendored, harness []byte, file AOPProtoFile) *AOPProto
 		if vendoredLines[i].text == harnessLines[i].text {
 			continue
 		}
-		mismatch.TianwuLine = vendoredLines[i].line
+		mismatch.SakerLine = vendoredLines[i].line
 		mismatch.HarnessLine = harnessLines[i].line
-		mismatch.Detail = fmt.Sprintf("tianwu 第 %d 行 %s 与 harness 第 %d 行 %s 不同",
+		mismatch.Detail = fmt.Sprintf("saker 第 %d 行 %s 与 harness 第 %d 行 %s 不同",
 			vendoredLines[i].line, clipText(vendoredLines[i].text, 160),
 			harnessLines[i].line, clipText(harnessLines[i].text, 160))
 		return mismatch
 	}
 	switch {
 	case len(vendoredLines) > len(harnessLines):
-		mismatch.TianwuLine = vendoredLines[limit].line
-		mismatch.Detail = fmt.Sprintf("tianwu 从第 %d 行起多出 %d 行规范化代码",
+		mismatch.SakerLine = vendoredLines[limit].line
+		mismatch.Detail = fmt.Sprintf("saker 从第 %d 行起多出 %d 行规范化代码",
 			vendoredLines[limit].line, len(vendoredLines)-len(harnessLines))
 	case len(harnessLines) > len(vendoredLines):
 		mismatch.HarnessLine = harnessLines[limit].line
-		mismatch.Detail = fmt.Sprintf("tianwu 缺少 %d 行规范化代码（harness 从第 %d 行起）",
+		mismatch.Detail = fmt.Sprintf("saker 缺少 %d 行规范化代码（harness 从第 %d 行起）",
 			len(harnessLines)-len(vendoredLines), harnessLines[limit].line)
 	default:
 		return nil
@@ -249,7 +249,7 @@ func compareAOPProtoFiles(vendored, harness []byte, file AOPProtoFile) *AOPProto
 	return mismatch
 }
 
-// AOPProtoVendoredContent turns one harness generated file into the copy tianwu
+// AOPProtoVendoredContent turns one harness generated file into the copy saker
 // keeps: line endings are normalized, the documented import rewrites are
 // applied, and the package clause is renamed when the vendored file lives in a
 // differently named package. Nothing else is edited, so the output stays a
@@ -289,7 +289,7 @@ func CheckAOPProto(root, harnessDir string) *AOPProtoInfo {
 	info := &AOPProtoInfo{Status: AOPProtoStatusOK}
 
 	fingerprint := sha256.New()
-	_, _ = io.WriteString(fingerprint, "tianwu-aop-proto-v1\n")
+	_, _ = io.WriteString(fingerprint, "saker-aop-proto-v1\n")
 	vendored := make(map[string][]byte, len(AOPProtoFiles))
 	for _, file := range AOPProtoFiles {
 		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(file.VendoredPath)))
@@ -336,7 +336,7 @@ func CheckAOPProto(root, harnessDir string) *AOPProtoInfo {
 			info.Mismatches = append(info.Mismatches, AOPProtoMismatch{
 				Path:        file.VendoredPath,
 				HarnessPath: file.HarnessPath,
-				Detail:      "tianwu 缺少 vendored 生成文件：" + file.VendoredPath,
+				Detail:      "saker 缺少 vendored 生成文件：" + file.VendoredPath,
 			})
 			continue
 		}
@@ -434,7 +434,7 @@ type AOPProtoSyncResult struct {
 }
 
 // SyncAOPProto copies the generated AOP files from the harness checkout into
-// tianwu, applying only the documented import/package rewrites. It is the
+// saker, applying only the documented import/package rewrites. It is the
 // upgrade path behind scripts/sync-aop-protos.*: generated code is never edited
 // by hand, it is replaced by the upstream copy. dryRun reports what would be
 // written without touching the tree.

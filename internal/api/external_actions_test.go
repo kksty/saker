@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 type externalWaitExecutor struct {

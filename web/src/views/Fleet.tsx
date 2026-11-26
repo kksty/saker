@@ -119,16 +119,16 @@ function ProjectCard({ project, now }: { project: FleetProject; now: number }) {
     <button
       type="button"
       onClick={() => openProject(project.id)}
-      className="tw-panel tw-project-card group flex min-w-0 flex-col rounded-xl p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+      className="saker-panel saker-project-card group flex min-w-0 flex-col rounded-xl p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
       title={`${project.name}${project.scope ? ` · ${project.scope}` : ''}`}
     >
       <div className="flex min-w-0 items-start gap-2.5">
-        <span className="tw-project-emblem grid size-8 shrink-0 place-items-center rounded-lg text-primary" aria-hidden="true">
+        <span className="saker-project-emblem grid size-8 shrink-0 place-items-center rounded-lg text-primary" aria-hidden="true">
           <FolderKanban className="size-4" />
         </span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[15px] font-semibold leading-5 text-ink">{project.name}</div>
-          <div className="tw-break mt-0.5 line-clamp-1 text-caption text-ink-2">
+          <div className="saker-break mt-0.5 line-clamp-1 text-caption text-ink-2">
             {project.scope || project.id}
           </div>
         </div>
@@ -141,10 +141,10 @@ function ProjectCard({ project, now }: { project: FleetProject; now: number }) {
       </div>
 
       <div className="mt-2 flex min-w-0 items-center gap-2 text-[11px] leading-4 text-ink-3">
-        <span className="tw-nums shrink-0 font-mono">
+        <span className="saker-nums shrink-0 font-mono">
           {dec.rounds ? `第 ${fmtInt(dec.rounds)} 轮` : '待命'}
         </span>
-        {active && elapsed > 0 && <span className="tw-nums shrink-0 font-mono">{elapsed}s</span>}
+        {active && elapsed > 0 && <span className="saker-nums shrink-0 font-mono">{elapsed}s</span>}
         {dec.activity?.wake && (
           <span className="ml-auto min-w-0 truncate rounded bg-surface-2 px-1.5 py-0.5 font-mono text-ink-3" title={dec.activity.wake}>
             {dec.activity.wake}
@@ -173,7 +173,7 @@ function ProjectCard({ project, now }: { project: FleetProject; now: number }) {
               <span className="min-w-0 flex-1 truncate text-[12px] text-ink-2" title={recent.title}>
                 {recent.title || '—'}
               </span>
-              <span className="tw-nums shrink-0 font-mono text-ink-2">
+              <span className="saker-nums shrink-0 font-mono text-ink-2">
                 {recent.tokens ? fmtInt(recent.tokens) : '—'} tok
               </span>
             </>
@@ -183,17 +183,17 @@ function ProjectCard({ project, now }: { project: FleetProject; now: number }) {
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-4 text-ink-3 sm:gap-x-3">
           <span className={project.intents.running > 0 ? 'text-info' : ''}>
-            在跑 <span className="tw-nums font-mono">{fmtInt(project.intents.running)}</span>
+            在跑 <span className="saker-nums font-mono">{fmtInt(project.intents.running)}</span>
           </span>
           <span>
-            待派 <span className="tw-nums font-mono">{fmtInt(project.intents.pending)}</span>
+            待派 <span className="saker-nums font-mono">{fmtInt(project.intents.pending)}</span>
           </span>
           {goalsOpen > 0 && (
             <span>
-              未达目标 <span className="tw-nums font-mono">{fmtInt(goalsOpen)}</span>
+              未达目标 <span className="saker-nums font-mono">{fmtInt(goalsOpen)}</span>
             </span>
           )}
-          <span className="ml-auto inline-flex items-center gap-1.5 tw-nums font-mono">
+          <span className="ml-auto inline-flex items-center gap-1.5 saker-nums font-mono">
             累计 {fmtInt(tokens)} tok
             <ArrowUpRight aria-hidden="true" className="size-3.5 shrink-0 text-ink-3 group-hover:text-ink" />
           </span>
@@ -304,7 +304,7 @@ function TasksTable({
       role="region"
       aria-labelledby="fleet-tasks-caption"
       tabIndex={0}
-      className="tw-inset max-h-[min(560px,70vh)] overflow-auto overscroll-contain rounded-b-xl [scrollbar-color:var(--ink-3)_transparent] [scrollbar-width:thin] @container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+      className="saker-inset max-h-[min(560px,70vh)] overflow-auto overscroll-contain rounded-b-xl [scrollbar-color:var(--ink-3)_transparent] [scrollbar-width:thin] @container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
     >
       <table className="w-full min-w-0 table-fixed border-separate border-spacing-0 text-[12px]">
         <caption id="fleet-tasks-caption" className="sr-only">
@@ -405,7 +405,7 @@ function TasksTable({
                 />
               </td>
               <td className="hidden whitespace-nowrap px-2.5 py-3 text-right font-mono text-[11px] text-ink-3 @sm:table-cell">
-                <span className="tw-nums">{elapsed}</span>
+                <span className="saker-nums">{elapsed}</span>
                 {row.kind === 'open' && <span className="ml-1 text-[11px] text-warning">排队</span>}
               </td>
               <td className="hidden px-2.5 py-3 @md:table-cell">
@@ -422,7 +422,7 @@ function TasksTable({
                         className="h-1 w-20"
                         aria-label="上下文占用"
                       />
-                      <span className="tw-nums whitespace-nowrap font-mono text-[11px] text-ink-3">
+                      <span className="saker-nums whitespace-nowrap font-mono text-[11px] text-ink-3">
                         {ctxPct}%
                       </span>
                     </div>
@@ -438,23 +438,23 @@ function TasksTable({
                         className="h-1 w-20"
                         aria-label="运行静默进度"
                       />
-                      <span className="tw-nums whitespace-nowrap font-mono text-[11px] text-ink-3">
+                      <span className="saker-nums whitespace-nowrap font-mono text-[11px] text-ink-3">
                         静默 {idle}s
                       </span>
                     </div>
                   )
                 ) : row.kind === 'done' ? (
-                  <span className="tw-nums text-[11px] text-ink-3">
+                  <span className="saker-nums text-[11px] text-ink-3">
                     {row.run.declared_facts ? `${fmtInt(row.run.declared_facts)} 事实` : '—'}
                   </span>
                 ) : (
                   <span className="text-[11px] text-ink-3">等待派发</span>
                 )}
               </td>
-              <td className="tw-nums hidden whitespace-nowrap px-2.5 py-3 text-right font-mono text-[11px] text-ink-3 @lg:table-cell">
+              <td className="saker-nums hidden whitespace-nowrap px-2.5 py-3 text-right font-mono text-[11px] text-ink-3 @lg:table-cell">
                 {events || '—'}
               </td>
-              <td className="tw-nums hidden whitespace-nowrap px-2.5 py-3 text-right font-mono text-[11px] text-ink-3 @sm:table-cell">
+              <td className="saker-nums hidden whitespace-nowrap px-2.5 py-3 text-right font-mono text-[11px] text-ink-3 @sm:table-cell">
                 {tokens ? fmtInt(tokens) : '—'}
               </td>
               <td className="px-2 py-3 text-right">
@@ -552,8 +552,8 @@ export function Fleet() {
       subtitle="查看项目活动、节点状态与运行时间线。"
       meta={
         data ? (
-          <span className="tw-eyebrow normal-case tracking-normal" title="每 3 秒刷新">
-            <span className="sr-only sm:not-sr-only">每 3 秒刷新 · </span>快照 <span className="tw-nums font-mono">{fmtTime(data.generated_at)}</span>
+          <span className="saker-eyebrow normal-case tracking-normal" title="每 3 秒刷新">
+            <span className="sr-only sm:not-sr-only">每 3 秒刷新 · </span>快照 <span className="saker-nums font-mono">{fmtTime(data.generated_at)}</span>
           </span>
         ) : undefined
       }
@@ -570,7 +570,7 @@ export function Fleet() {
                 type="button"
                 onClick={() => setWindowMinutes(w.minutes)}
                 aria-pressed={windowMinutes === w.minutes}
-                className={`tw-nums h-6 rounded px-2 font-mono text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+                className={`saker-nums h-6 rounded px-2 font-mono text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
                   windowMinutes === w.minutes
                     ? 'bg-surface-3 text-ink shadow-soft'
                     : 'text-ink-2 hover:bg-surface-3/60 hover:text-ink'
@@ -591,7 +591,7 @@ export function Fleet() {
           <div role="alert">
             <Callout tone="destructive" icon={<TriangleAlert className="h-4 w-4" />}>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <span className="min-w-0 tw-break">态势读不出来：{fleet.error}</span>
+                <span className="min-w-0 saker-break">态势读不出来：{fleet.error}</span>
                 <Button size="xs" variant="outline" onClick={fleet.reload} disabled={fleet.loading}>
                   重试
                 </Button>
@@ -602,7 +602,7 @@ export function Fleet() {
 
         {fleet.loading && !data && (
           <div className="space-y-4" aria-busy="true" aria-label="态势加载中">
-            <div className="tw-metric-grid tw-metric-cards tw-fleet-metrics grid-cols-6 sm:grid-cols-5">
+            <div className="saker-metric-grid saker-metric-cards saker-fleet-metrics grid-cols-6 sm:grid-cols-5">
               {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="space-y-2">
                   <Skeleton className="h-3 w-14 max-w-full" />
@@ -613,7 +613,7 @@ export function Fleet() {
             </div>
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
               {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="tw-panel space-y-3 rounded-xl p-4">
+                <div key={i} className="saker-panel space-y-3 rounded-xl p-4">
                   <Skeleton className="h-4 w-2/3" />
                   <Skeleton className="h-3 w-1/3" />
                   <Skeleton className="h-1 w-full" />
@@ -621,7 +621,7 @@ export function Fleet() {
                 </div>
               ))}
             </div>
-            <div className="tw-panel rounded-xl p-4">
+            <div className="saker-panel rounded-xl p-4">
               <SkeletonList count={5} />
             </div>
           </div>
@@ -631,7 +631,7 @@ export function Fleet() {
           <>
             {/* 先总后分: the five numbers that say whether anything is happening,
                 then the projects, then the raw run table. */}
-            <section aria-label="态势指标" className="tw-metric-grid tw-metric-cards tw-fleet-metrics grid-cols-6 sm:grid-cols-5">
+            <section aria-label="态势指标" className="saker-metric-grid saker-metric-cards saker-fleet-metrics grid-cols-6 sm:grid-cols-5">
               <StatTile
                 size="lg"
                 label="项目"
@@ -720,7 +720,7 @@ export function Fleet() {
                       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
                       <span className="truncate font-mono text-ink-2">{node.id}</span>
                       {node.transport && <span className="shrink-0 text-ink-3">{node.transport}</span>}
-                      {node.running > 0 && <span className="tw-nums shrink-0 font-mono text-info">{node.running}</span>}
+                      {node.running > 0 && <span className="saker-nums shrink-0 font-mono text-info">{node.running}</span>}
                     </Chip>
                   )
                 })}
@@ -745,7 +745,7 @@ export function Fleet() {
             </div>
 
             {projects.length === 0 ? (
-              <div className="tw-panel rounded-xl">
+              <div className="saker-panel rounded-xl">
                 <EmptyState
                   icon={FolderPlus}
                   title="还没有项目"
@@ -758,7 +758,7 @@ export function Fleet() {
                 />
               </div>
             ) : filteredProjects.length === 0 ? (
-              <div className="tw-panel rounded-xl">
+              <div className="saker-panel rounded-xl">
                 <EmptyState
                   icon={SearchX}
                   title="没有匹配的项目"

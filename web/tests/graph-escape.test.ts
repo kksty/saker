@@ -131,7 +131,7 @@ async function mountPanel(props: ReturnType<typeof panelProps>) {
 
 const panel = () =>
   renderer!.root.findAll(
-    (node) => node.type === 'div' && String(node.props.className ?? '').split(' ').includes('tw-graph-panel'),
+    (node) => node.type === 'div' && String(node.props.className ?? '').split(' ').includes('saker-graph-panel'),
   )[0]
 
 function escapeEvent(target: unknown) {

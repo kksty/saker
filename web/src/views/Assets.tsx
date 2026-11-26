@@ -64,7 +64,7 @@ export function Assets() {
           <Panel
             title="主机与端口"
             extra={
-              <span className="tw-nums font-mono text-[11px] text-ink-3">
+              <span className="saker-nums font-mono text-[11px] text-ink-3">
                 {hosts.length} 主机 · {services} 端口
               </span>
             }
@@ -93,10 +93,10 @@ export function Assets() {
                   >
                     <div className="flex min-h-[24px] flex-wrap items-center gap-2">
                       <Network className="h-3.5 w-3.5 shrink-0 text-ink-3" />
-                      <span className="tw-break font-mono text-[13px] font-medium leading-5 text-ink">
+                      <span className="saker-break font-mono text-[13px] font-medium leading-5 text-ink">
                         {h.host}
                       </span>
-                      <span className="tw-nums ml-auto shrink-0 font-mono text-[11px] text-ink-3">
+                      <span className="saker-nums ml-auto shrink-0 font-mono text-[11px] text-ink-3">
                         {h.ports.length} 端口
                       </span>
                     </div>
@@ -108,9 +108,9 @@ export function Assets() {
                           <span
                             key={p.port}
                             title={p.summary || p.port}
-                            className="tw-inset flex max-w-full items-center gap-1.5 rounded px-1.5 py-1"
+                            className="saker-inset flex max-w-full items-center gap-1.5 rounded px-1.5 py-1"
                           >
-                            <span className="tw-nums shrink-0 font-mono text-[11px] font-medium text-ink-2">
+                            <span className="saker-nums shrink-0 font-mono text-[11px] font-medium text-ink-2">
                               {p.port}
                             </span>
                             {p.summary && (
@@ -166,7 +166,7 @@ export function Assets() {
             {note && (
               <pre
                 role="status"
-                className="tw-inset tw-break whitespace-pre-wrap rounded-lg p-2.5 font-mono text-[11px] leading-relaxed text-ink-2"
+                className="saker-inset saker-break whitespace-pre-wrap rounded-lg p-2.5 font-mono text-[11px] leading-relaxed text-ink-2"
               >
                 {note}
               </pre>

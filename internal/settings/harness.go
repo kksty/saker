@@ -8,7 +8,7 @@ package settings
 // same knobs. Reading it keeps the two in step when someone changes the model in
 // the harness UI or with `cyber-harness config use`; writing it preserves every
 // other section (agent, traffic, extensions, …) and every profile the console
-// does not touch. The catalogue itself is the harness's own format; Tianwu only
+// does not touch. The catalogue itself is the harness's own format; Saker only
 // maintains the active entry and never routes on it.
 
 import (
@@ -23,11 +23,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// HarnessConfigPath is the harness's user-level configuration. TW_HARNESS_CONFIG
+// HarnessConfigPath is the harness's user-level configuration. SAKER_HARNESS_CONFIG
 // is the deployment override for a control plane that runs under another account
 // (a service, a container) than the harness it drives.
 func HarnessConfigPath() string {
-	if p := strings.TrimSpace(os.Getenv("TW_HARNESS_CONFIG")); p != "" {
+	if p := strings.TrimSpace(os.Getenv("SAKER_HARNESS_CONFIG")); p != "" {
 		return p
 	}
 	home, err := os.UserHomeDir()
@@ -138,7 +138,7 @@ func readHarnessModel(path string) (Model, string, error) {
 // timeout, images) is left exactly as it was.
 func writeHarnessModel(path string, m Model) error {
 	if path == "" {
-		return errors.New("没有 harness 配置路径：设置 TW_HARNESS_CONFIG")
+		return errors.New("没有 harness 配置路径：设置 SAKER_HARNESS_CONFIG")
 	}
 	data, err := os.ReadFile(path)
 	var root yaml.Node

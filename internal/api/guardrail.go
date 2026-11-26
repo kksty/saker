@@ -25,8 +25,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kksty/tianwu/internal/aop"
-	"github.com/kksty/tianwu/internal/aop/guardrail"
+	"github.com/kksty/saker/internal/aop"
+	"github.com/kksty/saker/internal/aop/guardrail"
 )
 
 // guardrailPendingView is one pending tool call as the console renders it. The

@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/aop/operation"
-	pb "github.com/kksty/tianwu/internal/aop/pb"
-	"github.com/kksty/tianwu/internal/aop/traffic"
+	"github.com/kksty/saker/internal/aop/operation"
+	pb "github.com/kksty/saker/internal/aop/pb"
+	"github.com/kksty/saker/internal/aop/traffic"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 

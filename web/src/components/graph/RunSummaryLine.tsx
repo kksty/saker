@@ -12,10 +12,10 @@ export function RunSummaryLine({ run, onOpenRun }: { run: Run; onOpenRun?: (runI
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-3">
       <span className="shrink-0">最近运行</span>
-      <span className="font-mono tw-nums">{run.id}</span>
+      <span className="font-mono saker-nums">{run.id}</span>
       <span className="text-ink-2">{runStatusLabel(run)}</span>
-      <span className="font-mono tw-nums">{fmtDuration(run.started_at, run.ended_at)}</span>
-      <span className="font-mono tw-nums">{fmtTime(run.started_at)}</span>
+      <span className="font-mono saker-nums">{fmtDuration(run.started_at, run.ended_at)}</span>
+      <span className="font-mono saker-nums">{fmtTime(run.started_at)}</span>
       {onOpenRun && (
         <Button size="xs" variant="ghost" className="ml-auto" onClick={() => onOpenRun(run.id)}>
           运行详情 →

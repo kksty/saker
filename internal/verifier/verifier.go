@@ -17,10 +17,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kksty/tianwu/internal/evidence"
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/evidence"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 // VerdictPath is where a verifier run writes its conclusion, relative to its
@@ -256,8 +256,8 @@ func (v *Verifier) runClaimed(ctx context.Context, f model.Fact, factID string) 
 	// so the reviewer's own filesystem cannot show it the bytes it must judge.
 	// Hand it the project's read-only surface instead of copying evidence into the
 	// run: the same .tw pair a dispatched turn gets, which the transport turns
-	// into $TW_BATTLE/$TW_AUTH for the session shell. The gate, not this package,
-	// decides what that credential reaches (cmd/tw/auth.go verifierReadAllowed).
+	// into $SAKER_BATTLE/$SAKER_AUTH for the session shell. The gate, not this package,
+	// decides what that credential reaches (cmd/saker/auth.go verifierReadAllowed).
 	if v.IssueRead != nil {
 		cred, cerr := v.IssueRead(run.ID)
 		if cerr != nil {
@@ -637,7 +637,7 @@ func BuildPrompt(f model.Fact, evidence []string, scope string, premises []premi
 	// it cannot open by itself. Name the surface it does have, or the credential
 	// handed to it is unusable and every review ends in needs_evidence.
 	b.WriteString("\n## 只读原件\n")
-	b.WriteString("上面的路径是账本里登记的原始位置，不一定在本轮工作目录里。结论与它引用的原件可以按 id 只读读取：`$TW_BATTLE` 是本项目的只读基址，`$TW_AUTH` 是一行可直接用的 `Authorization: Bearer …`（shell 已导出，缺失时读 `.tw/auth`）。可读：`$TW_BATTLE/facts`、`/facts/{id}`、`/facts/{id}/history`、`/evidence`、`/evidence/{id}`、`/runs/{id}/events`；其它路径一律 404，没有写接口。\n")
+	b.WriteString("上面的路径是账本里登记的原始位置，不一定在本轮工作目录里。结论与它引用的原件可以按 id 只读读取：`$SAKER_BATTLE` 是本项目的只读基址，`$SAKER_AUTH` 是一行可直接用的 `Authorization: Bearer …`（shell 已导出，缺失时读 `.tw/auth`）。可读：`$SAKER_BATTLE/facts`、`/facts/{id}`、`/facts/{id}/history`、`/evidence`、`/evidence/{id}`、`/runs/{id}/events`；其它路径一律 404，没有写接口。\n")
 	// The scope is stated for the same reason the other brief sections state it:
 	// a reviewer that goes looking for more (other directions' facts, other
 	// ledger tables) stops re-proving this claim and starts hunting, which is a

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/kb"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/kb"
+	"github.com/kksty/saker/internal/model"
 )
 
 func TestHumanPlaybookNominationDoesNotPublishAndDeletionDoesNotCascade(t *testing.T) {

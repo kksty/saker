@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/evidence"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/evidence"
+	"github.com/kksty/saker/internal/store"
 )
 
 // ProjectFormat identifies a whole-project transfer, as opposed to the
@@ -21,7 +21,7 @@ import (
 // not a reader: a case bundle lacks project.json and the SQLite ledger, so
 // treating one as the other would either fail halfway or create an empty
 // project.
-const ProjectFormat = "tianwu-project"
+const ProjectFormat = "saker-project"
 
 // ProjectVersion is the project archive format version. Bump only when an old
 // reader would misread a new archive.
@@ -149,7 +149,7 @@ func ExportProject(projectDir string, st *store.Store, out, sourceVersion string
 
 	// A private temp file means a failed VACUUM cannot leave a half-written
 	// ledger where a later retry would mistake it for a complete backup.
-	tmpDir, err := os.MkdirTemp("", "tw-project-ledger-")
+	tmpDir, err := os.MkdirTemp("", "saker-project-ledger-")
 	if err != nil {
 		return m, err
 	}
@@ -266,7 +266,7 @@ func CreateProjectUpload(dataDir string) (*os.File, error) {
 	if err := os.MkdirAll(root, 0o700); err != nil {
 		return nil, err
 	}
-	return os.CreateTemp(root, "upload-*.twproj")
+	return os.CreateTemp(root, "upload-*.sakerproj")
 }
 
 // CleanTransferRoot removes files left by an interrupted import. The caller
@@ -288,7 +288,7 @@ func CleanTransferRoot(dataDir string) error {
 			if err := os.RemoveAll(path); err != nil {
 				return err
 			}
-		case entry.Type().IsRegular() && strings.HasPrefix(name, "upload-") && strings.HasSuffix(name, ".twproj"):
+		case entry.Type().IsRegular() && strings.HasPrefix(name, "upload-") && (strings.HasSuffix(name, ".sakerproj") || strings.HasSuffix(name, ".twproj")):
 			if err := os.Remove(path); err != nil {
 				return err
 			}
@@ -634,7 +634,7 @@ func readProjectManifest(zr *zip.ReadCloser) (ProjectManifest, []byte, error) {
 		return m, nil, fmt.Errorf("项目包里没有 %s", ProjectManifestFile)
 	}
 	if m.Format != ProjectFormat {
-		return m, nil, fmt.Errorf("不是天吴项目包（format=%q）", m.Format)
+		return m, nil, fmt.Errorf("不是Saker项目包（format=%q）", m.Format)
 	}
 	if m.Version != ProjectVersion {
 		return m, nil, fmt.Errorf("项目包版本 %d 不受支持（当前 %d）", m.Version, ProjectVersion)

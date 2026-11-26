@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/model"
 )
 
 // mustBucketInt reads a reported bucket field; nil means "not reported", which

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/evidence"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/evidence"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 // digestOf is the sha256 hex an evidence row records for these bytes.

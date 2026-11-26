@@ -16,8 +16,8 @@ import type { ProjectInfo, SkippedProject } from '../src/lib/types.ts'
 const skipped: SkippedProject[] = [
   {
     id: 'p_broken',
-    dir: 'D:\\tw-data\\projects\\p_broken',
-    error: 'requires a current SQLite ledger: open D:\\tw-data\\projects\\p_broken\\ledger.sqlite: no such file',
+    dir: 'D:\\saker-data\\projects\\p_broken',
+    error: 'requires a current SQLite ledger: open D:\\saker-data\\projects\\p_broken\\ledger.sqlite: no such file',
   },
 ]
 
@@ -51,7 +51,7 @@ test('a skipped directory is rendered with its id, path and reason, and stays pu
   const html = renderToStaticMarkup(React.createElement(Notice, { skipped }))
   assert.match(html, /1 个项目目录没加载/)
   assert.match(html, /p_broken/)
-  assert.match(html, /D:\\tw-data\\projects\\p_broken/)
+  assert.match(html, /D:\\saker-data\\projects\\p_broken/)
   assert.match(html, /requires a current SQLite ledger/)
   // Says the rest of the instance is fine, and that nothing was done to the dir.
   assert.match(html, /其它项目照常启动与读写/)

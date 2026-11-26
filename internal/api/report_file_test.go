@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/report"
+	"github.com/kksty/saker/internal/report"
 )
 
 // writeReportDir puts one report directory under the case root with a

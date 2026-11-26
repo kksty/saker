@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/access"
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/access"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/model"
 )
 
 func (s *Server) listAccess(w http.ResponseWriter, r *http.Request) {

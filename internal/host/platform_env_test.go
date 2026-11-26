@@ -14,9 +14,9 @@ import (
 // silently drop unrelated variables (the model/gateway configuration can rely on
 // them).
 func TestChildEnvKeepsUnrelatedVariables(t *testing.T) {
-	t.Setenv("TW_PLATFORM_TEST", "kept")
+	t.Setenv("SAKER_PLATFORM_TEST", "kept")
 	h := &Host{cfg: Config{Logf: func(string, ...any) {}}}
-	if got := envValue(h.childEnv(nil), "TW_PLATFORM_TEST"); got != "kept" {
+	if got := envValue(h.childEnv(nil), "SAKER_PLATFORM_TEST"); got != "kept" {
 		t.Fatalf("unrelated variable = %q", got)
 	}
 }
@@ -84,18 +84,18 @@ func TestSetEnvKeepsSingleDefinitionOnBothPlatforms(t *testing.T) {
 // The host log line must not contain the console token; lineWriter masks it.
 // This is a cross-platform property of the same code path.
 func TestChildEnvCarriesSettingsOverridesOnce(t *testing.T) {
-	t.Setenv("TW_OVERRIDE", "inherited")
+	t.Setenv("SAKER_OVERRIDE", "inherited")
 	h := &Host{cfg: Config{
 		Logf: func(string, ...any) {},
-		Env:  []string{"TW_OVERRIDE=instance"},
+		Env:  []string{"SAKER_OVERRIDE=instance"},
 	}}
 	env := h.childEnv(h.cfg.Env)
-	if got := envValue(env, "TW_OVERRIDE"); got != "instance" {
+	if got := envValue(env, "SAKER_OVERRIDE"); got != "instance" {
 		t.Fatalf("override = %q", got)
 	}
 	n := 0
 	for _, kv := range env {
-		if strings.HasPrefix(kv, "TW_OVERRIDE=") {
+		if strings.HasPrefix(kv, "SAKER_OVERRIDE=") {
 			n++
 		}
 	}

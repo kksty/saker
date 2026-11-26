@@ -5,7 +5,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 func openReviewQueueStore(t *testing.T, path string) *Store {

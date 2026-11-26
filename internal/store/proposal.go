@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 var (

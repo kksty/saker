@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/decider"
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/project"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/decider"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/project"
+	"github.com/kksty/saker/internal/store"
 )
 
 // ---- model_stall detector (task-31, final-e2e I1) ----
@@ -94,7 +94,7 @@ func TestModelStallDetectorZeroDisables(t *testing.T) {
 	}
 }
 
-// The threshold is configurable without a new CLI flag: TW_MODEL_STALL_LIMIT=0
+// The threshold is configurable without a new CLI flag: SAKER_MODEL_STALL_LIMIT=0
 // turns the detector off, a positive value changes the cycle count.
 func TestModelStallLimitConfigurable(t *testing.T) {
 	dir := t.TempDir()

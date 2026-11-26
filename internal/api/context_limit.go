@@ -2,7 +2,7 @@ package api
 
 // One automatic recovery for a harness-reported context limit (D152, revised).
 //
-// Tianwu does not predict the model window. The harness refuses a request that
+// Saker does not predict the model window. The harness refuses a request that
 // cannot fit (context_window_exhausted) and compacts once on an overflow before
 // failing. When that structured failure reaches dispatch, the one useful action
 // is a fresh attempt with a smaller brief: hard constraints and the handoff
@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/model"
 )
 
 // contextLimitMarkers are provider/harness contract strings, not model output:

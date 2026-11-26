@@ -139,7 +139,7 @@ export function RetryIntentDialog({
                   {statusLabel(data.status)}
                 </Badge>
                 {data.resume_session && (
-                  <span className="tw-break font-mono" title="失败的那次 run 记录的 harness session">
+                  <span className="saker-break font-mono" title="失败的那次 run 记录的 harness session">
                     session {data.resume_session}
                   </span>
                 )}

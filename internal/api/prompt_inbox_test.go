@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/contract"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/contract"
+	"github.com/kksty/saker/internal/model"
 )
 
 func TestPromptPlacesConstraintsBeforeAssignment(t *testing.T) {
@@ -75,7 +75,7 @@ func TestInboxSeparatesMechanicalNoticesFromConversation(t *testing.T) {
 }
 
 // inboxSection keeps its own section-level caps (row count + byte budget). This
-// is a prompt-construction bound owned by Tianwu; it is deliberately not a model
+// is a prompt-construction bound owned by Saker; it is deliberately not a model
 // window prediction (D152 revised).
 func TestInboxRespectsItsOwnSectionCaps(t *testing.T) {
 	s, _ := newBindingServer(t)

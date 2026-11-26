@@ -113,7 +113,7 @@ export function GraphPanel({
   const stageWidth = useViewWidth()
   const dock = useDockSize(stageWidth)
   const filterCard = useRef<HTMLDivElement | null>(null)
-  const filterResize = useGraphCardResize('tw.graph.filterSize', 'bottom-right', filterCard)
+  const filterResize = useGraphCardResize('saker.graph.filterSize', 'bottom-right', filterCard)
   const bottomStack = useRef<HTMLDivElement | null>(null)
   const timelineStrip = useRef<HTMLDivElement | null>(null)
   const [timelineOpen, setTimelineOpen] = useState(false)
@@ -201,7 +201,7 @@ export function GraphPanel({
   // force map stays one click away for "what is connected to what".
   const [layout, setLayout] = useState<LayoutMode>(() => {
     try {
-      return localStorage.getItem('tw.graph.layout') === 'force' ? 'force' : 'layered'
+      return localStorage.getItem('saker.graph.layout') === 'force' ? 'force' : 'layered'
     } catch {
       return 'layered'
     }
@@ -253,7 +253,7 @@ export function GraphPanel({
   const chooseLayout = (next: LayoutMode) => {
     setLayout(next)
     try {
-      localStorage.setItem('tw.graph.layout', next)
+      localStorage.setItem('saker.graph.layout', next)
     } catch {
       /* private mode: the choice just does not persist */
     }
@@ -639,7 +639,7 @@ export function GraphPanel({
     <Page
       title="图谱"
       scroll={false}
-      className={`relative tw-graph-stage${timelineOpen ? ' has-timeline' : ''}`}
+      className={`relative saker-graph-stage${timelineOpen ? ' has-timeline' : ''}`}
       meta={
         // 一条状态线：账本计数（收纳成下拉）→ 用量 → 实时。整行 28px 高、垂直居中，
         // 组间只用同一条 1px 竖线（两侧各 10px），不再混字符 `|`；数字全部
@@ -753,7 +753,7 @@ export function GraphPanel({
 
       <div
         ref={filterCard}
-        className="tw-graph-corner-tl tw-graph-filter absolute flex rounded-xl border border-hairline bg-card/95 shadow-lifted backdrop-blur"
+        className="saker-graph-corner-tl saker-graph-filter absolute flex rounded-xl border border-hairline bg-card/95 shadow-lifted backdrop-blur"
         style={{ width: filterResize.size?.w, height: filterResize.size?.h }}
       >
         <GraphFilters
@@ -843,9 +843,9 @@ export function GraphPanel({
       {/* The bottom-anchored stack scrolls if the open cards outgrow its space. */}
       <div
         ref={bottomStack}
-        className="tw-graph-corner-bl tw-graph-dock tw-graph-stack absolute flex flex-col rounded-xl"
+        className="saker-graph-corner-bl saker-graph-dock saker-graph-stack absolute flex flex-col rounded-xl"
       >
-        <div className="tw-scroll flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto">
+        <div className="saker-scroll flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto">
           {/* Order is deliberate: the target and the legend come first; the live
               commander state sits at the bottom where it stays whole and pinned
               while the legend's own body scrolls above it. */}
@@ -853,8 +853,8 @@ export function GraphPanel({
             <div className="w-full shrink-0 rounded-xl border border-hairline bg-card/95 px-3 py-2 shadow-lifted backdrop-blur">
               <div className="flex items-center gap-1.5">
                 <Crosshair className="h-3.5 w-3.5 shrink-0 text-warning" />
-                <span className="tw-section-title">终点</span>
-                <span className="tw-nums ml-auto shrink-0 font-mono text-[11px] text-ink-3">
+                <span className="saker-section-title">终点</span>
+                <span className="saker-nums ml-auto shrink-0 font-mono text-[11px] text-ink-3">
                   未达成 {openGoals.length}
                 </span>
               </div>
@@ -862,7 +862,7 @@ export function GraphPanel({
                 {openGoals.slice(0, 2).map((g) => (
                   <div key={g.id} className="flex items-center gap-1.5">
                     <span
-                      className="tw-break min-w-0 flex-1 truncate text-caption text-ink-2"
+                      className="saker-break min-w-0 flex-1 truncate text-caption text-ink-2"
                       title={g.statement}
                     >
                       {g.statement}
@@ -899,9 +899,9 @@ export function GraphPanel({
       </div>
 
       {/* The minimap shares its corner with the pinned inspector and chat dock. */}
-      <div className="tw-graph-corner-br absolute flex flex-col items-end gap-1.5">
+      <div className="saker-graph-corner-br absolute flex flex-col items-end gap-1.5">
         {!node && !chatDock && !listView && (
-          <div className="tw-graph-minimap">
+          <div className="saker-graph-minimap">
             <GraphMinimap
               model={model}
               layout={layout}
@@ -988,7 +988,7 @@ export function GraphPanel({
 
       {!graph.loading && !graph.error && !model.nodes.some((n) => n.type !== 'project') && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
-          <div className="pointer-events-auto tw-panel w-[340px] rounded-xl">
+          <div className="pointer-events-auto saker-panel w-[340px] rounded-xl">
             <EmptyState
               icon={Crosshair}
               title="这个项目还是空的"

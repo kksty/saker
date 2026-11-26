@@ -22,9 +22,9 @@ import (
 // forbiddenImports are the layers that decide or render. Lifecycle may receive
 // their output through Options seams; importing them would let it reach back.
 var forbiddenImports = []string{
-	"github.com/kksty/tianwu/internal/decider",
-	"github.com/kksty/tianwu/internal/api",
-	"github.com/kksty/tianwu/internal/board",
+	"github.com/kksty/saker/internal/decider",
+	"github.com/kksty/saker/internal/api",
+	"github.com/kksty/saker/internal/board",
 }
 
 // forbiddenCalls are the entry points that create, reshape or start work. A

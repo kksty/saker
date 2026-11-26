@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/aop"
-	"github.com/kksty/tianwu/internal/testutil"
+	"github.com/kksty/saker/internal/aop"
+	"github.com/kksty/saker/internal/testutil"
 )
 
 // fakeHarness serves ConfigService/UpdateConfig and AgentService/ListAgents the

@@ -127,7 +127,7 @@ export function useDockSize(containerWidth?: number): DockSize {
  * The dock's left-edge grab strip. It is a child of the overlay (which is
  * `overflow-hidden`), so it cannot be clipped by the rounded border; the 1px
  * line only appears on hover/focus to keep the map quiet. It is focusable so the
- * width is reachable without a pointer (← →), and `tw-dock-handle` widens it to
+ * width is reachable without a pointer (← →), and `saker-dock-handle` widens it to
  * the 24px touch-target minimum on a coarse pointer.
  */
 export function DockResizeHandle({ dock }: { dock: DockSize }) {
@@ -143,7 +143,7 @@ export function DockResizeHandle({ dock }: { dock: DockSize }) {
       tabIndex={0}
       onPointerDown={dock.onResizeStart}
       onKeyDown={dock.onResizeKey}
-      className="tw-dock-handle group absolute inset-y-0 left-0 z-20 cursor-col-resize touch-none select-none outline-none"
+      className="saker-dock-handle group absolute inset-y-0 left-0 z-20 cursor-col-resize touch-none select-none outline-none"
     >
       <span
         aria-hidden="true"

@@ -14,8 +14,8 @@ package board
 import (
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 // LateAfterStop is the annotation attached to one fact that arrived after the

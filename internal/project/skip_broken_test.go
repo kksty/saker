@@ -6,13 +6,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // One project directory that cannot be loaded must not stop the instance.
 //
 // The trigger was our own failed delete: a directory left with only runs/ and no
-// ledger used to make Open return an error, and cmd/tw turned that into a fatal
+// ledger used to make Open return an error, and cmd/saker turned that into a fatal
 // exit — the console and every other engagement never started. The load path now
 // skips it and reports it, and it must do so without repairing anything: deleting
 // the directory or writing a placeholder ledger into it would turn a recoverable

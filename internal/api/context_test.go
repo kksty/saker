@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 func TestRunContextReadsCase(t *testing.T) {
@@ -29,12 +29,12 @@ func TestRunContextReadsCase(t *testing.T) {
 	}
 
 	dir := filepath.Join(root, in.ID)
-	tw := filepath.Join(dir, ".tw")
-	if err := os.MkdirAll(tw, 0o755); err != nil {
+	saker := filepath.Join(dir, ".tw")
+	if err := os.MkdirAll(saker, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	write := func(name, body string) {
-		if err := os.WriteFile(filepath.Join(tw, name), []byte(body), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(saker, name), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}

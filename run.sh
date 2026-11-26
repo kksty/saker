@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run Tianwu from source on Linux/macOS (no build step required).
+# Run Saker from source on Linux/macOS (no build step required).
 #   ./run.sh
 #   HARNESS=/opt/cyber/cyber-harness SCAN=/opt/cyber/cyber-scan ./run.sh
 #   PROJECT=acme-web ./run.sh
@@ -16,12 +16,12 @@ if ! command -v go >/dev/null 2>&1; then
   exit 1
 fi
 
-args=(run ./cmd/tw --addr "$ADDR" --data "$DATA")
+args=(run ./cmd/saker --addr "$ADDR" --data "$DATA")
 if [ -n "$PROJECT" ]; then
   args+=(--project "$PROJECT")
 fi
 if [ -n "$HARNESS" ]; then args+=(--harness "$HARNESS"); fi
 if [ -n "$SCAN" ]; then args+=(--scan "$SCAN"); fi
 
-echo "tianwu -> http://$ADDR"
+echo "Saker -> http://$ADDR"
 exec go "${args[@]}"

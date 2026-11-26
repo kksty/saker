@@ -81,7 +81,7 @@ export function ExternalActions() {
               spellCheck={false}
             />
           </div>
-          <span role="status" aria-live="polite" className="tw-nums ml-auto font-mono text-[11px] text-ink-3">
+          <span role="status" aria-live="polite" className="saker-nums ml-auto font-mono text-[11px] text-ink-3">
             显示 {rows.length} / {list.data?.actions?.length ?? 0}
           </span>
         </div>
@@ -108,30 +108,30 @@ export function ExternalActions() {
         {rows.map((a, index)=>(
           <li
             key={a.id}
-            className={`tw-panel overflow-hidden rounded-xl ${index >= 4 ? '[contain-intrinsic-size:auto_14rem] [content-visibility:auto]' : ''}`}
+            className={`saker-panel overflow-hidden rounded-xl ${index >= 4 ? '[contain-intrinsic-size:auto_14rem] [content-visibility:auto]' : ''}`}
           >
             <header className="flex flex-wrap items-center gap-2 border-b border-hairline px-4 py-3">
-              <h2 className="tw-break tw-section-title min-w-0 flex-1">{a.name}</h2>
+              <h2 className="saker-break saker-section-title min-w-0 flex-1">{a.name}</h2>
               <StatusIndicator compact status={a.state==='completed'?'idle':a.state==='unknown'?'warning':'running'} label={labels[a.state]} />
-              <Badge variant="outline" size="sm">版本 <span className="tw-nums font-mono">{a.version}</span></Badge>
+              <Badge variant="outline" size="sm">版本 <span className="saker-nums font-mono">{a.version}</span></Badge>
             </header>
             <div className="space-y-2.5 p-4">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px] leading-4 text-ink-3">
-                <span className="tw-break">{a.id}</span>
+                <span className="saker-break">{a.id}</span>
                 <a href={`?view=state&intent=${encodeURIComponent(a.intent_id)}`} className="inline-flex min-w-0 items-center gap-1 text-ink-2 underline-offset-2 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
                   <span className="truncate">{a.intent_id}</span><ArrowUpRight className="h-3 w-3 shrink-0" />
                 </a>
                 <a href={`?view=runs&run=${encodeURIComponent(a.run_id)}`} className="truncate text-ink-2 underline-offset-2 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">{a.run_id}</a>
-                <span className="tw-nums ml-auto">{fmtTime(a.updated_at)}</span>
+                <span className="saker-nums ml-auto">{fmtTime(a.updated_at)}</span>
               </div>
               {a.reference && (
-                <p className="tw-break text-[12px] leading-relaxed text-ink-2">外部引用：{a.reference}</p>
+                <p className="saker-break text-[12px] leading-relaxed text-ink-2">外部引用：{a.reference}</p>
               )}
               {a.result && (
-                <pre className="tw-inset tw-break max-h-64 overflow-auto whitespace-pre-wrap rounded-lg p-3 font-mono text-[11px] leading-relaxed text-ink-2">{a.result}</pre>
+                <pre className="saker-inset saker-break max-h-64 overflow-auto whitespace-pre-wrap rounded-lg p-3 font-mono text-[11px] leading-relaxed text-ink-2">{a.result}</pre>
               )}
               {a.result_ref && (
-                <p className="tw-break text-[11px] leading-4 text-ink-3">结果引用：{a.result_ref}</p>
+                <p className="saker-break text-[11px] leading-4 text-ink-3">结果引用：{a.result_ref}</p>
               )}
               {editing?.id===a.id ? (
                 <div className="space-y-2.5 rounded-lg border border-hairline bg-surface-2/40 p-3">

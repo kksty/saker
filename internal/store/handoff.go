@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 var ErrHandoffConflict = errors.New("交接冲突：版本已变化或意图正由另一项交接持有")

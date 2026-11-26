@@ -2,7 +2,7 @@ package api
 
 // Run-scoped native-session reads and the resume recovery step.
 //
-// The ledger is the authority for what Tianwu decided; the harness session is
+// The ledger is the authority for what Saker decided; the harness session is
 // the authority for what the model actually did. The controller keeps both, and
 // these endpoints expose the second one read-only (canonical history and the
 // native command menu) so an operator can reconstruct a run from the host's own
@@ -18,9 +18,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kksty/tianwu/internal/aop"
-	"github.com/kksty/tianwu/internal/aopexec"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/aop"
+	"github.com/kksty/saker/internal/aopexec"
+	"github.com/kksty/saker/internal/model"
 )
 
 // runNativeSession is the shared lookup for the two session reads: the run must
@@ -156,7 +156,7 @@ func (s *Server) resetGoneSession(ctx context.Context, run model.Run) (string, s
 	}
 	ctx, cancel := context.WithTimeout(ctx, hostReadTimeout)
 	defer cancel()
-	outcome, err := aop.New(base, token).ResetSession(ctx, "tw-resume-"+run.ID, run.SessionID, "", "tianwu: 续跑恢复")
+	outcome, err := aop.New(base, token).ResetSession(ctx, "saker-resume-"+run.ID, run.SessionID, "", "saker: 续跑恢复")
 	if err != nil {
 		return "", "宿主拒绝 ResetSession：" + err.Error()
 	}

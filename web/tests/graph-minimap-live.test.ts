@@ -317,7 +317,7 @@ test('the live pill is gone and nothing pins the corner column to a fixed width'
   const src = readFileSync(new URL('../src/components/graph/GraphPanel.tsx', import.meta.url), 'utf8')
   assert.equal(src.includes('graph-live-pill'), false, 'the live pill is removed, not hidden')
   assert.equal(src.includes('MINI_CARD'), false, 'the column no longer hardcodes a card width')
-  assert.match(src, /tw-graph-corner-br[^`]*items-end/, 'the column sizes to the card, right-aligned')
+  assert.match(src, /saker-graph-corner-br[^`]*items-end/, 'the column sizes to the card, right-aligned')
 })
 
 // 记忆在挂载时生效：上次拖到的尺寸直接就是这一次的开场尺寸（不用再拖一遍）。

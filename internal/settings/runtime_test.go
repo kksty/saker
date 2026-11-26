@@ -287,7 +287,7 @@ extensions:
 	}
 
 	// The LLM section stays a single explicit connection: the legacy provider
-	// catalogue and its tianwu metadata never reach the harness.
+	// catalogue and its saker metadata never reach the harness.
 	llm := runtimeSection(t, doc, "llm")
 	for _, forbidden := range []string{"providers", "active_profile", "api_keys", "tier", "fallback"} {
 		if _, ok := llm[forbidden]; ok {

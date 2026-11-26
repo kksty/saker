@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/board"
-	"github.com/kksty/tianwu/internal/state"
+	"github.com/kksty/saker/internal/board"
+	"github.com/kksty/saker/internal/state"
 )
 
 const testNote = "唯一标记-NOTE-42：下一步验 /admin"
@@ -372,7 +372,7 @@ func TestStateSectionCarriesTheCommanderNoteEndpoint(t *testing.T) {
 	const token = "/data/projects/p1/commander/.tw/auth"
 	rc := RoundContext{Resume: false, StateAPI: api, StateToken: token}
 	p := CommanderRoundPrompt(board.View{}, testNote, "", ContextStatus{}, rc)
-	for _, want := range []string{"GET " + api, "PUT " + api, token, "$TW_AUTH"} {
+	for _, want := range []string{"GET " + api, "PUT " + api, token, "$SAKER_AUTH"} {
 		if !strings.Contains(p, want) {
 			t.Fatalf("full-note prompt missing %q:\n%s", want, p)
 		}

@@ -14,9 +14,9 @@ import (
 // Both crash directions must replace the pair without changing its node ID.
 // The binaries, configuration, sessions and gateway are isolated from the app.
 func TestSplitHostRecoversBothProcesses(t *testing.T) {
-	bin, nodeBin := os.Getenv("TW_HARNESS_BIN"), os.Getenv("TW_SCAN_BIN")
+	bin, nodeBin := os.Getenv("SAKER_HARNESS_BIN"), os.Getenv("SAKER_SCAN_BIN")
 	if bin == "" || nodeBin == "" {
-		t.Skip("set TW_HARNESS_BIN and TW_SCAN_BIN for split-process recovery")
+		t.Skip("set SAKER_HARNESS_BIN and SAKER_SCAN_BIN for split-process recovery")
 	}
 	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

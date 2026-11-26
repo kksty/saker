@@ -30,9 +30,9 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	pb "github.com/kksty/tianwu/internal/aop/pb"
-	"github.com/kksty/tianwu/internal/connectretry"
-	"github.com/kksty/tianwu/internal/ws"
+	pb "github.com/kksty/saker/internal/aop/pb"
+	"github.com/kksty/saker/internal/connectretry"
+	"github.com/kksty/saker/internal/ws"
 )
 
 // Client dials one harness server (aiscan web: the process that hosts the AOP
@@ -419,7 +419,7 @@ func (c *Conn) call(ctx context.Context, msg *pb.ProtocolMessage) (*pb.Envelope,
 }
 
 // OpenSession asks for a session, optionally pinned to a node. workDir is the
-// session's workspace (the case directory); it travels as a Tianwu fork
+// session's workspace (the case directory); it travels as a harness fork
 // extension because upstream AOP has no per-session working directory (D110).
 func (c *Conn) OpenSession(ctx context.Context, nodeID, title, workDir string) (*pb.Session, error) {
 	req := &pb.OpenSessionRequest{NodeId: nodeID, Title: title}
@@ -455,7 +455,7 @@ type TurnOptions struct {
 	// different role and must not judge the executor's prompt.
 	Eval string
 	// Goal is the short control-plane goal the evaluator judges. It travels as
-	// the Tianwu RunGoal extension, separate from the turn input (which stays
+	// the RunGoal extension, separate from the turn input (which stays
 	// the executor's full brief). Empty leaves the upstream behavior: the
 	// evaluator derives its goal from the turn input.
 	Goal string
@@ -477,7 +477,7 @@ type TurnOptions struct {
 
 const agentRunOptionsTypeURL = "type.googleapis.com/cyber.agent.AgentRunOptions"
 
-// agentRunOptions encodes the extension by hand. tianwu does not link the whole
+// agentRunOptions encodes the extension by hand. saker does not link the whole
 // harness module just for one two-field message; the wire format is stable and
 // the harness validates it with the real proto on its side.
 func agentRunOptions(criteria string) *anypb.Any {
@@ -680,7 +680,7 @@ func (c *Conn) CancelWatch(reason string) error {
 func (c *Conn) Close() error {
 	// A subscription outlives the stream unless the host is told: make the end
 	// explicit before dropping the socket. Best effort; closing still wins.
-	_ = c.CancelWatch("tianwu: 连接关闭")
+	_ = c.CancelWatch("saker: 连接关闭")
 	return c.sock.Close()
 }
 

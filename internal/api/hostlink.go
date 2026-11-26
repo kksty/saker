@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/model"
 )
 
 // hostReadTimeout bounds one host read. A local host answers in milliseconds; a

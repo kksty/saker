@@ -13,13 +13,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/access"
-	"github.com/kksty/tianwu/internal/aop/tool"
-	"github.com/kksty/tianwu/internal/artifact"
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/access"
+	"github.com/kksty/saker/internal/aop/tool"
+	"github.com/kksty/saker/internal/artifact"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 type loginYieldExec struct {

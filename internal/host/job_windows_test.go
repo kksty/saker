@@ -14,10 +14,10 @@ import (
 
 // The point of the job object is that the OS kills the children when the job
 // handle closes — no signal from us, no cleanup code of ours running. That is
-// exactly the case an exe swap creates: tw is killed with taskkill /F, so the
+// exactly the case an exe swap creates: saker is killed with taskkill /F, so the
 // only thing that can stop the Hub and scan node is the job.
 func TestClosingTheJobKillsAssignedChildren(t *testing.T) {
-	if os.Getenv("TW_JOB_HELPER") == "1" {
+	if os.Getenv("SAKER_JOB_HELPER") == "1" {
 		// Child mode: live until the OS kills us.
 		time.Sleep(60 * time.Second)
 		os.Exit(0)
@@ -35,7 +35,7 @@ func TestClosingTheJobKillsAssignedChildren(t *testing.T) {
 	}()
 
 	cmd := exec.Command(os.Args[0], "-test.run=TestClosingTheJobKillsAssignedChildren")
-	cmd.Env = append(os.Environ(), "TW_JOB_HELPER=1")
+	cmd.Env = append(os.Environ(), "SAKER_JOB_HELPER=1")
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -72,12 +72,12 @@ func TestClosingTheJobKillsAssignedChildren(t *testing.T) {
 // appears in the process-wide job: if assignment silently failed, the leak would
 // be back and nothing else in the suite would notice.
 func TestGuardChildAssignsIntoTheProcessJob(t *testing.T) {
-	if os.Getenv("TW_JOB_HELPER") == "1" {
+	if os.Getenv("SAKER_JOB_HELPER") == "1" {
 		time.Sleep(60 * time.Second)
 		os.Exit(0)
 	}
 	cmd := exec.Command(os.Args[0], "-test.run=TestGuardChildAssignsIntoTheProcessJob")
-	cmd.Env = append(os.Environ(), "TW_JOB_HELPER=1")
+	cmd.Env = append(os.Environ(), "SAKER_JOB_HELPER=1")
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}

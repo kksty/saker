@@ -3,7 +3,7 @@ package ioa
 import (
 	"context"
 	"encoding/json"
-	"github.com/kksty/tianwu/internal/testutil"
+	"github.com/kksty/saker/internal/testutil"
 	"net/http"
 	"testing"
 )
@@ -75,7 +75,7 @@ func TestSendRejectsMissingAgent(t *testing.T) {
 }
 
 // A host restart can change the IOA space id. The cached value used to be kept
-// forever, so every say failed with 404 until tw itself restarted.
+// forever, so every say failed with 404 until saker itself restarted.
 func TestSendReResolvesAfterTheHostRestarts(t *testing.T) {
 	spaceID := "sp-1"
 	srv := testutil.NewServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

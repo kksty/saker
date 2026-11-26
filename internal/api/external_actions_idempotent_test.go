@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 type silentExec struct{}
@@ -60,7 +60,7 @@ func TestIdenticalReceiptResubmissionAnswersSuccess(t *testing.T) {
 	if rec = call(t, s, http.MethodPost, "/api/actions/"+created.Action.ID+"/result", body); rec.Code != 200 {
 		t.Fatalf("first resolve=%d %s", rec.Code, rec.Body.String())
 	}
-	if rec.Header().Get("X-Tianwu-Duplicate-Result") != "" {
+	if rec.Header().Get("X-Saker-Duplicate-Result") != "" {
 		t.Fatalf("first resolve was marked duplicate")
 	}
 
@@ -69,7 +69,7 @@ func TestIdenticalReceiptResubmissionAnswersSuccess(t *testing.T) {
 	if rec.Code != 200 {
 		t.Fatalf("resubmission=%d %s, want 200 (a done action restated is not a conflict)", rec.Code, rec.Body.String())
 	}
-	if rec.Header().Get("X-Tianwu-Duplicate-Result") != "1" {
+	if rec.Header().Get("X-Saker-Duplicate-Result") != "1" {
 		t.Fatalf("resubmission was not marked duplicate: %v", rec.Header())
 	}
 	if n := len(st.Actions(in.ID)); n != 1 {

@@ -1,7 +1,7 @@
 // Package node owns the execution locations of one instance.
 //
 // A node is "a machine + a harness host + the toolchain around it": it is an
-// AOP endpoint, including the machine tw runs on (tw starts a local `aiscan
+// AOP endpoint, including the machine saker runs on (saker starts a local `aiscan
 // web` and registers it as "local"). cyber-audit is the one non-host form: a
 // one-shot local binary with no agent to talk to. Everything else — dispatch,
 // steer, verify, report, terminal, REPL — goes through the host (D64).
@@ -19,14 +19,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kksty/tianwu/internal/aop"
-	"github.com/kksty/tianwu/internal/aopexec"
-	"github.com/kksty/tianwu/internal/executor"
+	"github.com/kksty/saker/internal/aop"
+	"github.com/kksty/saker/internal/aopexec"
+	"github.com/kksty/saker/internal/executor"
 )
 
 // Spec is one node as it is written in <data>/nodes.json or injected by the
 // control plane. Every execution node is an AOP host: the control-plane machine
-// is not an exception, tw starts a local `Hub + scan` and registers it as the
+// is not an exception, saker starts a local `Hub + scan` and registers it as the
 // node "local" (docs/14-nodes.md, D64).
 //
 //	{
@@ -74,7 +74,7 @@ type Registry struct {
 
 	// llmEnv / llmArgs are the instance's harness configuration from the
 	// settings page (CYBER_* and --context-window / --max-tokens). The local
-	// host tw starts inherits them; a remote AOP host keeps its own host-side
+	// host saker starts inherits them; a remote AOP host keeps its own host-side
 	// configuration.
 	llmMu   sync.RWMutex
 	llmEnv  []string
@@ -91,7 +91,7 @@ type Registry struct {
 // SetLocalID records the node started by this control plane.
 func (r *Registry) SetLocalID(id string) { r.localID = strings.TrimSpace(id) }
 
-// LocalID is the node id tw started ("" when this instance has no local host).
+// LocalID is the node id saker started ("" when this instance has no local host).
 func (r *Registry) LocalID() string { return r.localID }
 
 // SetLLM replaces the harness environment and flags handed to local audit runs.
@@ -161,7 +161,7 @@ func New(specs []Spec, def string) (*Registry, error) {
 	return r, nil
 }
 
-// File is the on-disk nodes.json: extra hosts on top of the local one tw
+// File is the on-disk nodes.json: extra hosts on top of the local one saker
 // starts itself.
 type File struct {
 	Default string `json:"default"`
@@ -172,7 +172,7 @@ type File struct {
 // local host to the list first, so validation belongs to New.
 //
 // A relative `bin` (audit only) is resolved against the directory of the file,
-// not the shell that started tw: the file describes its own nodes, so moving
+// not the shell that started saker: the file describes its own nodes, so moving
 // the file moves its references.
 func Read(path string) (File, error) {
 	data, err := os.ReadFile(path)
@@ -314,7 +314,7 @@ func (r *Registry) Infos() []executor.NodeInfo {
 	return out
 }
 
-// RefreshNodes discovers scan processes already registered with Tianwu's Hub.
+// RefreshNodes discovers scan processes already registered with Saker's Hub.
 // It does not start another Hub or invent a remote execution protocol.
 func (r *Registry) RefreshNodes(ctx context.Context) error {
 	r.discoveryMu.Lock()

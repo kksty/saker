@@ -16,9 +16,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 // readSkillAsset reads one shipped skill body. The skills are file content under
@@ -340,7 +340,7 @@ func TestBattlefieldReadDetailsLiveInTheSkill(t *testing.T) {
 	}
 
 	skill := readSkillAsset(t, "collaborate")
-	for _, want := range []string{`"$TW_BIN" board`, "truncated/dropped/has_more/next_cursor", "不要再拿 python 解析"} {
+	for _, want := range []string{`"$SAKER_BIN" board`, "truncated/dropped/has_more/next_cursor", "不要再拿 python 解析"} {
 		if !strings.Contains(skill, want) {
 			t.Errorf("collaborate skill lost the moved read detail %q", want)
 		}

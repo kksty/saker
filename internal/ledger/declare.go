@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/kksty/tianwu/internal/artifact"
+	"github.com/kksty/saker/internal/artifact"
 	"io"
 	"os"
 	"path/filepath"
@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // HandoffDir / HandoffFile locate the executor's own account of what it found.

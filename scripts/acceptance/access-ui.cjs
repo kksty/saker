@@ -1,14 +1,14 @@
 // Offline access/handoff acceptance. All page HTTP is fulfilled from fixtures;
-// no Tianwu service, model provider, project data or saved credentials are used.
+// no Saker service, model provider, project data or saved credentials are used.
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '../..');
-const webRoot = path.resolve(process.env.TW_ACCESS_WEB || path.join(root, 'internal/web/static'));
+const webRoot = path.resolve(process.env.SAKER_ACCESS_WEB || path.join(root, 'internal/web/static'));
 const out = path.join(root, '.build/ui-qa'); fs.mkdirSync(out, { recursive: true });
 const chromeProfile = fs.mkdtempSync(path.join(out, 'access-chrome-'));
-const chrome = spawn(process.env.TW_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe', ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--user-data-dir=' + chromeProfile, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
+const chrome = spawn(process.env.SAKER_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe', ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--user-data-dir=' + chromeProfile, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const now = '2026-11-07T00:00:00Z';
 const project = { id: 'fixture', name: '本地界面回归', scope: '本地界面测试', paused: true, max_runs_effective: 0 };
@@ -104,7 +104,7 @@ async function api(url, request) {
 
     const field = async(label,value) => evaluate(`(()=>{const l=[...document.querySelectorAll('label')].find(e=>e.querySelector('span')?.textContent===${JSON.stringify(label)});if(!l)throw Error('Missing field');const e=l.querySelector('input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}))})()`);
     await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1050,deviceScaleFactor:1,mobile:false});
-    await call('Page.navigate',{url:'http://tianwu.test/p/fixture/?view=access'}); await text('准备登录浏览器');
+    await call('Page.navigate',{url:'http://saker.test/p/fixture/?view=access'}); await text('准备登录浏览器');
     check('page omits identity fields and native results',await evaluate(`!document.body.innerText.includes('原生工具结果') && ![...document.querySelectorAll('label')].some(e=>['测试账号','角色','租户','浏览器所在模型宿主'].includes(e.querySelector('span')?.textContent))`));
     await click('准备登录浏览器'); await text('为「登录后继续核对」准备登录现场');
     check('request preparation only needs a target URL',await evaluate(`document.querySelectorAll('form input:required').length===1 && document.querySelector('form input:required').placeholder==='https://app.example/login'`));

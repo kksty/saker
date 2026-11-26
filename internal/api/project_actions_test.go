@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // decodeActions reads the action contract out of a board response.

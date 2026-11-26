@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/executor"
+	"github.com/kksty/saker/internal/executor"
 )
 
 // TestRunEventWindowKeepsGuardrailKinds pins the read side of the P4-J audit

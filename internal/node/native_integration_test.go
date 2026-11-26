@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/kksty/tianwu/internal/aopexec"
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/host"
+	"github.com/kksty/saker/internal/aopexec"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/host"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -21,9 +21,9 @@ import (
 
 // A real Hub and two real scan processes, with a local synthetic model only.
 func TestNativeMultiScanDispatchCancelAndResume(t *testing.T) {
-	hubBin, scanBin := os.Getenv("TW_HARNESS_BIN"), os.Getenv("TW_SCAN_BIN")
+	hubBin, scanBin := os.Getenv("SAKER_HARNESS_BIN"), os.Getenv("SAKER_SCAN_BIN")
 	if hubBin == "" || scanBin == "" {
-		t.Skip("set TW_HARNESS_BIN and TW_SCAN_BIN for native multi-node integration")
+		t.Skip("set SAKER_HARNESS_BIN and SAKER_SCAN_BIN for native multi-node integration")
 	}
 	blocked := make(chan struct{})
 	var blockedOnce sync.Once

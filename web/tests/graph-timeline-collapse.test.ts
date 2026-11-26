@@ -116,6 +116,6 @@ test('the toolbar switch carries the open state and reports clicks', async () =>
   })
   const open = timelineSwitch()
   assert.equal(open.props['aria-expanded'], true)
-  assert.equal(open.props['aria-controls'], 'tw-graph-timeline-body', 'the switch names the strip it opens')
+  assert.equal(open.props['aria-controls'], 'saker-graph-timeline-body', 'the switch names the strip it opens')
   assert.match(String(open.props.title), /收起/, 'an open switch says how to close it')
 })

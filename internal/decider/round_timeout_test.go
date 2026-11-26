@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/board"
-	"github.com/kksty/tianwu/internal/state"
+	"github.com/kksty/saker/internal/board"
+	"github.com/kksty/saker/internal/state"
 )
 
 // A round is one decision. The commander runs as a long-lived harness session

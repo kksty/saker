@@ -9,9 +9,9 @@ package executor
 import (
 	"context"
 	"encoding/json"
-	"github.com/kksty/tianwu/internal/aop/operation"
-	"github.com/kksty/tianwu/internal/aop/tool"
-	"github.com/kksty/tianwu/internal/aop/traffic"
+	"github.com/kksty/saker/internal/aop/operation"
+	"github.com/kksty/saker/internal/aop/tool"
+	"github.com/kksty/saker/internal/aop/traffic"
 	"strings"
 	"time"
 )
@@ -302,7 +302,7 @@ func HasNode(ex Executor, id string) bool {
 }
 
 // TerminalNode is implemented by executors that can open a shell on a node.
-// An AOP host exposes one directly; the local machine is such a host because tw
+// An AOP host exposes one directly; the local machine is such a host because saker
 // starts an `aiscan web` for it (D64).
 type TerminalNode interface {
 	TerminalEndpoint(nodeID string) (baseURL, token, agent string, ok bool)

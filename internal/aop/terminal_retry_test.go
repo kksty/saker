@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	pb "github.com/kksty/tianwu/internal/aop/pb"
-	"github.com/kksty/tianwu/internal/aop/pty"
-	"github.com/kksty/tianwu/internal/ws"
+	pb "github.com/kksty/saker/internal/aop/pb"
+	"github.com/kksty/saker/internal/aop/pty"
+	"github.com/kksty/saker/internal/ws"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )

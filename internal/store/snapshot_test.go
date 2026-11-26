@@ -3,7 +3,7 @@ package store
 import (
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 func TestIntentSnapshotsOwnAllMutableFields(t *testing.T) {

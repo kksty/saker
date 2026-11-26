@@ -19,8 +19,8 @@ export function Decisions({ board }: { board?: BoardResponse }) {
       meta={
         d?.enabled ? (
           <>
-            <span className="tw-nums font-mono text-[11px] text-ink-3">{fmtInt(d.rounds)} 轮</span>
-            <span className="tw-nums font-mono text-[11px] text-ink-3">{fmtInt(d.tokens_total)} tokens</span>
+            <span className="saker-nums font-mono text-[11px] text-ink-3">{fmtInt(d.rounds)} 轮</span>
+            <span className="saker-nums font-mono text-[11px] text-ink-3">{fmtInt(d.tokens_total)} tokens</span>
           </>
         ) : undefined
       }
@@ -60,7 +60,7 @@ export function Decisions({ board }: { board?: BoardResponse }) {
       {rows.length > 0 && (
         <Panel
           title="决策记录"
-          extra={<span className="tw-nums font-mono text-[11px] text-ink-3">{fmtInt(rows.length)} 条 · 最近在前</span>}
+          extra={<span className="saker-nums font-mono text-[11px] text-ink-3">{fmtInt(rows.length)} 条 · 最近在前</span>}
           bodyClassName="p-0"
         >
           <ul role="list" className="divide-y divide-hairline" aria-label="决策记录">
@@ -71,26 +71,26 @@ export function Decisions({ board }: { board?: BoardResponse }) {
               >
                 {/* Row head: round → wake → time … cost. Numbers are mono. */}
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="tw-nums font-mono text-[12px] font-medium text-ink">#{r.round}</span>
+                  <span className="saker-nums font-mono text-[12px] font-medium text-ink">#{r.round}</span>
                   <Badge size="sm" variant="secondary">
                     {r.wake}
                   </Badge>
-                  <span className="tw-nums font-mono text-[11px] text-ink-3">{fmtTime(r.at)}</span>
+                  <span className="saker-nums font-mono text-[11px] text-ink-3">{fmtTime(r.at)}</span>
                   {r.session_rounds ? (
-                    <span className="tw-nums font-mono text-[11px] text-ink-3">会话 {r.session_rounds}</span>
+                    <span className="saker-nums font-mono text-[11px] text-ink-3">会话 {r.session_rounds}</span>
                   ) : null}
-                  <span className="tw-nums ml-auto shrink-0 font-mono text-[11px] text-ink-3">
+                  <span className="saker-nums ml-auto shrink-0 font-mono text-[11px] text-ink-3">
                     {r.ms}ms · {fmtInt(r.tokens)} tok
                   </span>
                 </div>
 
                 {/* Why this round woke: the reasoning record, recessed. */}
                 {(r.attention ?? []).length > 0 && (
-                  <div className="tw-inset mt-2 rounded-md px-2.5 py-2" data-attention-reasons>
+                  <div className="saker-inset mt-2 rounded-md px-2.5 py-2" data-attention-reasons>
                     <div className="mb-1 text-[11px] font-medium leading-4 text-ink-3">本轮为何启动</div>
                     <ul className="space-y-1 text-[12px] leading-relaxed text-ink-2">
                       {r.attention!.slice(0, 6).map((reason, j) => (
-                        <li key={`${reason.kind}-${reason.id}-${j}`} className="tw-break">
+                        <li key={`${reason.kind}-${reason.id}-${j}`} className="saker-break">
                           {reason.detail}
                           {reason.intent_id && <span className="ml-1 font-mono text-[11px] text-ink-3">· {reason.intent_id}</span>}
                         </li>
@@ -120,7 +120,7 @@ export function Decisions({ board }: { board?: BoardResponse }) {
                 )}
 
                 {r.error && (
-                  <div role="alert" className="tw-break mt-2 rounded-md border border-destructive/25 bg-destructive/[0.07] px-2.5 py-1.5 text-[12px] leading-relaxed text-destructive">
+                  <div role="alert" className="saker-break mt-2 rounded-md border border-destructive/25 bg-destructive/[0.07] px-2.5 py-1.5 text-[12px] leading-relaxed text-destructive">
                     {r.error}
                   </div>
                 )}
@@ -145,7 +145,7 @@ export function Decisions({ board }: { board?: BoardResponse }) {
                 {(r.notes ?? []).length > 0 && (
                   <ul className="mt-2 list-disc space-y-0.5 border-t border-hairline pl-4 pt-2 text-[12px] leading-relaxed text-ink-2">
                     {r.notes!.map((n, j) => (
-                      <li key={j} className="tw-break">{n}</li>
+                      <li key={j} className="saker-break">{n}</li>
                     ))}
                   </ul>
                 )}
@@ -177,9 +177,9 @@ function DeciderStatusLine({ d }: { d: NonNullable<BoardResponse['decider']> }) 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-hairline px-4 py-2.5 text-[11px] text-ink-3">
       <StatusIndicator compact status="online" label={d.model ?? '模型'} />
-      <span className="tw-nums font-mono">{fmtInt(d.rounds)} 轮</span>
-      <span className="tw-nums font-mono">{fmtInt(d.tokens_total)} tokens</span>
-      <span className="tw-nums">连续无新事实 {d.stalled}</span>
+      <span className="saker-nums font-mono">{fmtInt(d.rounds)} 轮</span>
+      <span className="saker-nums font-mono">{fmtInt(d.tokens_total)} tokens</span>
+      <span className="saker-nums">连续无新事实 {d.stalled}</span>
       {d.last_digest && <span className="truncate font-mono">digest {d.last_digest.slice(0, 12)}</span>}
     </div>
   )

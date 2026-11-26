@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kksty/tianwu/internal/aopexec"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/aopexec"
+	"github.com/kksty/saker/internal/model"
 )
 
 // The worker note is the cross-turn memory of a direction whose harness session

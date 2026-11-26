@@ -238,8 +238,8 @@ def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     # No baked-in ledger path: a default pointing at a real project would ship a
     # project id and silently scan the wrong ledger.
-    ap.add_argument("--ledger", default=os.environ.get("TW_LEDGER_PATH"),
-                    help="ledger.sqlite to scan (or set TW_LEDGER_PATH); required unless --self-test")
+    ap.add_argument("--ledger", default=os.environ.get("SAKER_LEDGER_PATH"),
+                    help="ledger.sqlite to scan (or set SAKER_LEDGER_PATH); required unless --self-test")
     ap.add_argument("--threshold", type=int, default=3,
                     help="consecutive same-class failures that trip the non-anchor rule "
                          "(default 3); an anchor failure trips on its own")
@@ -254,7 +254,7 @@ def main(argv: list[str]) -> int:
     if args.self_test:
         return self_test(args.threshold, hints)
     if not args.ledger:
-        print("缺少 --ledger（或 TW_LEDGER_PATH）：脚本不内置账本路径", file=sys.stderr)
+        print("缺少 --ledger（或 SAKER_LEDGER_PATH）：脚本不内置账本路径", file=sys.stderr)
         return 2
     result = scan(load_runs(args.ledger), args.threshold, hints, args.window)
     if args.json:

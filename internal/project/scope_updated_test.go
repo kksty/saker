@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/store"
 )
 
 // The brief's revision time is what lets a reader tell "the operator changed the

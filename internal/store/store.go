@@ -1,4 +1,4 @@
-// Package store is Tianwu's ledger persistence.
+// Package store is Saker's ledger persistence.
 //
 // All project ledgers use embedded SQLite. JSON is only a portable export format.
 package store
@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 type DB struct {

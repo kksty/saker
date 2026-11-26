@@ -1,7 +1,7 @@
 package api
 
 // The project-mux conversation route is reachable by a harness executor with its
-// per-run credential (cmd/tw admits project reads for sessions and attaches the
+// per-run credential (cmd/saker admits project reads for sessions and attaches the
 // executor identity). It must narrow to that executor's own box, exactly like
 // the participant surface (/agent/.../api/messages) does; the operator view is
 // the only caller that may see every direction's conversation.
@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/model"
 )
 
 func TestProjectMessagesRouteNarrowsToTheCaller(t *testing.T) {

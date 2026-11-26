@@ -85,7 +85,7 @@ export function RunReview({
         />
         <span className="font-medium text-ink">执行审查</span>
         {counts.length > 0 && <span className="truncate text-[11px] text-ink-3">{counts.join(' · ')}</span>}
-        <span className="tw-nums ml-auto shrink-0 font-mono text-[11px] text-ink-3" title={tokenTitle}>
+        <span className="saker-nums ml-auto shrink-0 font-mono text-[11px] text-ink-3" title={tokenTitle}>
           {fmtInt(tokens)} tok
         </span>
       </summary>
@@ -110,7 +110,7 @@ export function RunReview({
                 {value === 'time' ? '时间' : '令牌'}
               </button>
             ))}
-            <span className="tw-nums ml-auto font-mono text-[11px] text-ink-3">{review.entries.length} 项</span>
+            <span className="saker-nums ml-auto font-mono text-[11px] text-ink-3">{review.entries.length} 项</span>
           </div>
           {review.entries.length === 0 ? (
             <EmptyState
@@ -157,7 +157,7 @@ function ReviewRow({
         selected ? 'bg-primary/[0.09] shadow-[inset_2px_0_0_var(--primary)]' : 'hover:bg-surface-2'
       }`}
     >
-      <span className="tw-nums mt-0.5 w-4 shrink-0 text-right font-mono text-[11px] text-ink-3">
+      <span className="saker-nums mt-0.5 w-4 shrink-0 text-right font-mono text-[11px] text-ink-3">
         {entry.order}
       </span>
       <Icon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${STATE_CLASS[entry.state]}`} />
@@ -170,12 +170,12 @@ function ReviewRow({
           </span>
         </span>
         {entry.evidence && (
-          <span className="tw-break mt-0.5 block text-[11px] leading-snug text-ink-3">
+          <span className="saker-break mt-0.5 block text-[11px] leading-snug text-ink-3">
             {entry.evidence}
           </span>
         )}
       </span>
-      <span className="tw-nums flex shrink-0 flex-col items-end gap-0.5 font-mono text-[11px] leading-tight text-ink-3">
+      <span className="saker-nums flex shrink-0 flex-col items-end gap-0.5 font-mono text-[11px] leading-tight text-ink-3">
         {entry.kind === 'tool' && entry.elapsedMs !== undefined && <span>{fmtReviewElapsed(entry.elapsedMs)}</span>}
         {hasUsage && (
           <span>

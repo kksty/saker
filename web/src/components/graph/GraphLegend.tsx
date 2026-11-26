@@ -172,7 +172,7 @@ function Row({ children, title }: { children: React.ReactNode; title?: string })
 }
 
 function GroupTitle({ children }: { children: React.ReactNode }) {
-  return <div className="tw-eyebrow mb-1 mt-2 first:mt-0">{children}</div>
+  return <div className="saker-eyebrow mb-1 mt-2 first:mt-0">{children}</div>
 }
 
 function Hint({ children }: { children: React.ReactNode }) {
@@ -185,7 +185,7 @@ export function GraphLegend({ className }: { className?: string }) {
   return (
     // The card is a column: the title row (with the collapse control) is pinned,
     // the body is the only part that scrolls. The bottom-left stack bounds the
-    // card's height (app.css `.tw-graph-stack`), so an expanded legend scrolls
+    // card's height (app.css `.saker-graph-stack`), so an expanded legend scrolls
     // inside the map instead of growing up under the page banner. `min-h-10` is
     // the title row: the control stays reachable even in the smallest box.
     // `shrink-0` keeps that promise: without it the legend is the only flexible
@@ -193,7 +193,7 @@ export function GraphLegend({ className }: { className?: string }) {
     // that scrolled a few pixels instead of the stack scrolling. The stack is the
     // scroll container; each card keeps its full height inside it.
     <div
-      className={`tw-graph-dock flex min-h-10 w-full flex-col overflow-hidden rounded-xl border border-hairline bg-card/95 text-caption shadow-lifted backdrop-blur ${
+      className={`saker-graph-dock flex min-h-10 w-full flex-col overflow-hidden rounded-xl border border-hairline bg-card/95 text-caption shadow-lifted backdrop-blur ${
         open ? 'min-h-40 flex-1' : 'shrink-0'
       } ${className ?? ''}`}
       data-testid="graph-legend"
@@ -208,11 +208,11 @@ export function GraphLegend({ className }: { className?: string }) {
           className={`h-4 w-4 shrink-0 text-ink-3 transition-transform duration-150 ${open ? '' : '-rotate-90'}`}
           aria-hidden="true"
         />
-        <span className="tw-section-title">图例</span>
+        <span className="saker-section-title">图例</span>
       </button>
 
       {open && (
-        <div className="tw-scroll tw-graph-legend-body min-h-0 flex-1 overflow-y-auto border-t border-hairline px-3 py-2.5">          <GroupTitle>事实（节点）</GroupTitle>
+        <div className="saker-scroll saker-graph-legend-body min-h-0 flex-1 overflow-y-auto border-t border-hairline px-3 py-2.5">          <GroupTitle>事实（节点）</GroupTitle>
           <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
             {FACT_KINDS.map((name) => (
               <Row key={name}>
@@ -293,7 +293,7 @@ export function GraphLegend({ className }: { className?: string }) {
           <div className="space-y-0.5">
             <Row title="选中节点后，画布用 1、2、3…… 标出主干顺序">
               <span
-                className="tw-nums flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border text-[9px] font-semibold"
+                className="saker-nums flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border text-[9px] font-semibold"
                 style={{ borderColor: CANVAS.info, color: CANVAS.ink }}
                 aria-hidden="true"
               >

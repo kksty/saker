@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/aopexec"
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/aopexec"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 func admissionServer(t *testing.T) (*Server, *blockingExec) {

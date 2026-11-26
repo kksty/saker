@@ -48,7 +48,7 @@ export function StatTile({
         <span className="truncate">{label}</span>
       </div>
       <div className={cn(
-        'tw-nums mt-1.5 font-mono font-semibold leading-none tracking-tight',
+        'saker-nums mt-1.5 font-mono font-semibold leading-none tracking-tight',
         size === 'lg' ? 'text-stat' : 'text-[20px]',
         valueTone[tone],
       )}>

@@ -92,9 +92,9 @@ export function OperatorProposalsCard() {
                     {proposalStatusLabel(row.status)}
                   </Badge>
                   <span className="min-w-0 truncate">{proposalScopeLabel(row)}</span>
-                  <span className="tw-nums ml-auto shrink-0 font-mono">v{row.version}</span>
+                  <span className="saker-nums ml-auto shrink-0 font-mono">v{row.version}</span>
                 </div>
-                <p className="tw-break mt-1 line-clamp-2 whitespace-pre-wrap text-[11px] leading-4 text-ink-2">
+                <p className="saker-break mt-1 line-clamp-2 whitespace-pre-wrap text-[11px] leading-4 text-ink-2">
                   {row.title}
                 </p>
               </li>
@@ -239,8 +239,8 @@ export function OperatorProposalsDialog({ onClose, onChanged }: { onClose: () =>
 
         <section aria-label="待批准提议" className="space-y-2">
           <div className="flex items-center gap-2">
-            <div className="tw-section-title">待批准</div>
-            <span className="tw-nums font-mono text-[11px] text-ink-3">{pending.length} 条</span>
+            <div className="saker-section-title">待批准</div>
+            <span className="saker-nums font-mono text-[11px] text-ink-3">{pending.length} 条</span>
             <Button size="xs" variant="ghost" className="ml-auto" onClick={() => rows.reload()} disabled={rows.loading}>
               刷新
             </Button>
@@ -276,8 +276,8 @@ export function OperatorProposalsDialog({ onClose, onChanged }: { onClose: () =>
 
         <section aria-label="待派发提议" className="space-y-2">
           <div className="flex items-center gap-2">
-            <div className="tw-section-title">待派发</div>
-            <span className="tw-nums font-mono text-[11px] text-ink-3">{approved.length} 条</span>
+            <div className="saker-section-title">待派发</div>
+            <span className="saker-nums font-mono text-[11px] text-ink-3">{approved.length} 条</span>
           </div>
           {!rows.loading && !rows.error && approved.length === 0 && (
             <p className="text-[11px] leading-4 text-ink-3">没有已批准待派发的提议：批准只生成意图，派发才起 run。</p>
@@ -297,8 +297,8 @@ export function OperatorProposalsDialog({ onClose, onChanged }: { onClose: () =>
 
         <section aria-label="已处理的提议" className="space-y-2">
           <div className="flex items-center gap-2">
-            <div className="tw-section-title">已处理</div>
-            <span className="tw-nums font-mono text-[11px] text-ink-3">{historyCount} 条</span>
+            <div className="saker-section-title">已处理</div>
+            <span className="saker-nums font-mono text-[11px] text-ink-3">{historyCount} 条</span>
             <Button
               size="xs"
               variant="ghost"
@@ -383,26 +383,26 @@ function ProposalRow({
           {proposalStatusLabel(proposal.status)}
         </Badge>
         <span>{proposalScopeLabel(proposal)}</span>
-        <span className="tw-nums font-mono">{proposalTimeLine(proposal)}</span>
+        <span className="saker-nums font-mono">{proposalTimeLine(proposal)}</span>
       </div>
-      <p className="tw-break mt-1.5 text-[12.5px] font-medium leading-relaxed text-ink">{proposal.title}</p>
-      <p className="tw-break mt-1 whitespace-pre-wrap text-[11.5px] leading-relaxed text-ink-2">
+      <p className="saker-break mt-1.5 text-[12.5px] font-medium leading-relaxed text-ink">{proposal.title}</p>
+      <p className="saker-break mt-1 whitespace-pre-wrap text-[11.5px] leading-relaxed text-ink-2">
         <span className="text-ink-3">验收：</span>
         {acceptance || '（未写验收标准）'}
       </p>
       {rationale && (
-        <p className="tw-break mt-0.5 whitespace-pre-wrap text-[11.5px] leading-relaxed text-ink-2">
+        <p className="saker-break mt-0.5 whitespace-pre-wrap text-[11.5px] leading-relaxed text-ink-2">
           <span className="text-ink-3">理由：</span>
           {rationale}
         </p>
       )}
       {premises > 0 && (
-        <p className="tw-break mt-0.5 text-[10.5px] text-ink-3">
+        <p className="saker-break mt-0.5 text-[10.5px] text-ink-3">
           必要前提 {premises} 条：{proposal.from_fact_ids?.join('、')}
         </p>
       )}
       {proposal.decided_by && (
-        <p className="tw-break mt-0.5 text-[10.5px] text-ink-3">
+        <p className="saker-break mt-0.5 text-[10.5px] text-ink-3">
           {proposalDecidedByLabel(proposal.decided_by)}处理
           {proposal.decision_note ? `：${proposal.decision_note}` : ''}
           {proposal.intent_id ? ` · 意图 ${proposal.intent_id}` : ''}

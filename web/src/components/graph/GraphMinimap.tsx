@@ -34,8 +34,8 @@ export const MINI_LONG = 168
 export const MINI_MIN = 88
 /** 最大边占画布的份额：小地图不能反客为主盖住要读的图。 */
 export const MINI_MAX_RATIO = 1 / 3
-/** 尺寸记忆：与相机（tw.graph.camera:<项目>）、右侧面板宽度同一族。 */
-export const MINI_SIZE_KEY = 'tw.graph.minimapSize'
+/** 尺寸记忆：与相机（saker.graph.camera:<项目>）、右侧面板宽度同一族。 */
+export const MINI_SIZE_KEY = 'saker.graph.minimapSize'
 const PADDING = 7
 const FRAME_INSET = 3
 /**
@@ -554,7 +554,7 @@ export function GraphMinimap({
         <span className="whitespace-nowrap text-caption font-medium text-ink-2">{size.w >= 128 ? '全图缩略' : '缩略图'}</span>
         {size.w >= 128 && (
           <span
-            className="tw-nums whitespace-nowrap font-mono text-[11px] text-ink-3"
+            className="saker-nums whitespace-nowrap font-mono text-[11px] text-ink-3"
             title="当前视口覆盖图谱外接范围的面积比例"
           >
             视口 {coveragePct}%

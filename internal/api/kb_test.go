@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/kb"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/kb"
 )
 
 // The hit list names entries and says what opening one costs, but ships no

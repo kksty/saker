@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
-	"github.com/kksty/tianwu/internal/verifier"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
+	"github.com/kksty/saker/internal/verifier"
 )
 
 // batchExec is a verifier run without a model: it optionally blocks (so the

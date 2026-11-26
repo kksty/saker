@@ -2,7 +2,7 @@ package retrieval
 
 import (
 	"fmt"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/store"
 )
 
 type HistoryPage struct {

@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 var ErrWaitInvalid = errors.New("等待条件不合法")

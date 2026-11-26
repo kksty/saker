@@ -23,20 +23,20 @@ description: 与同项目的执行者通信、读取账本事实并记录交接�
 你的身份在 case 目录的 `.tw/identity.json`：`token` 只对**本轮**有效，`api_base` 是控制面地址，
 `project_id`、`participant_id`、`run_id`、`generation` 是服务端发给你的身份。不要在 fact、
 playbook、证据、消息正文或日志里复制 token；本轮结束它就失效。`.tw/auth` 是同一凭据的一行现成
-`Authorization: Bearer …`；每个命令里 `$TW_AUTH` / `$TW_API` / `$TW_AGENT` / `$TW_BATTLE` /
-`$TW_PROJECT` / `$TW_SELF` 已经注入（本轮令牌），优先直接用，文件只在为空时兜底。
+`Authorization: Bearer …`；每个命令里 `$SAKER_AUTH` / `$SAKER_API` / `$SAKER_AGENT` / `$SAKER_BATTLE` /
+`$SAKER_PROJECT` / `$SAKER_SELF` 已经注入（本轮令牌），优先直接用，文件只在为空时兜底。
 
 控制面接口在 `${api_base}/agent/${project_id}/api`。下面的变量已经可用；为空时（非 bash 或注入失败）
 再按文件构造（Git Bash 自带 sed）：
 
 ```sh
 ID=.tw/identity.json
-BASE=${TW_API:-$(sed -n 's/.*"api_base": *"\([^"]*\)".*/\1/p' "$ID")}
-PROJECT=${TW_PROJECT:-$(sed -n 's/.*"project_id": *"\([^"]*\)".*/\1/p' "$ID")}
-API=${TW_AGENT:-$BASE/agent/$PROJECT/api}
-BATTLE=${TW_BATTLE:-$BASE/p/$PROJECT/api}
-AUTH=${TW_AUTH:-"Authorization: Bearer $(cat .tw/auth)"}
-SELF=${TW_SELF:-$(sed -n 's/.*"intent_id": *"\([^"]*\)".*/\1/p' "$ID")}
+BASE=${SAKER_API:-$(sed -n 's/.*"api_base": *"\([^"]*\)".*/\1/p' "$ID")}
+PROJECT=${SAKER_PROJECT:-$(sed -n 's/.*"project_id": *"\([^"]*\)".*/\1/p' "$ID")}
+API=${SAKER_AGENT:-$BASE/agent/$PROJECT/api}
+BATTLE=${SAKER_BATTLE:-$BASE/p/$PROJECT/api}
+AUTH=${SAKER_AUTH:-"Authorization: Bearer $(cat .tw/auth)"}
+SELF=${SAKER_SELF:-$(sed -n 's/.*"intent_id": *"\([^"]*\)".*/\1/p' "$ID")}
 ```
 
 **战场态势（只读）**：同一令牌可以读 `$BATTLE` 下的 board、意图列表、目标、证据、打法、run 列表等
@@ -45,9 +45,9 @@ SELF=${TW_SELF:-$(sed -n 's/.*"intent_id": *"\([^"]*\)".*/\1/p' "$ID")}
 `$BATTLE` 只读：动作仍走 `$API`，由服务端按你的身份限定范围；
 操作员收件箱不在只读范围里。
 
-会话还导出了 `$TW_BIN`，读命令的输出已格式化，直接读，不要再拿 python 解析：
-`"$TW_BIN" board`、`"$TW_BIN" wake`、`"$TW_BIN" facts --ids f_x`、`"$TW_BIN" changes`、`"$TW_BIN" inbox`、
-`"$TW_BIN" focus --intent in_x [--limit N --cursor C]`、`"$TW_BIN" readiness --intent in_x`。
+会话还导出了 `$SAKER_BIN`，读命令的输出已格式化，直接读，不要再拿 python 解析：
+`"$SAKER_BIN" board`、`"$SAKER_BIN" wake`、`"$SAKER_BIN" facts --ids f_x`、`"$SAKER_BIN" changes`、`"$SAKER_BIN" inbox`、
+`"$SAKER_BIN" focus --intent in_x [--limit N --cursor C]`、`"$SAKER_BIN" readiness --intent in_x`。
 输出末尾的 `truncated/dropped/has_more/next_cursor` 是分页契约：未读完时换小 `--limit` 重试，不要把截断当成全集。
 变量为空时读 `.tw/auth` 与 `.tw/identity.json`。
 

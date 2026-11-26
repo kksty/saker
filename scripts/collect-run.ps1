@@ -148,7 +148,7 @@ function New-CollectRequest([string]$dataAbs, [string]$projectDir, [string[]]$su
 
 function Invoke-Collect([string]$dataAbs, [string]$projectDir, [string[]]$submitLogs, [string]$manifestAbs, [string]$zipPath) {
     $req = New-CollectRequest $dataAbs $projectDir $submitLogs $manifestAbs
-    $stage = Join-Path ([System.IO.Path]::GetTempPath()) ("tw-collect-" + [guid]::NewGuid().ToString("N"))
+    $stage = Join-Path ([System.IO.Path]::GetTempPath()) ("saker-collect-" + [guid]::NewGuid().ToString("N"))
     New-Item -ItemType Directory -Force -Path $stage | Out-Null
     try {
         $entries = [System.Collections.Generic.List[object]]::new()
@@ -230,7 +230,7 @@ function Invoke-SelfTest {
         $script:stChecks++
         if (-not $cond) { $failures.Add($what) }
     }
-    $fixture = Join-Path ([System.IO.Path]::GetTempPath()) ("tw-collect-selftest-" + [guid]::NewGuid().ToString("N"))
+    $fixture = Join-Path ([System.IO.Path]::GetTempPath()) ("saker-collect-selftest-" + [guid]::NewGuid().ToString("N"))
     try {
         $data = Join-Path $fixture "data"
         $proj = Join-Path $data "projects/p-selftest"

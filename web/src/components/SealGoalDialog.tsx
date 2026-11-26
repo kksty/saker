@@ -59,7 +59,7 @@ export function SealGoalDialog({ goal, open, onOpenChange, onSealed, paused = tr
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <div className="tw-inset tw-break rounded-lg px-3 py-2 text-[12.5px] leading-relaxed text-ink-2">{goal?.statement}</div>
+          <div className="saker-inset saker-break rounded-lg px-3 py-2 text-[12.5px] leading-relaxed text-ink-2">{goal?.statement}</div>
           {!paused && <Callout tone="warning">请先暂停项目，再让指挥官核对并收口。</Callout>}
           {result && <div role="status"><Callout tone="warning">{result}</Callout></div>}
           {error && <div role="alert"><Callout tone="destructive">{error}</Callout></div>}

@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/retrieval"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/retrieval"
 	"net/http"
 	"os"
 	"strings"
@@ -13,11 +13,11 @@ import (
 )
 
 func configuredEmbedder() retrieval.Embedder {
-	endpoint, model := strings.TrimSpace(os.Getenv("TW_EMBEDDING_URL")), strings.TrimSpace(os.Getenv("TW_EMBEDDING_MODEL"))
+	endpoint, model := strings.TrimSpace(os.Getenv("SAKER_EMBEDDING_URL")), strings.TrimSpace(os.Getenv("SAKER_EMBEDDING_MODEL"))
 	if endpoint == "" && model == "" {
 		return nil
 	}
-	return &retrieval.HTTPEmbedder{Endpoint: endpoint, Model: model, APIKey: os.Getenv("TW_EMBEDDING_KEY")}
+	return &retrieval.HTTPEmbedder{Endpoint: endpoint, Model: model, APIKey: os.Getenv("SAKER_EMBEDDING_KEY")}
 }
 
 type trackedEmbedder struct {

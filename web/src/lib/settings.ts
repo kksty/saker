@@ -427,7 +427,7 @@ export function guardrailLLMLabel(llm?: SettingsGuardrailSummary['llm']): string
 // ---- 流量捕获保留上限（scan 节点范围，所有项目共享） ----
 //
 // One number: how much body bytes the scan node keeps in its capture directory
-// before rotating old bodies out. It is NOT a per-project quota and tianwu keeps
+// before rotating old bodies out. It is NOT a per-project quota and saker keeps
 // no project body copy of its own. The console edits MiB; the wire field is
 // bytes named traffic_body_retention_bytes; 0/absent means the generated default
 // (2 GiB) applies and is displayed as "默认 2 GiB（未显式设置）", never as 0.

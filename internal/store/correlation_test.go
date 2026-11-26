@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 func openCorrelationStore(t *testing.T) *Store {

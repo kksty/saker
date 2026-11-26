@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 // fixture builds a complete, valid report directory and returns its parts so a
@@ -529,12 +529,12 @@ func mustJSON(t *testing.T, v any) []byte {
 }
 
 // The outline is the skill's job (D92): the prompt carries the material, the
-// three artifacts and the hard invariants, then points at tianwu-report instead
+// three artifacts and the hard invariants, then points at saker-report instead
 // of restating the sections. In particular the old "覆盖表" line was a leftover
 // of the design D30 removed; the prompt must not reintroduce it.
 func TestBuildPromptDefersOutlineToSkill(t *testing.T) {
 	p := BuildPrompt(2, "https://example.test")
-	for _, want := range []string{"tianwu-report", Snapshot, Findings, IndexFile, FindingsDir, "不增、不减、不换序", "status=verified", "refs"} {
+	for _, want := range []string{"saker-report", Snapshot, Findings, IndexFile, FindingsDir, "不增、不减、不换序", "status=verified", "refs"} {
 		if !strings.Contains(p, want) {
 			t.Errorf("prompt missing %q:\n%s", want, p)
 		}

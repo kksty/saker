@@ -1,15 +1,15 @@
 {
-  "name": "tianwu",
+  "name": "saker",
   "private": true,
   "engines": {
     "node": ">=24"
   },
-  "description": "天吴控制台前端（cyber-ui）。Go 侧只用构建产物，见 web/。",
+  "description": "Saker 控制台前端（cyber-ui）。Go 侧只用构建产物，见 web/。",
   "scripts": {
-    "dev": "pnpm --filter @tianwu/web dev",
-    "build": "pnpm --filter @tianwu/web build",
-    "typecheck": "pnpm --filter @tianwu/web typecheck",
-    "test": "pnpm --filter @tianwu/web test"
+    "dev": "pnpm --filter @saker/web dev",
+    "build": "pnpm --filter @saker/web build",
+    "typecheck": "pnpm --filter @saker/web typecheck",
+    "test": "pnpm --filter @saker/web test"
   },
   "dependencies": {
     "express": "^4.22.3",

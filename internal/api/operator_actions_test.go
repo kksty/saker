@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // The operator's stamp is the final judgement and must leave a durable line:

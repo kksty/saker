@@ -92,7 +92,7 @@ export function TabBar<T extends string>({
             // control, so the panel swap happens in one commit, with no animation.
             onClick={() => onTab(item.id)}
             className={cn(
-              'min-h-[var(--tw-control-sm,32px)] shrink-0 rounded-md px-3 text-ui transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50',
+              'min-h-[var(--saker-control-sm,32px)] shrink-0 rounded-md px-3 text-ui transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50',
               active
                 ? 'bg-surface-3 font-medium text-ink shadow-soft'
                 : 'text-ink-3 hover:bg-surface-2 hover:text-ink',

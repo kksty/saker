@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/aop/operation"
-	native "github.com/kksty/tianwu/internal/aop/traffic"
+	"github.com/kksty/saker/internal/aop/operation"
+	native "github.com/kksty/saker/internal/aop/traffic"
 	"google.golang.org/protobuf/proto"
 )
 

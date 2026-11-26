@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/state"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/state"
 )
 
 // A verified handoff round is a step, not the end of the pressure cycle: it

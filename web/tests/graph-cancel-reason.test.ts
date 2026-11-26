@@ -53,7 +53,7 @@ test('the graph panel renders a held direction cancel reason', () => {
   assert.match(html, /f_rkvxog5/, 'the evidence id stays readable')
   // Label and body are stacked: side by side, a long reason is squeezed into a
   // column of six or seven characters inside the 360px panel.
-  assert.doesNotMatch(html, /tw-break[^"]*flex-1/, 'the reason owns the full width')
+  assert.doesNotMatch(html, /saker-break[^"]*flex-1/, 'the reason owns the full width')
 })
 
 test('an executor stop names the initiator role, not its raw participant id', () => {

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/collab"
+	"github.com/kksty/saker/internal/collab"
 )
 
 // Goals are operator-defined: a harness session (commander or executor) only

@@ -236,7 +236,7 @@ export function Access() {
               <SkeletonList count={1} />
             ) : inbox.error && !inbox.data ? (
               <Callout tone="warning">
-                读取授权请求失败：<span className="tw-break">{inbox.error}</span>。这不等于请求已处理。
+                读取授权请求失败：<span className="saker-break">{inbox.error}</span>。这不等于请求已处理。
               </Callout>
             ) : !focusedRequest ? (
               <div className="space-y-2">
@@ -250,7 +250,7 @@ export function Access() {
             ) : (
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="tw-break text-[13px] font-medium text-ink">
+                  <span className="saker-break text-[13px] font-medium text-ink">
                     {focusedRequest.action || '目标未达成，没有在办意图'}
                   </span>
                   {focusedRequest.generic && (
@@ -269,20 +269,20 @@ export function Access() {
                   </Callout>
                 )}
                 {(focusedRequest.asset || focusedRequest.impact) && (
-                  <div className="tw-break text-[12px] leading-relaxed text-ink-2">
+                  <div className="saker-break text-[12px] leading-relaxed text-ink-2">
                     {focusedRequest.asset && <span>资产：{focusedRequest.asset}</span>}
                     {focusedRequest.asset && focusedRequest.impact && <span className="px-1 text-ink-3">·</span>}
                     {focusedRequest.impact && <span>影响：{focusedRequest.impact}</span>}
                   </div>
                 )}
                 {focusedRequest.authorization && (
-                  <div className="tw-break text-[12px] leading-relaxed text-ink-2">
+                  <div className="saker-break text-[12px] leading-relaxed text-ink-2">
                     需要授权：{focusedRequest.authorization}
                   </div>
                 )}
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-3">
                   {focusedRequest.requested_by && <span>发起：{focusedRequest.requested_by}</span>}
-                  <span>创建 <span className="font-mono tw-nums">{fmtTime(focusedRequest.created_at)}</span></span>
+                  <span>创建 <span className="font-mono saker-nums">{fmtTime(focusedRequest.created_at)}</span></span>
                   {focusedRequest.detail_requested && <span>已请求明细</span>}
                 </div>
                 <p className="text-[11.5px] leading-relaxed text-ink-3">
@@ -308,9 +308,9 @@ export function Access() {
 
         <section aria-label="等待人工处理" className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="tw-section-title">人工操作请求</h2>
+            <h2 className="saker-section-title">人工操作请求</h2>
             <Badge size="sm" variant={pending.length > 0 ? 'warning' : 'muted'}>
-              <span className="tw-nums font-mono">{pending.length}</span>
+              <span className="saker-nums font-mono">{pending.length}</span>
             </Badge>
             <span className="ml-auto text-[11px] leading-4 text-ink-3">
               需要扫码 / 验证码时，执行者会带着现场来申请
@@ -323,7 +323,7 @@ export function Access() {
               暂时无法确认人工请求，请刷新重试。
             </Callout>
           ) : pending.length === 0 ? (
-            <div className="tw-panel flex items-start gap-3 rounded-xl px-4 py-5">
+            <div className="saker-panel flex items-start gap-3 rounded-xl px-4 py-5">
               <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" />
               <div className="min-w-0">
                 <p className="text-[13px] font-medium leading-5 text-ink">当前没有人工操作请求</p>
@@ -365,7 +365,7 @@ export function Access() {
                 最近处理过的请求里，状态与处理记录不一致
               </span>
             }
-            extra={<span className="font-mono tw-nums text-[11px] text-ink-3">{recentOverlaps.length}</span>}
+            extra={<span className="font-mono saker-nums text-[11px] text-ink-3">{recentOverlaps.length}</span>}
           >
             <ul className="divide-y divide-hairline/70" role="list">
               {recentOverlaps.map((request) => {
@@ -535,9 +535,9 @@ export function Access() {
 
         <section aria-label="登录材料" className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="tw-section-title">浏览器与已保存材料</h2>
+            <h2 className="saker-section-title">浏览器与已保存材料</h2>
             <Badge size="sm" variant="muted">
-              <span className="tw-nums font-mono">{entries.length}</span>
+              <span className="saker-nums font-mono">{entries.length}</span>
             </Badge>
             <span className="ml-auto text-[11px] leading-4 text-ink-3">
               多个浏览器可并行；相同站点不同账号需独立浏览器会话
@@ -567,7 +567,7 @@ export function Access() {
                   title={
                     <span className="flex min-w-0 flex-wrap items-center gap-2">
                       <Badge size="sm" variant="muted">{LABEL[entry.kind]}</Badge>
-                      <span className="tw-break">{entry.name}</span>
+                      <span className="saker-break">{entry.name}</span>
                     </span>
                   }
                   extra={
@@ -585,7 +585,7 @@ export function Access() {
                   }
                 >
                   {(entry.url || entry.origin) && (
-                    <p className="tw-break mb-3 font-mono text-[11px] leading-4 text-ink-3">
+                    <p className="saker-break mb-3 font-mono text-[11px] leading-4 text-ink-3">
                       {entry.url || entry.origin}
                     </p>
                   )}
@@ -628,14 +628,14 @@ export function Access() {
           {receipt && (
             // The last read page is a second confirmation surface for scanning
             // and captcha, but it is reference material: closed until asked for.
-            <details className="tw-panel rounded-xl">
+            <details className="saker-panel rounded-xl">
               <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-4 py-3 text-[12px] text-ink-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden [&[open]>svg]:rotate-180">
                 <Monitor className="h-4 w-4 shrink-0 text-ink-3" aria-hidden="true" />
-                <span className="tw-section-title">最近一次读取的浏览器页面</span>
+                <span className="saker-section-title">最近一次读取的浏览器页面</span>
                 <Badge size="sm" variant="info" className="ml-auto">已读取</Badge>
                 <ChevronDown className="h-4 w-4 shrink-0 text-ink-3 transition-transform" aria-hidden="true" />
               </summary>
-              <pre className="tw-inset tw-break max-h-48 overflow-auto whitespace-pre-wrap rounded-lg p-3 font-mono text-[11px] leading-relaxed text-ink-2">
+              <pre className="saker-inset saker-break max-h-48 overflow-auto whitespace-pre-wrap rounded-lg p-3 font-mono text-[11px] leading-relaxed text-ink-2">
                 {receipt}
               </pre>
             </details>
@@ -671,16 +671,16 @@ function OperatorCard({ item, entries, disabled, onPrepare, onComplete }: { item
     } catch (e) { setError(message(e)); onComplete() } finally { setBusy(false) }
   }
   return (
-    <article className="tw-panel overflow-hidden rounded-xl border-l-2 border-l-warning">
+    <article className="saker-panel overflow-hidden rounded-xl border-l-2 border-l-warning">
       <header className="flex flex-wrap items-center gap-2 border-b border-hairline px-4 py-3">
-        <h3 className="tw-break tw-section-title min-w-0">{item.title}</h3>
+        <h3 className="saker-break saker-section-title min-w-0">{item.title}</h3>
         <StatusIndicator compact status="pending" label="等待人工" className="ml-auto" />
       </header>
       <div className="space-y-3 p-4">
         <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-2">{item.request.request}</p>
         <div className="space-y-1">
           {linked.map(entry => (
-            <p key={entry.id} className="tw-break font-mono text-[11px] leading-4 text-ink-3">
+            <p key={entry.id} className="saker-break font-mono text-[11px] leading-4 text-ink-3">
               {entry.name}{entry.url ? ` · ${entry.url}` : ''}
             </p>
           ))}

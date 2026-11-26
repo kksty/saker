@@ -32,11 +32,11 @@ export function TokenBreakdownCard({
     <section
       data-testid="token-breakdown"
       aria-label="Token 记账"
-      className="tw-panel shrink-0 rounded-xl px-4 py-3"
+      className="saker-panel shrink-0 rounded-xl px-4 py-3"
     >
       <div className="flex flex-wrap items-center gap-2">
         <Calculator className="h-3.5 w-3.5 text-ink-3" aria-hidden="true" />
-        <span className="tw-section-title">Token 记账</span>
+        <span className="saker-section-title">Token 记账</span>
         <Badge size="sm" variant="outline">只读 · 模型上报</Badge>
         {loading && <span className="text-[11px] text-ink-3">读取中…</span>}
         <span className="ml-auto text-[11px] text-ink-3">不估算、不补零；未上报显示 —</span>
@@ -47,8 +47,8 @@ export function TokenBreakdownCard({
         {view.main.map((entry) => (
           <div key={entry.key} className="min-w-0 rounded-lg border border-hairline bg-surface-2/30 px-3 py-2">
             <div className="truncate text-[11px] leading-4 text-ink-3" title={entry.label}>{entry.label}</div>
-            <div className="tw-nums font-mono text-[16px] font-semibold leading-6 text-ink">{entry.text}</div>
-            {entry.detail && <div className="tw-nums truncate font-mono text-[10px] leading-4 text-ink-3" title={entry.detail}>{entry.detail}</div>}
+            <div className="saker-nums font-mono text-[16px] font-semibold leading-6 text-ink">{entry.text}</div>
+            {entry.detail && <div className="saker-nums truncate font-mono text-[10px] leading-4 text-ink-3" title={entry.detail}>{entry.detail}</div>}
           </div>
         ))}
       </div>
@@ -59,16 +59,16 @@ export function TokenBreakdownCard({
         {view.judge.map((entry) => (
           <span key={entry.key} className="inline-flex items-baseline gap-1" title={entry.detail || undefined}>
             <span className="text-ink-3">{entry.label}</span>
-            <span className="tw-nums font-mono font-medium text-ink">{entry.text}</span>
+            <span className="saker-nums font-mono font-medium text-ink">{entry.text}</span>
           </span>
         ))}
         <span className="inline-flex items-baseline gap-1" title={view.judgeTotal.detail || undefined}>
           <span className="text-ink-3">{view.judgeTotal.label}</span>
-          <span className="tw-nums font-mono text-ink">{view.judgeTotal.text}</span>
+          <span className="saker-nums font-mono text-ink">{view.judgeTotal.text}</span>
         </span>
         <span className="ml-auto inline-flex items-baseline gap-1.5">
           <span className="text-ink-3">全部（含裁判）</span>
-          <span className="tw-nums font-mono text-[14px] font-semibold text-ink">{view.all.text}</span>
+          <span className="saker-nums font-mono text-[14px] font-semibold text-ink">{view.all.text}</span>
         </span>
       </div>
 
@@ -96,7 +96,7 @@ export function TokenBreakdownCard({
             {[view.main[0], view.main[1], view.judgeTotal].map((entry: UsagePart) => (
               <div key={`detail-${entry.key}`} className="flex min-w-0 flex-wrap items-baseline gap-x-2">
                 <dt className="shrink-0 text-ink-3">{entry.label}</dt>
-                <dd className="tw-nums tw-break min-w-0 font-mono text-ink-2">{entry.detail || '未上报明细'}</dd>
+                <dd className="saker-nums saker-break min-w-0 font-mono text-ink-2">{entry.detail || '未上报明细'}</dd>
               </div>
             ))}
           </dl>

@@ -3,7 +3,7 @@ package settings
 import (
 	"context"
 	"encoding/json"
-	"github.com/kksty/tianwu/internal/testutil"
+	"github.com/kksty/saker/internal/testutil"
 	"net/http"
 	"os"
 	"path/filepath"

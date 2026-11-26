@@ -3,8 +3,8 @@
 // /login to the running 8080 console). Read-only: one POST /login for the
 // console cookie, then the page's own GETs. The only clicks are the left-column
 // group rows (pure front-end selection); pause/resume/rerun are never clicked.
-// Run with node scripts/acceptance/runs-ui.cjs; TW_PREVIEW_URL / TW_PROJECT /
-// TW_CHROME override the preview origin, the project route and Chrome.
+// Run with node scripts/acceptance/runs-ui.cjs; SAKER_PREVIEW_URL / SAKER_PROJECT /
+// SAKER_CHROME override the preview origin, the project route and Chrome.
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
@@ -13,9 +13,9 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '../..');
 const out = path.join(root, '.build/ui-qa');
 fs.mkdirSync(out, { recursive: true });
-const previewURL = (process.env.TW_PREVIEW_URL || 'http://127.0.0.1:5173').replace(/\/$/, '');
-// No project id is committed here; name the live project via TW_PROJECT.
-const projectID = process.env.TW_PROJECT || 'fixture';
+const previewURL = (process.env.SAKER_PREVIEW_URL || 'http://127.0.0.1:5173').replace(/\/$/, '');
+// No project id is committed here; name the live project via SAKER_PROJECT.
+const projectID = process.env.SAKER_PROJECT || 'fixture';
 const pageURL = previewURL + '/p/' + projectID + '/?view=runs';
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -49,7 +49,7 @@ function pngSize(buffer) {
   const token = fs.readFileSync(tokenFile, 'utf8').trim();
 
   // One login POST through the proxy; the console names its session cookie
-  // tw_session (cmd/tw/auth.go) and sets it with Path=/; HttpOnly.
+  // saker_session (cmd/saker/auth.go) and sets it with Path=/; HttpOnly.
   const login = await fetch(previewURL + '/login', {
     method: 'POST',
     redirect: 'manual',
@@ -61,14 +61,14 @@ function pngSize(buffer) {
       ? login.headers.getSetCookie()
       : [login.headers.get('set-cookie')].filter(Boolean);
   const pairs = rawCookies.map((c) => c.split(';')[0]);
-  const pair = pairs.find((p) => p.startsWith('tw_session=')) || pairs.find((p) => p.includes('=')) || '';
+  const pair = pairs.find((p) => p.startsWith('saker_session=')) || pairs.find((p) => p.includes('=')) || '';
   if (!pair) throw new Error('login returned no console cookie (status ' + login.status + ')');
   const cookieName = pair.slice(0, pair.indexOf('='));
   const cookieValue = pair.slice(pair.indexOf('=') + 1);
 
   const profile = fs.mkdtempSync(path.join(out, 'chrome-runs-'));
   const chrome = spawn(
-    process.env.TW_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe',
+    process.env.SAKER_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe',
     [
       '--headless=new',
       '--disable-gpu',
@@ -159,7 +159,7 @@ function pngSize(buffer) {
     await waitJS('document.body.innerText.includes("执行者与角色")', '执行者与角色');
     await waitJS('document.body.innerText.includes("次运行")', '次运行');
     await waitJS(
-      `(() => { const p = [...document.querySelectorAll('section.tw-panel')].find((s) => s.innerText.includes('执行者与角色')); return Boolean(p && p.querySelectorAll('button').length); })()`,
+      `(() => { const p = [...document.querySelectorAll('section.saker-panel')].find((s) => s.innerText.includes('执行者与角色')); return Boolean(p && p.querySelectorAll('button').length); })()`,
       '左列分组行',
     );
     // The project is paused by the auto-pause rule; the header control must show 继续项目.
@@ -172,7 +172,7 @@ function pngSize(buffer) {
     // Left rows are <button>s inside the 执行者与角色 panel; capture the three
     // lines that matter for an operator (direction / identity / latest run).
     const snap = await evalJS(`(() => {
-      const panels = [...document.querySelectorAll('section.tw-panel')];
+      const panels = [...document.querySelectorAll('section.saker-panel')];
       const left = panels.find((s) => s.innerText.includes('执行者与角色')) || null;
       const right = panels.find((s) => s.innerText.includes('事件流')) || null;
       const linesOf = (el) => el.innerText.split('\\n').map((s) => s.trim()).filter(Boolean);
@@ -240,7 +240,7 @@ function pngSize(buffer) {
     if (!executorRow) throw new Error('no executor row to click');
     const participantID = (/执行者 (pt_in_[0-9a-z]+)/.exec(executorRow.text) || [])[1] || '';
     const clicked = await evalJS(`(() => {
-      const left = [...document.querySelectorAll('section.tw-panel')].find((s) => s.innerText.includes('执行者与角色'));
+      const left = [...document.querySelectorAll('section.saker-panel')].find((s) => s.innerText.includes('执行者与角色'));
       if (!left) return false;
       const row = [...left.querySelectorAll('button')].find((b) => b.innerText.includes(${JSON.stringify(participantID)}));
       if (!row) return false;
@@ -249,12 +249,12 @@ function pngSize(buffer) {
     })()`);
     if (!clicked) throw new Error('executor group row not clickable: ' + participantID);
     await waitJS(
-      `(() => { const p = [...document.querySelectorAll('section.tw-panel')].find((s) => s.innerText.includes('事件流')); return Boolean(p && p.innerText.includes(${JSON.stringify(participantID)})); })()`,
+      `(() => { const p = [...document.querySelectorAll('section.saker-panel')].find((s) => s.innerText.includes('事件流')); return Boolean(p && p.innerText.includes(${JSON.stringify(participantID)})); })()`,
       '详情显示 ' + participantID,
     );
     await pause(700);
     const detail = await evalJS(`(() => {
-      const right = [...document.querySelectorAll('section.tw-panel')].find((s) => s.innerText.includes('事件流'));
+      const right = [...document.querySelectorAll('section.saker-panel')].find((s) => s.innerText.includes('事件流'));
       return right ? { text: right.innerText, href: location.href } : null;
     })()`);
     check('f. 点执行者组后详情显示「执行者」标签与 pt_in_', Boolean(detail && detail.text.includes('执行者') && detail.text.includes(participantID)), '详情含「执行者」与 ' + participantID, detail && detail.text.split('\n').filter((l) => l.includes('执行者') || l.includes(participantID)).slice(0, 4));

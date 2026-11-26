@@ -85,7 +85,7 @@ test('the location hook re-reads the store on subscribe and follows navigation',
   location.search = '?view=runs'
   location.hash = '#r_1'
   await act(async () => {
-    emit('tw:navigate')
+    emit('saker:navigate')
   })
   assert.equal(url?.pathname, '/p/beta/runs')
   assert.equal(url?.search, '?view=runs')

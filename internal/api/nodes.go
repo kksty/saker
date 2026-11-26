@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/host"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/host"
 )
 
 // nodeView projects configured execution locations and native scan discovery.

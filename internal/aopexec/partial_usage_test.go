@@ -3,7 +3,7 @@ package aopexec
 import (
 	"testing"
 
-	"github.com/kksty/tianwu/internal/executor"
+	"github.com/kksty/saker/internal/executor"
 )
 
 func TestCanceledTurnRetainsAllObservedCallsAndFinalTotalsDoNotDoubleCount(t *testing.T) {

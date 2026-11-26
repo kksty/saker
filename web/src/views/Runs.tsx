@@ -367,7 +367,7 @@ export function Runs({
             className="flex max-h-[min(52dvh,24rem)] min-h-0 flex-1 flex-col @3xl:max-h-none"
             bodyClassName="flex min-h-0 flex-1 flex-col p-0"
             extra={
-              <span className="tw-nums font-mono text-[11px] text-ink-3">
+              <span className="saker-nums font-mono text-[11px] text-ink-3">
                 共 {fmtInt(runs.data?.length ?? 0)} 次
               </span>
             }
@@ -471,7 +471,7 @@ export function Runs({
                               ⚠ {r.warnings!.length}
                             </span>
                           )}
-                          <span className="tw-nums ml-auto font-mono text-[11px] text-ink-3">
+                          <span className="saker-nums ml-auto font-mono text-[11px] text-ink-3">
                             {fmtDuration(r.started_at, r.ended_at)}
                           </span>
                         </div>
@@ -499,7 +499,7 @@ export function Runs({
           extra={
             current && (
               <>
-                <span className="tw-nums hidden font-mono text-[11px] text-ink-3 sm:inline">
+                <span className="saker-nums hidden font-mono text-[11px] text-ink-3 sm:inline">
                   {fmtTime(current.started_at)}
                 </span>
                 {current.status === 'running' && (
@@ -540,7 +540,7 @@ export function Runs({
               <div className="shrink-0 space-y-1.5 border-b border-hairline px-3 py-2.5">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-ink-2">
                   <StatusIndicator compact status={statusKind(current.status)} label={runStatusLabel(current)} />
-                  <span>耗时 <span className="tw-nums font-mono text-ink">{fmtDuration(current.started_at, current.ended_at)}</span></span>
+                  <span>耗时 <span className="saker-nums font-mono text-ink">{fmtDuration(current.started_at, current.ended_at)}</span></span>
                   {current.warnings?.length && !current.warnings_dismissed ? (
                     <span className="text-warning">⚠ {current.warnings.length} 条交接告警</span>
                   ) : null}
@@ -748,7 +748,7 @@ export function Runs({
                     <div className="min-w-0">
                       <div className="w-fit rounded border border-warning/25 bg-warning/12 px-1 font-medium text-warning">取消原因</div>
                       <div
-                        className="tw-break mt-1 text-[11px] leading-relaxed text-ink-2"
+                        className="saker-break mt-1 text-[11px] leading-relaxed text-ink-2"
                         title={cancelCauseText(current.cancel_cause)}
                       >
                         {runCancelReason(current)}
@@ -758,7 +758,7 @@ export function Runs({
                   {current.brief_path && (
                     <div className="flex items-center gap-1.5">
                       <span className="shrink-0 text-ink-3">任务书归档</span>
-                      <span className="tw-break min-w-0 flex-1 truncate font-mono text-[11px] text-ink-2" title={current.brief_path}>
+                      <span className="saker-break min-w-0 flex-1 truncate font-mono text-[11px] text-ink-2" title={current.brief_path}>
                         {current.brief_path}
                       </span>
                       <Button
@@ -799,7 +799,7 @@ export function Runs({
                           )}
                         </div>
                         {current.warnings!.map((w, i) => (
-                          <div key={i} className="tw-break text-[11px] leading-relaxed text-ink-2">
+                          <div key={i} className="saker-break text-[11px] leading-relaxed text-ink-2">
                             {/subagent/i.test(w) && (
                               <Badge size="sm" variant="warning" className="mr-1">
                                 原生 subagent
@@ -817,7 +817,7 @@ export function Runs({
                       </summary>
                       <div className="mt-1 space-y-1">
                         {current.infos!.map((info, i) => (
-                          <div key={i} className="tw-break text-[11px] leading-relaxed text-ink-3">
+                          <div key={i} className="saker-break text-[11px] leading-relaxed text-ink-3">
                             {info}
                           </div>
                         ))}
@@ -876,9 +876,9 @@ export function Runs({
               <RunTokenSection key={`tokens-${current.id}`} runID={current.id} />
 
               {/* Event stream: mono, timestamps in ink-3, the raw source of truth. */}
-              <div className="tw-panel-header sticky top-0 z-10 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-hairline px-3 py-2">
+              <div className="saker-panel-header sticky top-0 z-10 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-hairline px-3 py-2">
                 <h2 className="text-caption font-semibold text-ink">事件流</h2>
-                <span className="tw-nums font-mono text-[11px] text-ink-3">{events.length} 条</span>
+                <span className="saker-nums font-mono text-[11px] text-ink-3">{events.length} 条</span>
                 {locateNote ? (
                   <span className={`text-[11px] ${locateNote.tone === 'warning' ? 'text-warning' : 'text-primary'}`}>{locateNote.text}</span>
                 ) : reviewFocus !== null ? (
@@ -886,7 +886,7 @@ export function Runs({
                 ) : null}
                 <span className="ml-auto text-[11px] text-ink-3">每 3 秒刷新</span>
               </div>
-              <ScrollArea className="tw-run-stream min-h-0 @3xl:min-h-40 @3xl:flex-1">
+              <ScrollArea className="saker-run-stream min-h-0 @3xl:min-h-40 @3xl:flex-1">
                 <div ref={streamRef} className="space-y-0.5 p-2">
                   {error && <Callout tone="destructive">{error}</Callout>}
                   {eventRun === selected && eventError && eventMissing && (
@@ -905,7 +905,7 @@ export function Runs({
                       </div>
                       <details className="mt-1">
                         <summary className="cursor-pointer text-[11px] text-ink-3 hover:text-ink">错误详情</summary>
-                        <div className="tw-break mt-1 font-mono text-[11px] text-ink-3">{eventError}</div>
+                        <div className="saker-break mt-1 font-mono text-[11px] text-ink-3">{eventError}</div>
                       </details>
                     </Callout>
                   )}

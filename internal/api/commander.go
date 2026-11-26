@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/decider"
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/decider"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/model"
 )
 
 // recentAction is one successful ledger mutation, recorded by the API handler
@@ -145,7 +145,7 @@ func (s *Server) CommanderHeader() string {
 		id = s.Project.ID
 	}
 	base := s.apiBase()
-	return fmt.Sprintf("- 项目：`%s`\n- 控制面：`%s`\n- 令牌与地址已在每个命令里就绪：`$TW_AUTH`（一行 `Authorization: Bearer …`）、`$TW_BATTLE`（战场与笔记基址）、`$TW_AGENT`（参与者基址）、`$TW_API`（控制面地址）、`$TW_PROJECT`、`$TW_BIN`（tw 可执行文件绝对路径）；直接用。为空时用 `$(cat .tw/auth)` 与 `.tw/identity.json` 兜底\n- 读状态优先用原生只读命令（输出已是给模型读的格式化文本，**不得再用 python 解析**）：`\"$TW_BIN\" board`、`\"$TW_BIN\" wake`、`\"$TW_BIN\" facts --ids f_x`；写操作仍用 API/curl\n- 原始接口兜底：读 `$TW_BATTLE/board`，请求头用 `$TW_AUTH`；笔记是 `$TW_BATTLE/state`\n- 署名：控制面按令牌归属，写操作不必自己加署名头\n- 会话目录：`%s`",
+	return fmt.Sprintf("- 项目：`%s`\n- 控制面：`%s`\n- 令牌与地址已在每个命令里就绪：`$SAKER_AUTH`（一行 `Authorization: Bearer …`）、`$SAKER_BATTLE`（战场与笔记基址）、`$SAKER_AGENT`（参与者基址）、`$SAKER_API`（控制面地址）、`$SAKER_PROJECT`、`$SAKER_BIN`（saker 可执行文件绝对路径）；直接用。为空时用 `$(cat .tw/auth)` 与 `.tw/identity.json` 兜底\n- 读状态优先用原生只读命令（输出已是给模型读的格式化文本，**不得再用 python 解析**）：`\"$SAKER_BIN\" board`、`\"$SAKER_BIN\" wake`、`\"$SAKER_BIN\" facts --ids f_x`；写操作仍用 API/curl\n- 原始接口兜底：读 `$SAKER_BATTLE/board`，请求头用 `$SAKER_AUTH`；笔记是 `$SAKER_BATTLE/state`\n- 署名：控制面按令牌归属，写操作不必自己加署名头\n- 会话目录：`%s`",
 		id, base, s.CommanderDir())
 }
 
@@ -202,7 +202,7 @@ func (s *Server) failCommanderRun(runID, reason string) {
 }
 
 // commanderIdentity returns the commander session's credential, reusing it while
-// the same harness session continues. The shell init exports TW_AUTH once per
+// the same harness session continues. The shell init exports SAKER_AUTH once per
 // shell, so a per-round rotation would leave a long-lived shell on a stale token;
 // a per-session credential stays valid and is revoked when a replacement session
 // starts. A process restart has an empty registry, so the next round reissues.
@@ -211,9 +211,9 @@ func (s *Server) commanderIdentity(runID string, resume bool) (collab.Identity, 
 	defer s.commanderMu.Unlock()
 	if resume && s.commanderIdent != nil {
 		if _, ok := s.Collab.Resolve(s.commanderIdent.Token); ok {
-			// Keep the token so the shell init's $TW_AUTH stays valid, but move
+			// Keep the token so the shell init's $SAKER_AUTH stays valid, but move
 			// its run binding to this round: messages and audit events sent
-			// through $TW_AGENT belong to the live round, not the first one.
+			// through $SAKER_AGENT belong to the live round, not the first one.
 			if s.Collab.Adopt(s.commanderIdent.Token, runID, s.commanderIdent.Generation) {
 				s.commanderIdent.RunID = runID
 				return *s.commanderIdent, nil
@@ -352,7 +352,7 @@ func (s *Server) StartCommander(ctx context.Context, prompt string, resume bool)
 	// agent token: every harness session on a host inherits that token, and an
 	// executor holding it could otherwise read or rewrite state.md. The credential
 	// is a per-session commander identity (the same mechanism executors use),
-	// written into the session case; the shell init exports it as TW_AUTH.
+	// written into the session case; the shell init exports it as SAKER_AUTH.
 	if s.Collab != nil && s.Project != nil && strings.TrimSpace(s.CaseRoot) != "" {
 		ident, ierr := s.commanderIdentity(run.ID, resume)
 		if ierr == nil {
@@ -452,7 +452,7 @@ func (s *Server) StartCommander(ctx context.Context, prompt string, resume bool)
 	}
 	// Queued peer/executor messages ride this round: the commander session gets
 	// one user message per wake, so a second turn just for a message would run
-	// without a board. The inbox section has its own row/byte caps; Tianwu does
+	// without a board. The inbox section has its own row/byte caps; Saker does
 	// not shrink it against a window (the harness owns feasibility, compaction
 	// and the structured context-limit error — D152 revised).
 	// A closed engagement can still be woken by an operator message. Say so

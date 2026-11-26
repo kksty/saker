@@ -36,7 +36,7 @@ dialog::backdrop {
 }
 /* The shell's first tab stop: off-screen until focused, then a real control.
    Tokens only — the palette and type ramp are untouched. */
-.tw-skip-link {
+.saker-skip-link {
   position: fixed;
   left: max(0.75rem, env(safe-area-inset-left, 0px));
   top: -100vh;
@@ -50,7 +50,7 @@ dialog::backdrop {
   line-height: 20px;
   box-shadow: var(--shadow-elevated, 0 10px 30px rgb(0 0 0 / 0.25));
 }
-.tw-skip-link:focus {
+.saker-skip-link:focus {
   top: max(0.75rem, env(safe-area-inset-top, 0px));
   outline: 2px solid var(--ring);
   outline-offset: 2px;
@@ -58,9 +58,9 @@ dialog::backdrop {
 `
 
 function installProgressiveStyles(): void {
-  if (typeof document === 'undefined' || document.getElementById('tw-progressive-css')) return
+  if (typeof document === 'undefined' || document.getElementById('saker-progressive-css')) return
   const style = document.createElement('style')
-  style.id = 'tw-progressive-css'
+  style.id = 'saker-progressive-css'
   style.textContent = PROGRESSIVE_CSS
   document.head.append(style)
 }

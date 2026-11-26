@@ -6,7 +6,7 @@ package metrics
 // definition string, and says explicitly when the available structured data
 // cannot support it (unavailable reason) instead of substituting a keyword guess.
 //
-// The functions here are pure: the caller (cmd/tw-metrics) does all file IO and
+// The functions here are pure: the caller (cmd/saker-metrics) does all file IO and
 // passes a Snapshot. That keeps the unit tests off the real data directory and
 // makes "source data zero writes" a property of the caller, testable in isolation.
 //
@@ -25,9 +25,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 // SchemaVersion is the stable output contract of Compute. Bump it when a metric

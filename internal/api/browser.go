@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/access"
-	"github.com/kksty/tianwu/internal/aop"
-	"github.com/kksty/tianwu/internal/executor"
+	"github.com/kksty/saker/internal/access"
+	"github.com/kksty/saker/internal/aop"
+	"github.com/kksty/saker/internal/executor"
 )
 
 type browserControl struct {
@@ -190,7 +190,7 @@ func (s *Server) runBrowserCommand(ctx context.Context, entry access.Entry, line
 		if err != nil {
 			return "", err
 		}
-		session, err := conn.OpenSession(ctx, agentID, "tianwu browser: "+entry.ID, dir)
+		session, err := conn.OpenSession(ctx, agentID, "saker browser: "+entry.ID, dir)
 		if err != nil {
 			return "", err
 		}

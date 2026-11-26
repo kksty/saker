@@ -157,7 +157,7 @@ const GroupCard = memo(function GroupCard({ group, events, runID, sessionID, ope
                 {guardrailEvent ? (
                   <GuardrailEventRow event={event} sessionID={sessionID} />
                 ) : (
-                  <pre className="tw-break whitespace-pre-wrap text-[12px] leading-relaxed text-ink-2">{event.text || ''}</pre>
+                  <pre className="saker-break whitespace-pre-wrap text-[12px] leading-relaxed text-ink-2">{event.text || ''}</pre>
                 )}
                 {mediaPath && (
                   <div className="mt-2">
@@ -170,7 +170,7 @@ const GroupCard = memo(function GroupCard({ group, events, runID, sessionID, ope
                     <div className="mt-2 text-xs text-ink-3">
                       {event.kind === 'tool_call' ? '工具参数（解码）' : '原始事件 / 返回'}
                     </div>
-                    <pre className="tw-break whitespace-pre-wrap text-[11px] text-ink-3">
+                    <pre className="saker-break whitespace-pre-wrap text-[11px] text-ink-3">
                       {JSON.stringify(event.kind === 'tool_call' ? eventArguments(event) : event.raw, null, 2)}
                     </pre>
                   </>

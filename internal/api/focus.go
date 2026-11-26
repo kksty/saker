@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kksty/tianwu/internal/retrieval"
+	"github.com/kksty/saker/internal/retrieval"
 )
 
 // focusPage is the read side of the focus projection. It is a query view over

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 func TestIdleGuardDoesNotHoldOrCancelReplacementForStaleRun(t *testing.T) {

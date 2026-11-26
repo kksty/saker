@@ -3,8 +3,8 @@ package decider
 import (
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 // completeGoal stamps a goal with one reviewable, currently proven fact. The

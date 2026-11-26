@@ -1,5 +1,5 @@
 #!/usr/bin/env pwsh
-# Run Tianwu from source on Windows (no build step required).
+# Run Saker from source on Windows (no build step required).
 #   ./run.ps1                      # default addr/data
 #   ./run.ps1 -Harness "C:\path\cyber-harness.exe" -Scan "C:\path\cyber-scan.exe"
 #   ./run.ps1 -Project acme-web    # open one project
@@ -20,11 +20,11 @@ if (-not $go) {
   else { throw "go not found. Install Go 1.26+ (winget install GoLang.Go)." }
 }
 
-$goArgs = @("run", "./cmd/tw", "--addr", $Addr, "--data", $Data)
+$goArgs = @("run", "./cmd/saker", "--addr", $Addr, "--data", $Data)
 if ($Project -ne "") { $goArgs += @("--project", $Project) }
 if ($Harness -ne "") { $goArgs += @("--harness", $Harness) }
 if ($Scan -ne "") { $goArgs += @("--scan", $Scan) }
 if ($Timeout -ne "") { $goArgs += @("--timeout", $Timeout) }
 
-Write-Host "tianwu -> http://$Addr" -ForegroundColor Red
+Write-Host "Saker -> http://$Addr" -ForegroundColor Red
 & go @goArgs

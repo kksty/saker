@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // RegisterOperatorWait persists a business yield before the API interrupts

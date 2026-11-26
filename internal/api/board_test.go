@@ -2,14 +2,14 @@ package api
 
 import (
 	"encoding/json"
-	"github.com/kksty/tianwu/internal/testutil"
+	"github.com/kksty/saker/internal/testutil"
 	"net/http"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 // The overview's guard panel reads board.guard: the watchdog must publish its

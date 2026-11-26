@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # Thin local-gate entry for Linux/macOS.
 #
-# All checks live in cmd/tw-gate (one implementation shared with scripts/gate.ps1),
+# All checks live in cmd/saker-gate (one implementation shared with scripts/gate.ps1),
 # so Linux and Windows run exactly the same list. This script only locates the
 # repository root, runs the gate and forwards its arguments and exit code.
 #
@@ -20,4 +20,4 @@ command -v go >/dev/null 2>&1 || {
 }
 
 cd "$root"
-exec go run ./cmd/tw-gate "$@"
+exec go run ./cmd/saker-gate "$@"

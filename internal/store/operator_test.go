@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 func operatorStore(t *testing.T) (*Store, model.Intent) {

@@ -49,7 +49,7 @@ Thumbs.db
 /data/kb/candidates/
 /data/kb/builtin/
 
-# 构建产物与运行日志（tw 可执行文件、gate 临时 bin、启动日志）
+# 构建产物与运行日志（saker 可执行文件、gate 临时 bin、启动日志）
 /_build-artifacts/
 
 # 本机 agent 指令文件（harness 读取，不是随仓库发布的文档），不同机器内容不同

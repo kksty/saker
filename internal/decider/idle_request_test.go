@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/board"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/board"
+	"github.com/kksty/saker/internal/model"
 )
 
 // The automatic fallback request is only for "goal open + work attempted +

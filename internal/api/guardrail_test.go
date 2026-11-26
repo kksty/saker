@@ -16,14 +16,14 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/kksty/tianwu/internal/aop/guardrail"
-	"github.com/kksty/tianwu/internal/aop/operation"
-	pb "github.com/kksty/tianwu/internal/aop/pb"
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
-	"github.com/kksty/tianwu/internal/testutil"
-	"github.com/kksty/tianwu/internal/ws"
+	"github.com/kksty/saker/internal/aop/guardrail"
+	"github.com/kksty/saker/internal/aop/operation"
+	pb "github.com/kksty/saker/internal/aop/pb"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
+	"github.com/kksty/saker/internal/testutil"
+	"github.com/kksty/saker/internal/ws"
 )
 
 // guardrailHub is a minimal AOP application server for the guardrail namespace.

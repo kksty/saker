@@ -260,7 +260,7 @@ func cloneMCPServer(server MCPServer) MCPServer {
 // combined save.
 func (s *Store) ValidateProduct(in ProductInput) error {
 	if s.harness == "" {
-		return fmt.Errorf("没有 harness 配置路径：设置 TW_HARNESS_CONFIG")
+		return fmt.Errorf("没有 harness 配置路径：设置 SAKER_HARNESS_CONFIG")
 	}
 	if in.MCPServers == nil && strings.TrimSpace(in.SearchKey) == "" && !in.ClearSearchKey {
 		return nil
@@ -338,7 +338,7 @@ func equalMCPServers(a, b map[string]MCPServer) bool {
 // write back the other's stale view.
 func (s *Store) SaveProduct(in ProductInput) error {
 	if s.harness == "" {
-		return fmt.Errorf("没有 harness 配置路径：设置 TW_HARNESS_CONFIG")
+		return fmt.Errorf("没有 harness 配置路径：设置 SAKER_HARNESS_CONFIG")
 	}
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()

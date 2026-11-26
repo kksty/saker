@@ -3,7 +3,7 @@ package api
 import (
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // A human verdict must land on the assertion the operator actually looked at.

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 func noteStore(t *testing.T) *Store {

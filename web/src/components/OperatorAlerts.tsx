@@ -37,7 +37,7 @@ export function OperatorAlerts({projectID}:{projectID:string}) {
         const latest=incoming[incoming.length-1]!
         if(latest.seq>notified.current){
           notified.current=latest.seq;setDismissed(false)
-          if(typeof Notification!=='undefined'&&Notification.permission==='granted'&&document.hidden){const n=new Notification('天吴：收到操作员消息',{body:latest.text.slice(0,140),tag:`tw:${projectID}`});n.onclick=()=>{window.focus();navigate(`${window.location.pathname}?view=messages`);n.close()}}
+          if(typeof Notification!=='undefined'&&Notification.permission==='granted'&&document.hidden){const n=new Notification('Saker：收到操作员消息',{body:latest.text.slice(0,140),tag:`saker:${projectID}`});n.onclick=()=>{window.focus();navigate(`${window.location.pathname}?view=messages`);n.close()}}
         }
       }catch{/* Keep unread state; the next poll retries the same cursor. */}finally{busy=false}
     }
@@ -46,8 +46,8 @@ export function OperatorAlerts({projectID}:{projectID:string}) {
     // it. Coming back to the tab refreshes immediately so nothing is missed.
     const onVisible=()=>{if(document.visibilityState==='visible')void poll()}
     window.addEventListener('visibilitychange',onVisible)
-    window.addEventListener('tw:operator-messages-read',markRead)
-    return()=>{active=false;window.clearInterval(timer);window.removeEventListener('visibilitychange',onVisible);window.removeEventListener('tw:operator-messages-read',markRead)}
+    window.addEventListener('saker:operator-messages-read',markRead)
+    return()=>{active=false;window.clearInterval(timer);window.removeEventListener('visibilitychange',onVisible);window.removeEventListener('saker:operator-messages-read',markRead)}
   },[projectID])
   useEffect(()=>{
     const decorate=()=>{const base=document.title.replace(/^\(\d+\) /,'');const next=unread.length?`(${unread.length}) ${base}`:base;if(document.title!==next)document.title=next}

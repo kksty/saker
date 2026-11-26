@@ -20,9 +20,9 @@ type killCall struct {
 func sweepWith(t *testing.T, procs []procInfo, dataDir string, dry bool) (OrphanSweep, []killCall, *testLog) {
 	t.Helper()
 	if dry {
-		t.Setenv("TW_HOST_CLEANUP", "dry")
+		t.Setenv("SAKER_HOST_CLEANUP", "dry")
 	} else {
-		t.Setenv("TW_HOST_CLEANUP", "")
+		t.Setenv("SAKER_HOST_CLEANUP", "")
 	}
 	var (
 		mu    sync.Mutex

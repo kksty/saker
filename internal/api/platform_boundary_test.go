@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/platform"
+	"github.com/kksty/saker/internal/platform"
 )
 
 // boundaryOnMux fetches the boundary document from a mux built exactly like the

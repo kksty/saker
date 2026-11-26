@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/testutil"
+	"github.com/kksty/saker/internal/testutil"
 )
 
 const testAPIKey = "sk-test-abcdef0123456789"

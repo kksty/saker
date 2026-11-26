@@ -1,6 +1,6 @@
 package retrieval
 
-import "github.com/kksty/tianwu/internal/store"
+import "github.com/kksty/saker/internal/store"
 
 // TaskSources follows recorded provenance, including joint prerequisites. It
 // does not infer an entity or choose a tactical direction from prose.

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/executor"
+	"github.com/kksty/saker/internal/executor"
 )
 
 // captureCredentialExec records what the reviewer's work dir and brief looked
@@ -65,7 +65,7 @@ func TestReviewRunGetsAReadOnlyCredentialForItsOwnLifetime(t *testing.T) {
 	if ex.authErr != nil {
 		t.Fatalf("reviewer could not read .tw/auth: %v", ex.authErr)
 	}
-	// Exactly the line the shell contract documents for $TW_AUTH.
+	// Exactly the line the shell contract documents for $SAKER_AUTH.
 	if ex.auth != "Authorization: Bearer tok-read\n" {
 		t.Fatalf(".tw/auth = %q", ex.auth)
 	}
@@ -79,7 +79,7 @@ func TestReviewRunGetsAReadOnlyCredentialForItsOwnLifetime(t *testing.T) {
 	}
 	// The brief has to name the surface, or the credential is invisible to the
 	// model and every review ends in needs_evidence.
-	if !strings.Contains(ex.prompt, "$TW_BATTLE") || !strings.Contains(ex.prompt, "/evidence/{id}") {
+	if !strings.Contains(ex.prompt, "$SAKER_BATTLE") || !strings.Contains(ex.prompt, "/evidence/{id}") {
 		t.Errorf("review brief does not name the read-only surface")
 	}
 

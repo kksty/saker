@@ -6,11 +6,11 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 
-	pb "github.com/kksty/tianwu/internal/aop/pb"
+	pb "github.com/kksty/saker/internal/aop/pb"
 )
 
 // evalDetailExtensionURL is the harness evaluator's detail extension on status
-// events (state eval_start / eval_end / eval_error). tianwu decodes the five
+// events (state eval_start / eval_end / eval_error). saker decodes the five
 // declared fields by hand instead of linking the harness module just for this
 // message: the wire format is stable and the harness validates the real proto on
 // its side. An unknown or absent extension leaves the status event untouched,

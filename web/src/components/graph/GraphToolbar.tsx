@@ -56,8 +56,8 @@ export interface GraphToolbarProps {
   onToggleHoverPreview: () => void
 }
 
-const BOX = 'tw-graph-tool shrink-0'
-const ICON = 'tw-graph-tool-icon shrink-0'
+const BOX = 'saker-graph-tool shrink-0'
+const ICON = 'saker-graph-tool-icon shrink-0'
 /**
  * 选中态：淡色底 + 主色图标。不用 `Button` 的 `active`（它是 `bg-primary/10`，在深色
  * 底上仍是一块红板），这里按同一套语义自己给一层更淡的底，`aria-pressed` 照旧。
@@ -186,7 +186,7 @@ export function GraphViewPanel({
 
 function ZoomPercent() {
   const zoom = useZoomPercent()
-  return <span className="tw-graph-zoom tw-nums text-center font-mono text-caption text-ink-2" aria-label={`缩放比例 ${zoom}%`}>{zoom}%</span>
+  return <span className="saker-graph-zoom saker-nums text-center font-mono text-caption text-ink-2" aria-label={`缩放比例 ${zoom}%`}>{zoom}%</span>
 }
 
 export function GraphToolbar({
@@ -209,14 +209,14 @@ export function GraphToolbar({
 }: GraphToolbarProps) {
   return (
     <div
-      className="tw-graph-corner-tr tw-graph-toolbar absolute z-20 flex items-center gap-1 rounded-xl border border-hairline bg-card/95 p-1 shadow-lifted backdrop-blur"
+      className="saker-graph-corner-tr saker-graph-toolbar absolute z-20 flex items-center gap-1 rounded-xl border border-hairline bg-card/95 p-1 shadow-lifted backdrop-blur"
       role="toolbar"
       aria-label="图谱视图控件"
     >
       <Button
         size="icon-sm"
         variant="ghost"
-        className={`tw-graph-tool-text ${BOX} ${chatDock ? ON : ''}`}
+        className={`saker-graph-tool-text ${BOX} ${chatDock ? ON : ''}`}
         aria-pressed={chatDock}
         title="下发：打开通信页的下发入口（右侧面板）"
         aria-label="下发"
@@ -273,7 +273,7 @@ export function GraphToolbar({
           <Button
             size="icon-sm"
             variant="ghost"
-            className={`tw-graph-tool-text ${BOX}`}
+            className={`saker-graph-tool-text ${BOX}`}
             title="视图：布局、标签、列表、时间轴与悬停预览"
             aria-label="视图"
           >

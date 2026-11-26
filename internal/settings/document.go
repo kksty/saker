@@ -10,7 +10,7 @@ import (
 
 func (s *Store) readDocument() (*yaml.Node, *yaml.Node, error) {
 	if s.harness == "" {
-		return nil, nil, errors.New("没有 harness 配置路径：设置 TW_HARNESS_CONFIG")
+		return nil, nil, errors.New("没有 harness 配置路径：设置 SAKER_HARNESS_CONFIG")
 	}
 	root := &yaml.Node{Kind: yaml.DocumentNode}
 	data, err := os.ReadFile(s.harness)

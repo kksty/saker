@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 const danglingEvidenceID = "e_doesnotexist000000000000000000"

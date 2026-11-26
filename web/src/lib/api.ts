@@ -1,6 +1,6 @@
 // One thin client over the HTTP API. Two namespaces, exactly as the server
 // mounts them: instance-level endpoints (/api/projects, /api/vulns, …) and the
-// project namespace (/p/<id>/api/…). See cmd/tw/hub.go and internal/api/api.go.
+// project namespace (/p/<id>/api/…). See cmd/saker/hub.go and internal/api/api.go.
 
 import { decodeLocationPart, locationPath } from './navigation.ts'
 import { focusSearchParams } from './focus.ts'
@@ -481,7 +481,8 @@ export const api = {
     ),
   // Whole-project transfer. Export refuses a running project server-side: the
   // archive must describe one committed state, so the button first tells the
-  // operator to pause. Import is an upload of the .twproj file.
+  // operator to pause. Import is an upload of the .sakerproj file (or a legacy
+  // .twproj archive, which the server still accepts).
   exportProject: (id: string) =>
     post<ProjectExportResult>(`/api/projects/${encodeURIComponent(id)}/export`),
   projectExportURL: (name: string) => `/api/exports/${encodeURIComponent(name)}`,

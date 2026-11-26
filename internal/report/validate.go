@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 // Validate checks a finished report against the invariants that make it
@@ -325,7 +325,7 @@ func readFindings(dir string) ([]Finding, error) {
 
 // BuildPrompt is the whole brief of a report run. It carries the material, the
 // three artifacts and the hard invariants — the ones the code also checks.
-// The outline (sections, order, wording, length) lives in the tianwu-report
+// The outline (sections, order, wording, length) lives in the saker-report
 // skill, which travels into the same turn prompt; restating it here is how the
 // two drift apart, and the old "覆盖表" line was a leftover of a design D30
 // already removed (D92).
@@ -345,7 +345,7 @@ func BuildPrompt(findings int, scope string) string {
 	}
 
 	b.WriteString("## 产物\n")
-	b.WriteString("按技能 tianwu-report 的体例写这三个文件：" + Findings + "、" + IndexFile + "、" +
+	b.WriteString("按技能 saker-report 的体例写这三个文件：" + Findings + "、" + IndexFile + "、" +
 		FindingsDir + "/<fact>.md；章节、顺序、写法、篇幅都按该技能执行，不增、不减、不换序。\n\n")
 
 	b.WriteString("## 硬约束\n")

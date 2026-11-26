@@ -5,9 +5,9 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 func (s *Server) registerActions(mux *http.ServeMux) {
@@ -111,7 +111,7 @@ func (s *Server) resolveAction(w http.ResponseWriter, r *http.Request) {
 	// callers keep working; the header is for a client that wants to tell the two
 	// apart.
 	if duplicate {
-		w.Header().Set("X-Tianwu-Duplicate-Result", "1")
+		w.Header().Set("X-Saker-Duplicate-Result", "1")
 	}
 	writeJSON(w, 200, out)
 	// No commander wake: only explicitly registered waits become ready.

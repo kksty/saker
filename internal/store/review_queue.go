@@ -12,7 +12,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // ReviewEligible decides what belongs in the automatic review queue: the same

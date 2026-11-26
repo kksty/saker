@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 func ValidatePattern(p *model.ExperiencePattern) error {

@@ -7,8 +7,8 @@
 package guardrail
 
 import (
-	aop "github.com/kksty/tianwu/internal/aop/pb"
-	operation "github.com/kksty/tianwu/internal/aop/operation"
+	aop "github.com/kksty/saker/internal/aop/pb"
+	operation "github.com/kksty/saker/internal/aop/operation"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"

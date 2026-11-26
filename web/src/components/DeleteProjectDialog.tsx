@@ -73,7 +73,7 @@ export function DeleteProjectDialog({ project, onClose, onDeleted }: {
         {pending ? (
           <div className="space-y-3" role="status">
             <div role="progressbar" aria-label="项目删除进度" aria-valuetext="正在处理，等待服务器确认" className="h-1.5 overflow-hidden rounded-full bg-surface-2">
-              <div className="tw-progress-indeterminate h-full w-1/3 rounded-full bg-primary" />
+              <div className="saker-progress-indeterminate h-full w-1/3 rounded-full bg-primary" />
             </div>
             <p className="text-[12px] leading-relaxed text-ink-3">运行收尾可能需要一些时间，完成后会自动更新。请保持此窗口打开。</p>
           </div>

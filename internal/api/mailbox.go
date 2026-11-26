@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/aopexec"
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/aopexec"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/model"
 )
 
 // The commander's inbox is the same message service the executors use, with one
@@ -341,7 +341,7 @@ func (s *Server) sweepMessages() {
 }
 
 // actorOf resolves who is speaking on the console API. The gate stamps
-// X-Tw-Actor from the agent token (cmd/tw auth.wrap), so a harness write is
+// X-Tw-Actor from the agent token (cmd/saker auth.wrap), so a harness write is
 // attributed to the commander even when the model forgets the header; a request
 // on the operator credential stays the operator. The header remains a claim
 // about the speaker, not a second security boundary; it exists so a say from the

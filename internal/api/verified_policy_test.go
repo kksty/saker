@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/evidence"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/project"
-	"github.com/kksty/tianwu/internal/verifier"
+	"github.com/kksty/saker/internal/evidence"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/project"
+	"github.com/kksty/saker/internal/verifier"
 )
 
 func proofPolicyFixture(t *testing.T) (*Server, *project.Project, model.Fact, *reviewProbeExec) {

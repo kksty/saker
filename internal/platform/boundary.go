@@ -100,7 +100,7 @@ type BoundaryReport struct {
 
 // BoundarySchema versions the response shape. It is a read-only status document
 // and is not part of the ledger schema.
-const BoundarySchema = "tianwu.platform-boundary.v1"
+const BoundarySchema = "saker.platform-boundary.v1"
 
 // Report builds the boundary document for one target platform.
 func Report(goos, goarch string) BoundaryReport {

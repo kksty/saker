@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // A retried "append a goal and continue" request must find the goal it already

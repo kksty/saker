@@ -148,7 +148,7 @@ export function GraphResizeHandle({ resize, label, testId }: {
       aria-label={`${label}：拖动调整大小，方向键微调，Home 恢复默认`}
       title="拖动调整大小 · 方向键微调 · Home 恢复默认"
       data-testid={testId}
-      className={`tw-graph-grip pointer-events-auto absolute z-10 grid h-6 w-6 touch-none select-none place-items-center text-ink-3 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring ${corners[resize.corner].className}`}
+      className={`saker-graph-grip pointer-events-auto absolute z-10 grid h-6 w-6 touch-none select-none place-items-center text-ink-3 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring ${corners[resize.corner].className}`}
       tabIndex={0}
     >
       <svg viewBox="0 0 16 16" aria-hidden="true" className={`size-4 ${resize.corner === 'top-left' ? 'rotate-180' : ''}`}>

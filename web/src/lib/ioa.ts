@@ -265,7 +265,7 @@ export function resolveEndpoint(id: string, maps: RecordMaps): Endpoint {
 
 /**
  * Which IOA nodes belong to the control plane? Every injected message is
- * formatted by tianwu before it is sent — peer messages get `[collab]`, console
+ * formatted by saker before it is sent — peer messages get `[collab]`, console
  * deliveries `[消息]`, ledger notices `[机械通知]` — so a record carrying one of
  * those headers identifies a candidate transport node. The address alone does
  * not say which participant ultimately received a reply.
@@ -280,7 +280,7 @@ export function buildRecordMaps(
     if (!rec.sender) continue
     const text = typeof rec.content?.text === 'string' ? rec.content.text : ''
     // The prefix check keeps the old behaviour for a malformed `[collab]` (it is
-    // still tianwu's marker); the parser adds the two other forms.
+    // still saker's marker); the parser adds the two other forms.
     if (parseRecordText(text).header !== null || text.startsWith(COLLAB_PREFIX)) controlNodes.add(rec.sender)
   }
   return { sessions, participants, controlNodes }

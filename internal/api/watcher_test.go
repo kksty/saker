@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/decider"
-	"github.com/kksty/tianwu/internal/ledger"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/decider"
+	"github.com/kksty/saker/internal/ledger"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 // The live watcher adds the same row the finish path later settles. A summary

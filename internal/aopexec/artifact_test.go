@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	pb "github.com/kksty/tianwu/internal/aop/pb"
-	"github.com/kksty/tianwu/internal/aop/tool"
+	pb "github.com/kksty/saker/internal/aop/pb"
+	"github.com/kksty/saker/internal/aop/tool"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 

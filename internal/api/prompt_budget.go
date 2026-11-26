@@ -6,7 +6,7 @@ package api
 // compaction and overflow recovery: it reports the resolved window and the
 // context size it measured (usage.detail.context_window / context_tokens,
 // compact_end), refuses a request that cannot fit, and compacts once on an
-// overflow before failing. Tianwu does not predict any of that.
+// overflow before failing. Saker does not predict any of that.
 //
 // What remains here is only reuse of the harness's own numbers:
 //   - continuationHistoryTokens: the post-compaction context size the harness
@@ -21,7 +21,7 @@ package api
 import (
 	"strings"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // continuationHistoryTokens is what a continued session already holds, as

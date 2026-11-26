@@ -95,5 +95,5 @@ test('the expander still counts rows, not the inbox total', () => {
     total: 9,
   }))
   assert.match(html, /展开全部/)
-  assert.match(html, /还有\s*<span class="font-mono tw-nums">1<\/span>/)
+  assert.match(html, /还有\s*<span class="font-mono saker-nums">1<\/span>/)
 })

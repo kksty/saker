@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	pb "github.com/kksty/tianwu/internal/aop/pb"
-	"github.com/kksty/tianwu/internal/executor"
+	pb "github.com/kksty/saker/internal/aop/pb"
+	"github.com/kksty/saker/internal/executor"
 )
 
 func mediaContent(kind, mimeType, filename string, data []byte) *pb.Content {

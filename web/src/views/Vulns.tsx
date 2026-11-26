@@ -462,7 +462,7 @@ export function Vulns({
     >
       {reviewsDisabled && (
         <Callout tone="warning" className="mb-3" icon={<ShieldOff className="h-4 w-4" />}>
-          <span className="tw-break">{REVIEWS_DISABLED_NOTE}</span>
+          <span className="saker-break">{REVIEWS_DISABLED_NOTE}</span>
         </Callout>
       )}
       {list.error && (
@@ -523,12 +523,12 @@ export function Vulns({
           </span>
           <Chip active={status === ''} onClick={() => setStatus('')}>
             全部
-            <span className="tw-nums font-mono text-[11px] opacity-70">{rows.length}</span>
+            <span className="saker-nums font-mono text-[11px] opacity-70">{rows.length}</span>
           </Chip>
           {STATUS_FILTERS.map((f) => (
             <Chip key={f.value} active={status === f.value} onClick={() => setStatus(f.value)}>
               {f.label}
-              <span className="tw-nums font-mono text-[11px] opacity-70">{statusCount(f.value)}</span>
+              <span className="saker-nums font-mono text-[11px] opacity-70">{statusCount(f.value)}</span>
             </Chip>
           ))}
         </div>
@@ -550,7 +550,7 @@ export function Vulns({
               >
                 <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${severityDot(tier)}`} />
                 {severityLabel(tier)}
-                <span className="tw-nums font-mono text-[11px] opacity-70">{severityCount(tier)}</span>
+                <span className="saker-nums font-mono text-[11px] opacity-70">{severityCount(tier)}</span>
               </Chip>
             ))}
             <Chip
@@ -559,11 +559,11 @@ export function Vulns({
               title="还没有等级的事实：不是低危，只是没被判定过"
             >
               未标注
-              <span className="tw-nums font-mono text-[11px] opacity-70">{severityCount(UNLABELLED)}</span>
+              <span className="saker-nums font-mono text-[11px] opacity-70">{severityCount(UNLABELLED)}</span>
             </Chip>
           </div>
         )}
-        <span role="status" aria-live="polite" className="tw-nums ml-auto font-mono text-[11px] text-ink-3">
+        <span role="status" aria-live="polite" className="saker-nums ml-auto font-mono text-[11px] text-ink-3">
           显示 {visible.length} / {rows.length}
         </span>
       </div>
@@ -571,7 +571,7 @@ export function Vulns({
       <Panel
         title="漏洞条目"
         extra={
-          <span className="tw-nums font-mono text-[11px] text-ink-3">
+          <span className="saker-nums font-mono text-[11px] text-ink-3">
             共 {total} 条{matched !== total ? ` · 当前筛选 ${matched}` : ''}
           </span>
         }
@@ -639,7 +639,7 @@ export function Vulns({
                           e.stopPropagation()
                           openVuln(v)
                         }}
-                        className="tw-break max-w-full rounded text-left text-[13px] font-medium leading-5 text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                        className="saker-break max-w-full rounded text-left text-[13px] font-medium leading-5 text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                       >
                         {v.title}
                       </button>
@@ -672,13 +672,13 @@ export function Vulns({
 
                     {v.summary && (
                       // 列表只负责扫读：摘要压成两行，完整内容在详情面板里。
-                      <div className="tw-break mt-1 line-clamp-2 text-[12px] leading-relaxed text-ink-2">
+                      <div className="saker-break mt-1 line-clamp-2 text-[12px] leading-relaxed text-ink-2">
                         {v.summary}
                       </div>
                     )}
                     {v.review && v.review.verdict !== 'pass' && (
                       // 不打开面板也能看到「为什么没过」，不留下只有「复核未通过」一个词。
-                      <div className="tw-break mt-1 text-[12px] leading-relaxed text-warning">
+                      <div className="saker-break mt-1 text-[12px] leading-relaxed text-warning">
                         复核未通过：{oneLine(v.review.notes, 80) || statusLabel(v.review.verdict)}
                       </div>
                     )}
@@ -703,21 +703,21 @@ export function Vulns({
                           </button>
                         ))}
                         {v.evidence!.length > 3 && (
-                          <span className="tw-nums text-[11px] text-ink-3">
+                          <span className="saker-nums text-[11px] text-ink-3">
                             还有 {v.evidence!.length - 3} 个（详情里看全部）
                           </span>
                         )}
                       </div>
                     )}
                     {(v.evidence_dropped ?? []).length > 0 && (
-                      <div className="tw-nums mt-1 text-[11px] text-warning">
+                      <div className="saker-nums mt-1 text-[11px] text-warning">
                         缺失证据 {v.evidence_dropped!.length} 个（项目删除时已不存在）
                       </div>
                     )}
                   </div>
 
                   <div className="flex shrink-0 flex-col items-end gap-1.5">
-                    <span className="tw-nums whitespace-nowrap font-mono text-[11px] leading-4 text-ink-3">
+                    <span className="saker-nums whitespace-nowrap font-mono text-[11px] leading-4 text-ink-3">
                       {fmtTime(v.created_at)}
                     </span>
                     {!v.orphaned && v.status === 'unverified' && (
@@ -850,8 +850,8 @@ function VulnSheet({
         {vuln && (
           <>
             <SheetHeader className="shrink-0 space-y-2 border-b border-hairline px-5 py-4 pr-12 text-left">
-              <div className="tw-eyebrow">漏洞详情</div>
-              <SheetTitle className="tw-break text-[17px] leading-6 text-ink">{vuln.title}</SheetTitle>
+              <div className="saker-eyebrow">漏洞详情</div>
+              <SheetTitle className="saker-break text-[17px] leading-6 text-ink">{vuln.title}</SheetTitle>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <StatusIndicator
                   compact
@@ -875,10 +875,10 @@ function VulnSheet({
                   </Badge>
                 )}
               </div>
-              <div className="tw-break flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] leading-4 text-ink-3">
+              <div className="saker-break flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] leading-4 text-ink-3">
                 <span>id {vuln.id}</span>
-                <span className="tw-nums">入库 {fmtTime(vuln.created_at)}</span>
-                <span className="tw-nums">更新 {fmtTime(vuln.updated_at)}</span>
+                <span className="saker-nums">入库 {fmtTime(vuln.created_at)}</span>
+                <span className="saker-nums">更新 {fmtTime(vuln.updated_at)}</span>
               </div>
             </SheetHeader>
 
@@ -887,7 +887,7 @@ function VulnSheet({
             <ScrollArea className="min-h-0 flex-1 [&_[data-radix-scroll-area-viewport]>div]:!block">
               <div className="min-w-0 space-y-4 px-5 py-4">
                 <section className="space-y-2">
-                  <h3 className="tw-section-title">元信息</h3>
+                  <h3 className="saker-section-title">元信息</h3>
                   <dl className="grid grid-cols-1 gap-x-4 gap-y-2.5 rounded-lg border border-hairline bg-surface-2/40 p-3 sm:grid-cols-2">
                     <MetaItem label="来源事实 id" mono>
                       {vuln.source_id || '—'}
@@ -920,7 +920,7 @@ function VulnSheet({
                   )}
                 >
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="tw-section-title">复核结果</h3>
+                    <h3 className="saker-section-title">复核结果</h3>
                     {review && (
                       <StatusIndicator
                         compact
@@ -929,7 +929,7 @@ function VulnSheet({
                       />
                     )}
                     {review && (
-                      <span className="tw-nums ml-auto font-mono text-[11px] text-ink-3">
+                      <span className="saker-nums ml-auto font-mono text-[11px] text-ink-3">
                         {fmtTime(review.created_at)}
                       </span>
                     )}
@@ -937,7 +937,7 @@ function VulnSheet({
                   {review ? (
                     <>
                       {review.verifier_run && (
-                        <div className="tw-break font-mono text-[11px] text-ink-3">
+                        <div className="saker-break font-mono text-[11px] text-ink-3">
                           复核 run {review.verifier_run}
                         </div>
                       )}
@@ -950,16 +950,16 @@ function VulnSheet({
                       )}
                     </>
                   ) : (
-                    <p className="tw-break text-[12px] leading-relaxed text-ink-2">
+                    <p className="saker-break text-[12px] leading-relaxed text-ink-2">
                       还没有复核结论。复核会排一次真实的 verifier run（消耗 token）；只有它能给出通过 / 缺证据 / 否决的判定和理由，人工按钮不会代替它。
                     </p>
                   )}
                 </section>
 
                 <section className="space-y-2 border-t border-hairline pt-4">
-                  <h3 className="tw-section-title">摘要</h3>
+                  <h3 className="saker-section-title">摘要</h3>
                   {vuln.summary ? (
-                    <p className="tw-break whitespace-pre-wrap text-[13px] leading-relaxed text-ink-2">
+                    <p className="saker-break whitespace-pre-wrap text-[13px] leading-relaxed text-ink-2">
                       {vuln.summary}
                     </p>
                   ) : (
@@ -968,9 +968,9 @@ function VulnSheet({
                 </section>
 
                 <section className="space-y-2 border-t border-hairline pt-4">
-                  <h3 className="tw-section-title">详情 / 复现</h3>
+                  <h3 className="saker-section-title">详情 / 复现</h3>
                   {vuln.doc ? (
-                    <div className="tw-inset rounded-lg p-3">
+                    <div className="saker-inset rounded-lg p-3">
                       <MiniMarkdown text={vuln.doc} />
                     </div>
                   ) : (
@@ -982,8 +982,8 @@ function VulnSheet({
 
                 <section className="space-y-2 border-t border-hairline pt-4">
                   <div className="flex items-center gap-2">
-                    <h3 className="tw-section-title">证据</h3>
-                    <span className="tw-nums font-mono text-[11px] text-ink-3">{evidence.length}</span>
+                    <h3 className="saker-section-title">证据</h3>
+                    <span className="saker-nums font-mono text-[11px] text-ink-3">{evidence.length}</span>
                   </div>
                   {evidence.length === 0 && (
                     <p className="text-[12px] leading-relaxed text-ink-3">
@@ -1001,7 +1001,7 @@ function VulnSheet({
                             type="button"
                             onClick={() => onPreviewEvidence(p)}
                             title="预览证据（不离开漏洞页，不下载）"
-                            className="tw-break flex min-w-0 flex-1 items-center gap-1.5 rounded py-1 text-left font-mono text-[11px] leading-4 text-info hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                            className="saker-break flex min-w-0 flex-1 items-center gap-1.5 rounded py-1 text-left font-mono text-[11px] leading-4 text-info hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                           >
                             <Eye className="h-3.5 w-3.5 shrink-0" />
                             <span className="min-w-0 truncate">{p}</span>
@@ -1021,7 +1021,7 @@ function VulnSheet({
                   )}
                   {dropped.length > 0 && (
                     <Callout tone="warning">
-                      <span className="tw-break">
+                      <span className="saker-break">
                         缺失证据 {dropped.length} 个（项目删除时已不存在）：{dropped.join('、')}
                       </span>
                     </Callout>
@@ -1103,7 +1103,7 @@ function MetaItem({
       <dt className="text-[11px] font-medium leading-4 text-ink-3">{label}</dt>
       <dd
         className={cn(
-          'tw-break mt-1 text-[12px] leading-5 text-ink-2',
+          'saker-break mt-1 text-[12px] leading-5 text-ink-2',
           mono && 'font-mono text-[11px]',
         )}
       >

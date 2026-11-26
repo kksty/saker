@@ -44,7 +44,7 @@ export function FactClaimDetail({
   return (
     <div className="space-y-2.5" data-fact-claim-detail>
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="tw-eyebrow">断言与复核</span>
+        <span className="saker-eyebrow">断言与复核</span>
         <Badge
           size="sm"
           variant="secondary"
@@ -111,9 +111,9 @@ export function FactClaimDetail({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-t border-hairline pt-2.5">
-        <span className="tw-eyebrow">复核（{sortedReviews.length}）</span>
+        <span className="saker-eyebrow">复核（{sortedReviews.length}）</span>
         {summary.proved && (
-          <span className="font-mono text-[11px] tw-nums text-ink-3" title="最近一次通过结论所证明的断言版本">
+          <span className="font-mono text-[11px] saker-nums text-ink-3" title="最近一次通过结论所证明的断言版本">
             最近通过 {reviewVersionLabel(summary.proved.review)}
           </span>
         )}
@@ -148,12 +148,12 @@ export function FactClaimDetail({
                       旧断言
                     </Badge>
                   )}
-                  <span className="ml-auto font-mono text-[11px] tw-nums text-ink-3">
+                  <span className="ml-auto font-mono text-[11px] saker-nums text-ink-3">
                     {fmtTime(review.created_at)}
                   </span>
                 </div>
                 {review.notes && (
-                  <div className="tw-break mt-1 text-[12px] leading-relaxed text-ink-2">
+                  <div className="saker-break mt-1 text-[12px] leading-relaxed text-ink-2">
                     {review.notes}
                   </div>
                 )}
@@ -188,7 +188,7 @@ function ClaimMeta({
         {label}
       </span>
       <span
-        className={`tw-break min-w-0 text-[12px] leading-5 text-ink-2 ${mono ? 'font-mono' : ''}`}
+        className={`saker-break min-w-0 text-[12px] leading-5 text-ink-2 ${mono ? 'font-mono' : ''}`}
         title={title}
       >
         {value}

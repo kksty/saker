@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/board"
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/contract"
-	"github.com/kksty/tianwu/internal/decider"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/board"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/contract"
+	"github.com/kksty/saker/internal/decider"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 func testDB() store.DB {

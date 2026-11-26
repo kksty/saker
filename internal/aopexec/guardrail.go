@@ -22,7 +22,7 @@ package aopexec
 //
 // A payload that fails to decode is still an event: the caller keeps it and the
 // Text says why the detail is missing. An unknown type_url keeps the old
-// behaviour (kind=raw), because tianwu must not guess at a payload it has no
+// behaviour (kind=raw), because saker must not guess at a payload it has no
 // descriptor for.
 
 import (
@@ -32,10 +32,10 @@ import (
 
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/kksty/tianwu/internal/aop/guardrail"
-	"github.com/kksty/tianwu/internal/aop/operation"
-	pb "github.com/kksty/tianwu/internal/aop/pb"
-	"github.com/kksty/tianwu/internal/executor"
+	"github.com/kksty/saker/internal/aop/guardrail"
+	"github.com/kksty/saker/internal/aop/operation"
+	pb "github.com/kksty/saker/internal/aop/pb"
+	"github.com/kksty/saker/internal/executor"
 )
 
 // guardrailAudit is the decoded content of one guardrail payload. An empty

@@ -21,8 +21,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/model"
 )
 
 // ErrMessageBackpressure means the recipient's queue is at its declared bound.

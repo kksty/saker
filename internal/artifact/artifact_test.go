@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/aop/tool"
+	"github.com/kksty/saker/internal/aop/tool"
 )
 
 func TestNativeResultIdentityAndCitationPreserveOriginalBytes(t *testing.T) {

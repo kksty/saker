@@ -78,36 +78,36 @@ export function GuardrailPolicyCard({ guardrail }: { guardrail?: SettingsGuardra
       <dl className="grid grid-cols-1 gap-x-4 gap-y-1.5 text-[12px] leading-relaxed sm:grid-cols-2">
         <div className="flex min-w-0 items-baseline gap-1.5">
           <dt className="shrink-0 text-ink-3">裁判</dt>
-          <dd className="tw-break min-w-0 text-ink-2">{guardrailProviderLabel(guardrail.provider)}</dd>
+          <dd className="saker-break min-w-0 text-ink-2">{guardrailProviderLabel(guardrail.provider)}</dd>
         </div>
         <div className="flex min-w-0 items-baseline gap-1.5">
           <dt className="shrink-0 text-ink-3">模式</dt>
-          <dd className="tw-break min-w-0 text-ink-2">{guardrail.mode?.trim() || '默认'}</dd>
+          <dd className="saker-break min-w-0 text-ink-2">{guardrail.mode?.trim() || '默认'}</dd>
         </div>
         <div className="flex min-w-0 items-baseline gap-1.5">
           <dt className="shrink-0 text-ink-3">检查面（scope）</dt>
-          <dd className="tw-break min-w-0 text-ink-2">{guardrailScopeSummary(guardrail.scope)}</dd>
+          <dd className="saker-break min-w-0 text-ink-2">{guardrailScopeSummary(guardrail.scope)}</dd>
         </div>
         <div className="flex min-w-0 items-baseline gap-1.5">
           <dt className="shrink-0 text-ink-3">前缀放行（allow_prefixes）</dt>
-          <dd className="tw-break min-w-0 text-ink-2">{guardrailAllowPrefixesSummary(allowPrefixes)}</dd>
+          <dd className="saker-break min-w-0 text-ink-2">{guardrailAllowPrefixesSummary(allowPrefixes)}</dd>
         </div>
         <div className="flex min-w-0 items-baseline gap-1.5">
           <dt className="shrink-0 text-ink-3">异常处理（on_error）</dt>
-          <dd className={`tw-break min-w-0 ${flags.failOpen ? 'font-medium text-warning' : 'text-ink-2'}`}>
+          <dd className={`saker-break min-w-0 ${flags.failOpen ? 'font-medium text-warning' : 'text-ink-2'}`}>
             {guardrail.on_error?.trim() || '未设置（默认 review）'}
             {flags.failOpen ? ' · 自动放行' : guardrail.on_error === 'review' ? ' · 转人工复核' : guardrail.on_error === 'block' ? ' · 直接拦截' : ''}
           </dd>
         </div>
         <div className="flex min-w-0 items-baseline gap-1.5">
           <dt className="shrink-0 text-ink-3">JEV 凭据（可选复核裁判）</dt>
-          <dd className={`tw-break min-w-0 ${guardrail.jev_configured ? 'text-ink-2' : 'text-ink-3'}`}>
+          <dd className={`saker-break min-w-0 ${guardrail.jev_configured ? 'text-ink-2' : 'text-ink-3'}`}>
             {guardrail.jev_configured ? '已配置' : '未配置（llm 模式不需要）'}
           </dd>
         </div>
         <div className="flex min-w-0 items-baseline gap-1.5">
           <dt className="shrink-0 text-ink-3">小模型裁判</dt>
-          <dd className="tw-break min-w-0 font-mono text-[11px] text-ink-2">{guardrailLLMLabel(guardrail.llm)}</dd>
+          <dd className="saker-break min-w-0 font-mono text-[11px] text-ink-2">{guardrailLLMLabel(guardrail.llm)}</dd>
         </div>
       </dl>
 
@@ -115,17 +115,17 @@ export function GuardrailPolicyCard({ guardrail }: { guardrail?: SettingsGuardra
           caveats the harness documentation states; the card must not imply that
           scope isolates executions or that prefix matching understands shell. */}
       <div className="space-y-1.5 border-t border-hairline pt-2 text-[11px] leading-relaxed text-ink-3">
-        <p className="tw-break">
+        <p className="saker-break">
           <span className="font-medium text-ink-2">scope（只缩小检查面）</span>：{guardrailScopeExplainText}
         </p>
-        <p className="tw-break">
+        <p className="saker-break">
           <span className="font-medium text-ink-2">allow_prefixes（仅 safe，字面匹配）</span>：{guardrailAllowPrefixesExplainText}
         </p>
-        <p className="tw-break">
+        <p className="saker-break">
           <span className="font-medium text-ink-2">如何启用</span>：{guardrailEnableText}
         </p>
         {usesLLM && (
-          <p className="tw-break">
+          <p className="saker-break">
             <span className="font-medium text-ink-2">LLM 判定语义</span>：{guardrailLLMSemanticsText}
           </p>
         )}

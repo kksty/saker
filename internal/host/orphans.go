@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/kksty/tianwu/internal/platform"
+	"github.com/kksty/saker/internal/platform"
 )
 
 // An orphan host is an `aiscan web` this instance started in an earlier life
@@ -17,7 +17,7 @@ import (
 // SQLite file and often the port. The next start then loses the port or, worse,
 // two hosts write the same session database.
 //
-// Reaping is deliberately paranoid, because several tw instances run on one
+// Reaping is deliberately paranoid, because several saker instances run on one
 // machine (the acceptance setup alone runs four, each with its own data
 // directory). A candidate is killed only when all of these hold:
 //
@@ -29,7 +29,7 @@ import (
 //     `local.json` for the live host.
 //
 // Anything else is left alone, even if it is clearly an aiscan. Setting
-// TW_HOST_CLEANUP=dry only logs candidates and kills nothing, which is the
+// SAKER_HOST_CLEANUP=dry only logs candidates and kills nothing, which is the
 // intended first run on a machine with other instances.
 
 // procInfo is one entry of the platform process table.
@@ -105,9 +105,9 @@ func SweepOrphans(ctx context.Context, dataDir string, logf func(string, ...any)
 	return out, nil
 }
 
-// cleanupDryRun reports the TW_HOST_CLEANUP=dry switch.
+// cleanupDryRun reports the SAKER_HOST_CLEANUP=dry switch.
 func cleanupDryRun() bool {
-	return strings.EqualFold(strings.TrimSpace(os.Getenv("TW_HOST_CLEANUP")), "dry")
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("SAKER_HOST_CLEANUP")), "dry")
 }
 
 // orphanCandidates filters a process table down to this instance's leftovers

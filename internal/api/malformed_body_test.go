@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // callRaw routes one request with a body that may be deliberately malformed

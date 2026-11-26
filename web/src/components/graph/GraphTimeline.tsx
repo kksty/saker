@@ -46,7 +46,7 @@ export interface GraphTimelineProps {
   disabledReason?: string
 }
 
-const BODY_ID = 'tw-graph-timeline-body'
+const BODY_ID = 'saker-graph-timeline-body'
 /** The toolbar button points `aria-controls` at the same id. */
 export const TIMELINE_BODY_ID = BODY_ID
 
@@ -77,7 +77,7 @@ export function GraphTimeline({
     <div
       ref={stripRef}
       id={BODY_ID}
-      className="tw-graph-timeline absolute z-10 rounded-xl border border-hairline bg-card/95 shadow-elevated backdrop-blur"
+      className="saker-graph-timeline absolute z-10 rounded-xl border border-hairline bg-card/95 shadow-elevated backdrop-blur"
       role="group"
       aria-label="时间轴：按入账顺序揭示节点"
       tabIndex={usable ? 0 : undefined}
@@ -90,23 +90,23 @@ export function GraphTimeline({
         onTogglePlay()
       }}
     >
-      <div className="tw-graph-timeline-heading flex min-w-0 items-center gap-2.5">
+      <div className="saker-graph-timeline-heading flex min-w-0 items-center gap-2.5">
         <Clock className="size-4 shrink-0 text-info" aria-hidden="true" />
         <span className="shrink-0 text-ui font-semibold text-ink">时间轴</span>
         {usable && (
-          <span className="tw-nums whitespace-nowrap rounded-md bg-surface-2 px-2 py-1 font-mono text-caption text-ink">
+          <span className="saker-nums whitespace-nowrap rounded-md bg-surface-2 px-2 py-1 font-mono text-caption text-ink">
             {atLabel}
           </span>
         )}
       </div>
       {usable && (
-        <p className="tw-graph-timeline-counts tw-nums min-w-0 truncate text-caption text-ink-3" aria-live={playing ? 'off' : 'polite'}>
+        <p className="saker-graph-timeline-counts saker-nums min-w-0 truncate text-caption text-ink-3" aria-live={playing ? 'off' : 'polite'}>
           已揭示 <strong className="font-semibold text-ink-2">{revealed}/{total}</strong>
           {pending > 0 && ` · 未到 ${pending}`}
           {untimed > 0 && ` · ${untimed} 无时间`}
         </p>
       )}
-      <div className="tw-graph-timeline-actions flex items-center gap-1">
+      <div className="saker-graph-timeline-actions flex items-center gap-1">
         {usable && (
           <>
             <Button
@@ -128,7 +128,7 @@ export function GraphTimeline({
               onClick={() => onCursor(null)}
             >
               <SkipForward className="size-4 shrink-0" />
-              <span className="tw-graph-timeline-latest-label">最新</span>
+              <span className="saker-graph-timeline-latest-label">最新</span>
             </Button>
           </>
         )}
@@ -145,8 +145,8 @@ export function GraphTimeline({
         </Button>
       </div>
       {usable ? (
-          <div className="tw-graph-timeline-track grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5">
-            <span className="tw-graph-timeline-endpoint tw-nums whitespace-nowrap font-mono text-[11px] text-ink-3">{firstLabel}</span>
+          <div className="saker-graph-timeline-track grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5">
+            <span className="saker-graph-timeline-endpoint saker-nums whitespace-nowrap font-mono text-[11px] text-ink-3">{firstLabel}</span>
             <input
               type="range"
               min={0}
@@ -159,13 +159,13 @@ export function GraphTimeline({
               }}
               aria-label="按入账顺序揭示节点"
               aria-valuetext={`第 ${value + 1} 条，共 ${total} 条，${atLabel}`}
-              className="tw-graph-timeline-range block h-6 w-full min-w-0 cursor-pointer"
+              className="saker-graph-timeline-range block h-6 w-full min-w-0 cursor-pointer"
               style={{ '--timeline-progress': `${(value / last) * 100}%` } as CSSProperties}
             />
-            <span className="tw-graph-timeline-endpoint tw-nums whitespace-nowrap font-mono text-[11px] text-ink-3">{lastLabel}</span>
+            <span className="saker-graph-timeline-endpoint saker-nums whitespace-nowrap font-mono text-[11px] text-ink-3">{lastLabel}</span>
           </div>
         ) : (
-          <p className="tw-graph-timeline-track text-caption text-ink-3">
+          <p className="saker-graph-timeline-track text-caption text-ink-3">
             {disabledReason ?? '没有可排序的入账时间，所有节点按当前顺序显示。'}
             {untimed > 0 && `（${untimed} 个节点没有入账时间，始终显示）`}
           </p>

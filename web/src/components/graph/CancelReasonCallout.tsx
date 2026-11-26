@@ -31,7 +31,7 @@ export function CancelReasonCallout({
       {/* 标签单独一行、正文独占整行宽：并排双列会把操作员原话切成每行六七个字。 */}
       <div className="min-w-0">
         <div className="text-[11px] font-semibold text-warning">取消原因{who ? ` · ${who}` : ''}</div>
-        <div className="tw-break mt-1 text-[12px] leading-relaxed text-ink-2" title={title}>
+        <div className="saker-break mt-1 text-[12px] leading-relaxed text-ink-2" title={title}>
           {body}
         </div>
       </div>

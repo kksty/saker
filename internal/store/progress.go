@@ -3,7 +3,7 @@ package store
 import (
 	"encoding/json"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // RoundProgress is one completed decision round's view of the durable journal:

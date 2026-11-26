@@ -84,7 +84,7 @@ func (s *TreeSnapshot) AggregateSHA256() string {
 		return ""
 	}
 	h := sha256.New()
-	_, _ = io.WriteString(h, "tianwu-tree-v1\n")
+	_, _ = io.WriteString(h, "saker-tree-v1\n")
 	for _, path := range s.Paths() {
 		f := s.Files[path]
 		fmt.Fprintf(h, "%s\x00%s\x00%s\x00%d\n", path, f.Kind, f.SHA256, f.Size)

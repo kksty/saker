@@ -124,8 +124,8 @@ export function Workers({
       subtitle="查看意图执行情况、停止运行、管理消息授权"
       meta={
         <>
-          <span className="tw-nums font-mono text-[11px] text-ink-3">执行者 {fmtInt(total)}</span>
-          <span className="tw-nums font-mono text-[11px] text-ink-3">在跑 {fmtInt(running)}</span>
+          <span className="saker-nums font-mono text-[11px] text-ink-3">执行者 {fmtInt(total)}</span>
+          <span className="saker-nums font-mono text-[11px] text-ink-3">在跑 {fmtInt(running)}</span>
         </>
       }
       scroll={false}
@@ -211,7 +211,7 @@ function WorkerRoster({
       bodyClassName="flex min-h-0 flex-1 flex-col p-0"
       extra={
         <>
-          <span className="tw-nums font-mono text-[11px] text-ink-3">在跑 {running}</span>
+          <span className="saker-nums font-mono text-[11px] text-ink-3">在跑 {running}</span>
         </>
       }
     >
@@ -459,12 +459,12 @@ function WorkerRow({
           </div>
           <div className="flex items-start gap-2 text-[11px] leading-relaxed text-ink-2">
             <span className="shrink-0 text-ink-3">最近事件</span>
-            <span className="tw-break min-w-0 flex-1">{oneLine(w.last_event_text ?? '', 220) || '—'}</span>
+            <span className="saker-break min-w-0 flex-1">{oneLine(w.last_event_text ?? '', 220) || '—'}</span>
           </div>
           {w.status === 'parked' && w.park_reason && (
             <div className="flex items-start gap-2 text-[11px] leading-relaxed text-ink-2">
               <span className="shrink-0 text-ink-3">停放理由</span>
-              <span className="tw-break min-w-0 flex-1">
+              <span className="saker-break min-w-0 flex-1">
                 {w.park_reason}
                 {w.parked_at ? `（${fmtTime(w.parked_at)}）` : ''}
               </span>
@@ -579,7 +579,7 @@ function PeerPolicyPanel() {
         {mode === 'allowlist' && (
           <div className="space-y-1.5">
             {rows.length === 0 && (
-              <div className="tw-inset rounded-md px-2.5 py-2 text-[12px] text-ink-2">
+              <div className="saker-inset rounded-md px-2.5 py-2 text-[12px] text-ink-2">
                 allowlist 为空 = 除 commander 通道外都不能互发。用「加一条」授权意图。
               </div>
             )}

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/host"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/host"
 )
 
 type modelExecStub struct {

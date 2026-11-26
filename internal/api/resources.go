@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/resource"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/resource"
 )
 
 // The resource registry is a read-only projection over owners that already

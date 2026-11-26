@@ -5,8 +5,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/model"
 )
 
 // AttentionReason is a recorded reason to offer a GLOBAL decision opportunity.

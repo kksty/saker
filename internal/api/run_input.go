@@ -7,7 +7,7 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/store"
 )
 
 const runInputFile = ".tw/run-input.json"

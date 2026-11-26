@@ -17,7 +17,7 @@ export function MediaPreview({ runID, path }: { runID: string; path: string }) {
   const [zoom, setZoom] = useState(false)
   if (!name) {
     return (
-      <p className="tw-break font-mono text-[11px] text-ink-3" title={path}>
+      <p className="saker-break font-mono text-[11px] text-ink-3" title={path}>
         媒体路径无法解析：{path}
       </p>
     )

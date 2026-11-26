@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/kksty/tianwu/internal/access"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/access"
+	"github.com/kksty/saker/internal/model"
 )
 
 // resourceForEntry projects one `.access/` entry. A browser entry is an owned

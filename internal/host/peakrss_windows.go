@@ -13,7 +13,7 @@ import (
 )
 
 // childPeakRSS reads the peak working set of every process in this instance's
-// job object. That is the same handle that kills the tree when tw exits, so the
+// job object. That is the same handle that kills the tree when saker exits, so the
 // job already lists exactly what this instance started plus every descendant the
 // harness spawned — including a PoC interpreter a tool call launched, which is
 // the process that grew to tens of gigabytes in the incident that motivated

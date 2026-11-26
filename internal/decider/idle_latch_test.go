@@ -3,7 +3,7 @@ package decider
 import (
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // idleLedger builds the canonical idle shape: an open goal after a settled

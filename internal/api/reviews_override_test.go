@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/verifier"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/verifier"
 )
 
 // The project settings write moves the live switch in the same call as the

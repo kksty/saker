@@ -21,7 +21,7 @@ export const DOCK_KEY_STEP = 24
 const DOCK_EDGE_GAP = 24
 /** The map always keeps this much width to the left of the dock. */
 const DOCK_MIN_MAP_WIDTH = 320
-export const DOCK_STORAGE_KEY = 'tw.graph.dockWidth'
+export const DOCK_STORAGE_KEY = 'saker.graph.dockWidth'
 
 export interface DockBounds {
   min: number

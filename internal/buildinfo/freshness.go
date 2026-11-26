@@ -1,7 +1,7 @@
 package buildinfo
 
 // Embedded-artifact freshness around a frontend build. This is the exact logic
-// cmd/tw-gate uses, factored out so a unit test can prove both outcomes:
+// cmd/saker-gate uses, factored out so a unit test can prove both outcomes:
 //
 //   - a rebuild that produces the bytes the commit already has is not a failure,
 //     even when the working tree was dirty before the gate started;

@@ -7,10 +7,10 @@
 // The pre-fix baseline (messages-before-native.png / messages-before-project.png,
 // messages-before-dom.txt) was produced by the same harness against the previous
 // build; this script only writes the after artifacts, so those stay intact.
-// Run with node scripts/acceptance/messages-ui.cjs; TW_CHROME overrides Chrome.
+// Run with node scripts/acceptance/messages-ui.cjs; SAKER_CHROME overrides Chrome.
 // A live-data shot is opt-in: start `node scripts/acceptance/preview-proxy.mjs`
 // (serves internal/web/static, proxies to the running console) and set
-// TW_PREVIEW_URL=http://127.0.0.1:5173; TW_PREVIEW_PROJECT names the project
+// SAKER_PREVIEW_URL=http://127.0.0.1:5173; SAKER_PREVIEW_PROJECT names the project
 // route for that shot (default `fixture`). Without it the run stays fully offline.
 const fs = require('node:fs');
 const path = require('node:path');
@@ -23,10 +23,10 @@ const fixtures = path.join(out, 'messages-fixture');
 const staticRoot = path.join(root, 'internal/web');
 fs.mkdirSync(out, { recursive: true });
 
-const pageURL = 'http://tianwu.test/p/fixture/?view=messages';
+const pageURL = 'http://saker.test/p/fixture/?view=messages';
 const profile = fs.mkdtempSync(path.join(out, 'chrome-'));
 const chrome = spawn(
-  process.env.TW_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe',
+  process.env.SAKER_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe',
   [
     '--headless=new',
     '--disable-gpu',
@@ -149,8 +149,8 @@ const fixtureLabels = (() => {
  * the result. Nothing is clicked and nothing is written.
  */
 async function verifyLivePreview() {
-  const previewURL = process.env.TW_PREVIEW_URL || '';
-  const liveProject = process.env.TW_PREVIEW_PROJECT || 'fixture';
+  const previewURL = process.env.SAKER_PREVIEW_URL || '';
+  const liveProject = process.env.SAKER_PREVIEW_PROJECT || 'fixture';
   const result = { skipped: true, previewURL, login: null, snapshot: null, screenshot: null, checks: [], runtimeErrors: [], error: '' };
   if (!previewURL) return result;
   const check = (name, passed, expected, actual) => result.checks.push({ name, passed: Boolean(passed), expected, actual });
@@ -162,7 +162,7 @@ async function verifyLivePreview() {
   const token = fs.readFileSync(tokenFile, 'utf8').trim();
   const profile = fs.mkdtempSync(path.join(out, 'chrome-live-'));
   const proc = spawn(
-    process.env.TW_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe',
+    process.env.SAKER_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe',
     [
       '--headless=new',
       '--disable-gpu',
@@ -194,10 +194,10 @@ async function verifyLivePreview() {
         ? login.headers.getSetCookie()
         : [login.headers.get('set-cookie')].filter(Boolean);
     const pairs = rawCookies.map((c) => c.split(';')[0]);
-    // The console names its session cookie tw_session (cmd/tw/auth.go). Accept
+    // The console names its session cookie saker_session (cmd/saker/auth.go). Accept
     // whichever cookie the proxy forwards and prefer that one, so a rename does
     // not break the live shot.
-    const pair = pairs.find((p) => p.startsWith('tw_session=')) || pairs.find((p) => p.includes('=')) || '';
+    const pair = pairs.find((p) => p.startsWith('saker_session=')) || pairs.find((p) => p.includes('=')) || '';
     const cookieName = pair.slice(0, pair.indexOf('='));
     const cookieValue = pair.slice(pair.indexOf('=') + 1);
     result.login = {
@@ -671,7 +671,7 @@ async function verifyLivePreview() {
     // ---- live console through the preview proxy (real data, read-only) ----
     // Opt-in: scripts/acceptance/preview-proxy.mjs serves the new build and
     // proxies to the running 8080; this proves the new UI works against real
-    // data, not only the fixtures. Unset TW_PREVIEW_URL keeps the run offline.
+    // data, not only the fixtures. Unset SAKER_PREVIEW_URL keeps the run offline.
     const live = await verifyLivePreview();
     live.checks.forEach((c) => check('活数据：' + c.name, c.passed, c.expected, c.actual));
     if (live.error) check('活数据：预览页可登录并截图', false, '登录并渲染出原生 IOA 卡片', live.error);
@@ -726,7 +726,7 @@ async function verifyLivePreview() {
       '页面: ' + pageURL,
       ...checks.map((c) => (c.passed ? 'PASS ' : 'FAIL ') + c.name),
       '',
-      '活数据预览: ' + (live.skipped ? 'SKIP（设置 TW_PREVIEW_URL 后运行）' : live.error ? 'FAIL ' + live.error : 'PASS ' + live.previewURL + ' · 卡片 ' + live.snapshot.cardCount + ' 张'),
+      '活数据预览: ' + (live.skipped ? 'SKIP（设置 SAKER_PREVIEW_URL 后运行）' : live.error ? 'FAIL ' + live.error : 'PASS ' + live.previewURL + ' · 卡片 ' + live.snapshot.cardCount + ' 张'),
       '截图:',
       ...allScreenshots.map((s) => '  ' + s.path + ' ' + (s.size ? s.size.width + 'x' + s.size.height : '?') + ' ' + s.bytes + 'B'),
       'DOM: .build/ui-qa/messages-after-dom.txt',

@@ -3,8 +3,8 @@ package api
 import (
 	"testing"
 
-	"github.com/kksty/tianwu/internal/host"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/host"
+	"github.com/kksty/saker/internal/model"
 )
 
 // The record has to answer "which process, in which round" from the journal

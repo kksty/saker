@@ -5,7 +5,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/ws"
+	"github.com/kksty/saker/internal/ws"
 )
 
 // A close code is the host's own statement about why the stream ended. Only a

@@ -1,5 +1,5 @@
 // Offline upgrade acceptance. Every HTTP response is synthetic;
-// no Tianwu service, saved project, model or credential is used.
+// no Saker service, saved project, model or credential is used.
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
@@ -9,7 +9,7 @@ const webRoot = path.join(root, 'internal/web/static');
 const out = path.join(root, '.build/ui-qa');
 fs.mkdirSync(out, { recursive: true });
 const profile = fs.mkdtempSync(path.join(out, 'upgrade-chrome-'));
-const chrome = spawn(process.env.TW_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe', ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--user-data-dir=' + profile, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
+const chrome = spawn(process.env.SAKER_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe', ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--user-data-dir=' + profile, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 const stamp='2026-11-17T10:00:00Z';
@@ -95,7 +95,7 @@ async function api(url,request){
     const wait = async expression => { for (let n = 0; n < 100; n++) { if (await evaluate(`Boolean(${expression})`)) return; await pause(75); } throw new Error('Timed out: ' + expression + '\n' + await evaluate('document.body.innerText')); };
     const check = async (name, expression) => { const passed = await evaluate(expression); checks.push({ name, passed }); assert.ok(passed, name); };
     const shot = async name => { const s = await call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }); fs.writeFileSync(path.join(out, name + '.png'), Buffer.from(s.data, 'base64')); };
-    const visit = async view => call('Page.navigate', { url: 'http://tianwu.test/p/fixture/?view=' + view });
+    const visit = async view => call('Page.navigate', { url: 'http://saker.test/p/fixture/?view=' + view });
 
     await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1050,deviceScaleFactor:1,mobile:false});
     const click=async label=>evaluate(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.getClientRects().length&&b.textContent.trim()===${JSON.stringify(label)});if(!b)throw Error('Missing '+${JSON.stringify(label)});b.click()})()`);

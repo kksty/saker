@@ -6,8 +6,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/kksty/tianwu/internal/aop"
-	"github.com/kksty/tianwu/internal/executor"
+	"github.com/kksty/saker/internal/aop"
+	"github.com/kksty/saker/internal/executor"
 )
 
 // runtimeCatalogueTimeout bounds one AOP ListAgents read. The host is local, so

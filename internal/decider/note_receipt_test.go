@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/state"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/state"
+	"github.com/kksty/saker/internal/store"
 )
 
 // Use the actual persistence contract in fake commander rounds. A display

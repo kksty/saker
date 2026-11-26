@@ -67,7 +67,7 @@ export interface AppendGoalKey {
 
 export interface PendingAppendGoal { draft: AppendGoalDraft; key: AppendGoalKey; goalId?: string }
 type DraftStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
-const pendingName = (project: string) => `tw:pending-goal:${project}`
+const pendingName = (project: string) => `saker:pending-goal:${project}`
 
 export function loadPendingAppend(storage: DraftStorage, project: string): PendingAppendGoal | null {
   try {

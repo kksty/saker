@@ -1,4 +1,4 @@
-# 天吴 AGENTS.md
+# Saker AGENTS.md
 
 本文件只规定**设计取向与协作底线**，不写实现机制与协议细节（见 `docs/01-architecture.md`）；与架构文档冲突时以本文件为准。
 

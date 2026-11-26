@@ -8,7 +8,7 @@ $installRoot = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
 if (-not [IO.Path]::IsPathRooted($From)) { $From = Join-Path $installRoot $From }
 $installSource = (Resolve-Path -LiteralPath $From).Path
 $installBin = Join-Path $installRoot 'bin'
-$installNames = @('tw.exe', 'cyber-harness.exe', 'cyber-scan.exe', 'tw-repair.exe')
+$installNames = @('saker.exe', 'cyber-harness.exe', 'cyber-scan.exe', 'saker-repair.exe')
 $installTargets = @($installNames | ForEach-Object { Join-Path $installBin $_ })
 $installRunning = @(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -in $installTargets })
 if ($installRunning.Count) {
@@ -20,7 +20,7 @@ foreach ($installName in $installNames) {
     }
 }
 if ($installSource -eq $installBin) { throw '候选目录不能是安装目录 bin' }
-if (-not $PSCmdlet.ShouldProcess($installBin, '替换 tw.exe、cyber-harness.exe、cyber-scan.exe 和 tw-repair.exe，清理旧构建副本')) { return }
+if (-not $PSCmdlet.ShouldProcess($installBin, '替换 saker.exe、cyber-harness.exe、cyber-scan.exe 和 saker-repair.exe，清理旧构建副本')) { return }
 
 New-Item -ItemType Directory -Path $installBin -Force | Out-Null
 foreach ($installName in $installNames) {
@@ -43,7 +43,7 @@ foreach ($installName in $installNames) {
 # Only top-level application build files are eligible, never directories,
 # toolchains, project data, or the release pair used for this installation.
 $installBuild = Join-Path $installRoot '.build'
-$installOld = @(Get-ChildItem -LiteralPath $installBuild -File | Where-Object { $_.Name -like 'tw*.exe' -or $_.Name -like 'aiscan-full*.exe' })
+$installOld = @(Get-ChildItem -LiteralPath $installBuild -File | Where-Object { $_.Name -like 'saker*.exe' -or $_.Name -like 'aiscan-full*.exe' })
 foreach ($installFile in $installOld) {
     if ([IO.Path]::GetFullPath($installFile.DirectoryName) -ne $installBuild) { throw '旧构建路径越界' }
     if ($installFile.DirectoryName -eq $installSource) { continue }

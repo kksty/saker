@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/executor"
+	"github.com/kksty/saker/internal/executor"
 )
 
 // writeRunEvents lays down a synthetic run journal. The tail endpoint reads the

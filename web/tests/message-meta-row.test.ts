@@ -21,5 +21,5 @@ test('time and delivery badge stay one shrink-0 group', () => {
 })
 
 test('the bubble can wrap long text and never overflows', () => {
-  assert.match(source, /tw-break min-w-0 max-w-full whitespace-pre-wrap break-words rounded-2xl border/)
+  assert.match(source, /saker-break min-w-0 max-w-full whitespace-pre-wrap break-words rounded-2xl border/)
 })

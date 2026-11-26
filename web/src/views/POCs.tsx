@@ -115,7 +115,7 @@ export function POCs() {
                 清空
               </Button>
             )}
-            <span className="tw-nums shrink-0 font-mono text-[11px] text-ink-3">
+            <span className="saker-nums shrink-0 font-mono text-[11px] text-ink-3">
               {searching ? `${matched} / ${total}` : `${total} 个`}
             </span>
             {severities.length > 0 && (
@@ -144,7 +144,7 @@ export function POCs() {
             <div role="alert">
               <Callout tone="destructive" icon={<TriangleAlert className="h-4 w-4" />}>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <span className="min-w-0 tw-break">{list.error}</span>
+                  <span className="min-w-0 saker-break">{list.error}</span>
                   <Button size="xs" variant="outline" disabled={list.loading} onClick={list.reload}>重试</Button>
                 </div>
               </Callout>
@@ -154,7 +154,7 @@ export function POCs() {
           <Panel
             title="模板"
             extra={
-              <span className="tw-nums font-mono text-[11px] text-ink-3">
+              <span className="saker-nums font-mono text-[11px] text-ink-3">
                 {filtered ? `本页 ${visiblePocs.length} / ${pocs.length}` : `${matched} 个匹配`}
               </span>
             }
@@ -219,7 +219,7 @@ export function POCs() {
                         {p.tags ? ` · ${p.tags}` : ''}
                       </div>
                     </div>
-                    <span className="tw-nums shrink-0 font-mono text-[11px] text-ink-3">
+                    <span className="saker-nums shrink-0 font-mono text-[11px] text-ink-3">
                       {fmtBytes(p.size)}
                     </span>
                   </li>
@@ -233,7 +233,7 @@ export function POCs() {
 
           {matched > PAGE_SIZE && (
             <div className="flex flex-wrap items-center justify-between gap-2" role="group" aria-label="模板分页">
-              <span className="tw-nums font-mono text-[11px] text-ink-3">
+              <span className="saker-nums font-mono text-[11px] text-ink-3">
                 第 {page} / {pageCount} 页
               </span>
               <div className="flex items-center gap-1.5">
@@ -275,7 +275,7 @@ export function POCs() {
             {busy ? '导入中…' : '导入'}
           </Button>
           {list.data?.dir && (
-            <div className="tw-inset tw-break rounded-lg px-2.5 py-2 font-mono text-[11px] text-ink-3">{list.data.dir}</div>
+            <div className="saker-inset saker-break rounded-lg px-2.5 py-2 font-mono text-[11px] text-ink-3">{list.data.dir}</div>
           )}
           {note && (
             <div role={noteError ? 'alert' : 'status'}>

@@ -39,7 +39,7 @@ export function GuardrailEventRow({
       <Badge size="sm" variant={guardrailActionVariant(view.action)}>{guardrailActionLabel(view.action)}</Badge>
       {view.tool && <span className="font-mono text-[11px] text-ink">{view.tool}</span>}
       {stateLabel && <Badge size="sm" variant="outline">{stateLabel}</Badge>}
-      <span className="tw-break text-[11px] leading-relaxed text-ink-2">{view.reason || '（没有记录原因）'}</span>
+      <span className="saker-break text-[11px] leading-relaxed text-ink-2">{view.reason || '（没有记录原因）'}</span>
       {view.operationID && <span className="font-mono text-[10px] text-ink-3">操作 {view.operationID}</span>}
       {view.callID && <span className="font-mono text-[10px] text-ink-3">调用 {view.callID}</span>}
       {actionable && view.operationID && sessionID && (

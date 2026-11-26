@@ -8,9 +8,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/kksty/tianwu/internal/kb"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/kb"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 func (s *Server) getPlaybook(w http.ResponseWriter, r *http.Request) {

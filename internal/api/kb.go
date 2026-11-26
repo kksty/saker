@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kksty/tianwu/internal/kb"
+	"github.com/kksty/saker/internal/kb"
 )
 
 // kbBrief is a search hit: enough to judge whether an entry is worth opening,

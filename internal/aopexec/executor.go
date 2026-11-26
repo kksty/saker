@@ -1,6 +1,6 @@
 // Package aopexec runs an intent through a harness AOP host (docs/06, D43).
 // It is now the only execution transport: the control plane's own machine is a
-// host too, started and supervised by tw (D64).
+// host too, started and supervised by saker (D64).
 //
 // One run is one turn in a host session. The control plane supervises local
 // hosts; the fork's WorkDir extension binds tools to the case directory. The
@@ -11,9 +11,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/kksty/tianwu/internal/aop/operation"
-	"github.com/kksty/tianwu/internal/aop/tool"
-	"github.com/kksty/tianwu/internal/aop/traffic"
+	"github.com/kksty/saker/internal/aop/operation"
+	"github.com/kksty/saker/internal/aop/tool"
+	"github.com/kksty/saker/internal/aop/traffic"
 	"log"
 	"os"
 	"path/filepath"
@@ -23,9 +23,9 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/kksty/tianwu/internal/aop"
-	pb "github.com/kksty/tianwu/internal/aop/pb"
-	"github.com/kksty/tianwu/internal/executor"
+	"github.com/kksty/saker/internal/aop"
+	pb "github.com/kksty/saker/internal/aop/pb"
+	"github.com/kksty/saker/internal/executor"
 )
 
 // Executor is the AOP form of executor.Executor.
@@ -80,7 +80,7 @@ func (e *Executor) Run(ctx context.Context, req executor.Request, emit func(exec
 		defer func() {
 			cctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			_ = conn.CloseSession(cctx, sess.GetId(), "tianwu: "+req.Purpose+" 一次性 run 结束")
+			_ = conn.CloseSession(cctx, sess.GetId(), "saker: "+req.Purpose+" 一次性 run 结束")
 		}()
 	}
 
@@ -96,12 +96,12 @@ func (e *Executor) Run(ctx context.Context, req executor.Request, emit func(exec
 		}
 		cctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		_ = conn.CloseSession(cctx, sess.GetId(), "tianwu: "+why)
+		_ = conn.CloseSession(cctx, sess.GetId(), "saker: "+why)
 		// The pointer session() wrote must not outlive the session it names.
 		_ = os.Remove(markerPath(req.WorkDir))
 	}
 
-	// The Tianwu harness fork makes the case directory the session's workspace
+	// The harness fork makes the case directory the session's workspace
 	// (D110), so file and shell tools already resolve relative paths there. The
 	// prompt still states it: a model writes board dumps, screenshots and proofs
 	// and must know where they belong. The case must remain below the agent's
@@ -126,7 +126,7 @@ func (e *Executor) Run(ctx context.Context, req executor.Request, emit func(exec
 		return executor.Result{ExitCode: -1}, promptErr
 	}
 
-	// The evaluator's goal is not the turn input: it travels as the Tianwu
+	// The evaluator's goal is not the turn input: it travels as the Saker
 	// RunGoal extension (with the optional round pacing), so the executor gets
 	// the whole brief and the evaluator judges the short control-plane goal
 	// instead of "you are an executor…". An old harness ignores the unknown
@@ -156,7 +156,7 @@ func (e *Executor) Run(ctx context.Context, req executor.Request, emit func(exec
 	// The subscription is an explicit operation on the host. Release it when
 	// this turn is over (all return paths) instead of leaving it to the socket
 	// teardown. Best effort: the turn's result does not depend on the frame.
-	defer func() { _ = conn.CancelWatch("tianwu: 回合结束") }()
+	defer func() { _ = conn.CancelWatch("saker: 回合结束") }()
 
 	turnID := fmt.Sprintf("turn-%d", time.Now().UnixNano())
 	// The wire field is a uint32: a negative int would arrive as 2^32-1 turns.
@@ -276,7 +276,7 @@ func (e *Executor) Run(ctx context.Context, req executor.Request, emit func(exec
 			// The host's stream still ends with turn_ended, but the turn is over
 			// for us either way: cancelling is a request, not a wait.
 			stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			_ = conn.CancelTurn(stopCtx, sess.GetId(), turnID, "tianwu: 取消")
+			_ = conn.CancelTurn(stopCtx, sess.GetId(), turnID, "saker: 取消")
 			cancel()
 			drain(conn, ours, 2*time.Second, func(ev *pb.Event) {
 				res.Events++
@@ -380,11 +380,11 @@ func (e *Executor) session(ctx context.Context, conn *aop.Conn, req executor.Req
 	// to the host: otherwise every re-dispatch leaves a session behind that
 	// nobody will ever continue.
 	if old, ok := readMarker(req.WorkDir); ok && old.URL == e.BaseURL {
-		_ = conn.CloseSession(ctx, old.Session, "tianwu: 重派")
+		_ = conn.CloseSession(ctx, old.Session, "saker: 重派")
 	}
-	title := "tianwu"
+	title := "saker"
 	if req.IntentID != "" {
-		title = "tianwu: " + req.IntentID
+		title = "saker: " + req.IntentID
 	}
 	// The session owns its workspace: tools resolve relative paths there instead
 	// of the agent process directory (<data>), so a run that writes
@@ -469,7 +469,7 @@ func skillPrompt(paths []string) (string, error) {
 // promptFor appends the session workspace without displacing a native
 // /skill:name invocation, which the harness expands only at input start.
 //
-// Since the Tianwu fork makes the case directory the session workspace (D110),
+// Since the harness fork makes the case directory the session workspace (D110),
 // the tools and shell already start there; the prompt states it anyway, because
 // the model writes board dumps, screenshots and proofs and must know where they
 // belong. The absolute path is context, not shell instructions. The host-dir
@@ -498,7 +498,7 @@ func promptFor(prompt, workDir, hostDir string) (string, error) {
 		return "", fmt.Errorf("宿主工作目录 %s 与本轮 case %s 不在同一个卷上：AOP 节点要求 case 在宿主的工作目录里面", hostDir, abs)
 	}
 	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("宿主的工作目录是 %s，不包含本轮 case %s：把宿主起在实例根（tw 的 --data 目录）上，或给这个意图换一个节点", hostDir, abs)
+		return "", fmt.Errorf("宿主的工作目录是 %s，不包含本轮 case %s：把宿主起在实例根（saker 的 --data 目录）上，或给这个意图换一个节点", hostDir, abs)
 	}
 	rel = filepath.ToSlash(rel)
 	b.WriteString("本轮的工作目录是 `" + abs + "`（宿主进程目录 `" + hostDir + "` 下的 `" + rel + "`）。\n")

@@ -55,7 +55,7 @@ export default defineConfig({
   server: {
     host: '127.0.0.1',
     port: 5173,
-    // `go run ./cmd/tw` owns the API; the dev server owns the page. Only the
+    // `go run ./cmd/saker` owns the API; the dev server owns the page. Only the
     // per-project API calls are forwarded, so /p/<id>/ still renders here.
     proxy: {
       '/api': 'http://127.0.0.1:8080',

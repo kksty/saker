@@ -117,10 +117,12 @@ test('project export is a JSON POST and import uploads the archive as the body',
   globalThis.fetch = async (url, init) => {
     const headers = (init?.headers ?? {}) as Record<string, string>
     calls.push({ url: String(url), method: init?.method ?? 'GET', type: headers['Content-Type'] ?? '', body: init?.body })
-    return new Response('{"name":"p-1.twproj","url":"/api/exports/p-1.twproj","size":1,"manifest":{},"project":{}}')
+    return new Response('{"name":"p-1.sakerproj","url":"/api/exports/p-1.sakerproj","size":1,"manifest":{},"project":{}}')
   }
   try {
     await api.exportProject('p-1')
+    // A legacy .twproj archive must go up untouched: the page never inspects the
+    // suffix, so an export made before the rename stays importable.
     const archive = new File(['PK'], 'p-1.twproj', { type: 'application/zip' })
     await api.importProject(archive)
     assert.deepEqual(calls.map(c => ({ url: c.url, method: c.method, type: c.type })), [

@@ -27,7 +27,7 @@ interface Node {
 const sourcePath = fileURLToPath(new URL('../src/components/PageSkeleton.tsx', import.meta.url))
 
 /** Every motion primitive this component used to opt into. */
-const BANNED_MOTION = ['tw-rise', 'tw-stagger', 'tw-scan-track', 'tw-slide-in', 'tw-live', 'tw-breath', 'tw-ripple']
+const BANNED_MOTION = ['saker-rise', 'saker-stagger', 'saker-scan-track', 'saker-slide-in', 'saker-live', 'saker-breath', 'saker-ripple']
 
 let server: Awaited<ReturnType<typeof createTestServer>>
 let PageSkeleton: React.ComponentType
@@ -97,7 +97,7 @@ test('nothing in the frame animates into place', async () => {
     for (const token of BANNED_MOTION) {
       assert.equal(hasClass(node, token), false, `\`${token}\` must not be used by the fallback`)
     }
-    // No inline motion override either: a `--tw-i` delay or an `animation`
+    // No inline motion override either: a `--saker-i` delay or an `animation`
     // shorthand on the component would bypass the stylesheet contract.
     const style = node.props.style as Record<string, unknown> | undefined
     assert.equal(style, undefined, 'the fallback declares no inline style')
@@ -118,8 +118,8 @@ test('the loading signal is the design system skeleton, and only that', async ()
 test('the header, three metric cards and five-row list card keep their geometry', async () => {
   const root = await renderSkeleton()
 
-  const header = findAll(root, (node) => hasClass(node, 'tw-page-header'))[0]
-  assert.ok(header, 'the header strip keeps its tw-page-header chrome')
+  const header = findAll(root, (node) => hasClass(node, 'saker-page-header'))[0]
+  assert.ok(header, 'the header strip keeps its saker-page-header chrome')
   assert.ok(hasClass(header, 'shrink-0'), 'header stays a fixed-height strip')
   const headerSkeletons = findAll(header, (node) => hasClass(node, 'animate-pulse'))
   assert.deepEqual(

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 // seedProject builds a project directory with the durable files a real
@@ -83,7 +83,7 @@ func sha256Sum(b []byte) []byte {
 
 func TestProjectExportImportRoundTrip(t *testing.T) {
 	dir, st, _ := seedProject(t)
-	archive := filepath.Join(t.TempDir(), "p-test.twproj")
+	archive := filepath.Join(t.TempDir(), "p-test.sakerproj")
 	m, err := ExportProject(dir, st, archive, "test")
 	if err != nil {
 		t.Fatalf("ExportProject: %v", err)
@@ -172,7 +172,7 @@ func TestProjectExportImportRoundTrip(t *testing.T) {
 
 func TestProjectImportRefusesExistingProject(t *testing.T) {
 	dir, st, _ := seedProject(t)
-	archive := filepath.Join(t.TempDir(), "p-test.twproj")
+	archive := filepath.Join(t.TempDir(), "p-test.sakerproj")
 	if _, err := ExportProject(dir, st, archive, "test"); err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func TestProjectImportRefusesExistingProject(t *testing.T) {
 
 func TestProjectImportRejectsTamperedArchive(t *testing.T) {
 	dir, st, _ := seedProject(t)
-	archive := filepath.Join(t.TempDir(), "p-test.twproj")
+	archive := filepath.Join(t.TempDir(), "p-test.sakerproj")
 	if _, err := ExportProject(dir, st, archive, "test"); err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +203,7 @@ func TestProjectImportRejectsTamperedArchive(t *testing.T) {
 
 func TestProjectImportRejectsUnrecordedMissingEvidence(t *testing.T) {
 	dir, st, _ := seedProject(t)
-	archive := filepath.Join(t.TempDir(), "p-test.twproj")
+	archive := filepath.Join(t.TempDir(), "p-test.sakerproj")
 	if _, err := ExportProject(dir, st, archive, "test"); err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +232,7 @@ func TestProjectImportRejectsUnrecordedMissingEvidence(t *testing.T) {
 
 func TestProjectImportRejectsEvidenceDigestConflict(t *testing.T) {
 	dir, st, _ := seedProject(t)
-	archive := filepath.Join(t.TempDir(), "p-test.twproj")
+	archive := filepath.Join(t.TempDir(), "p-test.sakerproj")
 	if _, err := ExportProject(dir, st, archive, "test"); err != nil {
 		t.Fatal(err)
 	}
@@ -316,7 +316,7 @@ func TestCleanTransferRootKeepsCompletedArchives(t *testing.T) {
 	if err := os.MkdirAll(exports, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	archive := filepath.Join(exports, "upload-example-20261120-120000.twproj")
+	archive := filepath.Join(exports, "upload-example-20261120-120000.sakerproj")
 	if err := os.WriteFile(archive, []byte("export"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -326,7 +326,7 @@ func TestCleanTransferRootKeepsCompletedArchives(t *testing.T) {
 	if err := os.Mkdir(root, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	upload := filepath.Join(root, "upload-123.twproj")
+	upload := filepath.Join(root, "upload-123.sakerproj")
 	if err := os.WriteFile(upload, []byte("partial upload"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -406,4 +406,47 @@ func corruptZipEntry(t *testing.T, path, name string, body []byte) {
 		}
 	}
 	writeZipEntries(t, path, entries)
+}
+
+// A renamed product must not orphan archives made before the rename: the export
+// suffix is new, and import still accepts the old one. This is the data-format
+// half of the rename, kept separate from display names.
+func TestLegacyTwprojArchiveStillImports(t *testing.T) {
+	dir, st, _ := seedProject(t)
+	archive := filepath.Join(t.TempDir(), "legacy-export.twproj")
+	if _, err := ExportProject(dir, st, archive, "test"); err != nil {
+		t.Fatalf("ExportProject: %v", err)
+	}
+	got, err := ImportProject(archive, t.TempDir())
+	if err != nil {
+		t.Fatalf("a .twproj archive was refused: %v", err)
+	}
+	if got.Project.ID != "p-test" {
+		t.Fatalf("imported id = %s", got.Project.ID)
+	}
+}
+
+// Boot sweep after an interrupted upload must clean both the new staging suffix
+// and the one a previous build left behind.
+func TestCleanTransferRootRemovesBothUploadSuffixes(t *testing.T) {
+	data := t.TempDir()
+	root := filepath.Join(data, ".transfer")
+	if err := os.Mkdir(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	legacy := filepath.Join(root, "upload-old.twproj")
+	current := filepath.Join(root, "upload-new.sakerproj")
+	for _, p := range []string{legacy, current} {
+		if err := os.WriteFile(p, []byte("partial"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := CleanTransferRoot(data); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{legacy, current} {
+		if _, err := os.Stat(p); !os.IsNotExist(err) {
+			t.Fatalf("abandoned upload survived: %s: %v", p, err)
+		}
+	}
 }

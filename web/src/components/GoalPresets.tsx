@@ -44,7 +44,7 @@ export function GoalPresets({
           <div
             role="list"
             aria-label="常用目标模板"
-            className="tw-scroll max-h-56 space-y-1 overflow-y-auto p-2 pt-1"
+            className="saker-scroll max-h-56 space-y-1 overflow-y-auto p-2 pt-1"
           >
             {GOAL_PRESETS.map((preset) => (
               <button

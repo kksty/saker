@@ -3,7 +3,7 @@ package store
 import (
 	"fmt"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 type ConfidenceChange struct {

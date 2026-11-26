@@ -20,9 +20,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/ledger"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/ledger"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 // MaxRecords caps one import; a full /16 sweep is not one ledger entry.

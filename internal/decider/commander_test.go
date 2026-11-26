@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/board"
-	"github.com/kksty/tianwu/internal/contract"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/state"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/board"
+	"github.com/kksty/saker/internal/contract"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/state"
+	"github.com/kksty/saker/internal/store"
 )
 
 // The project documents ride the round as their own text, verbatim. Nothing

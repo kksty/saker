@@ -100,7 +100,7 @@ export function Toolbox() {
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {metrics.map(({ label, value, hint, icon: Icon }) => (
-            <div key={label} className="tw-panel rounded-xl p-4">
+            <div key={label} className="saker-panel rounded-xl p-4">
               <StatTile
                 label={label}
                 value={value}
@@ -126,7 +126,7 @@ export function Toolbox() {
             <div className="min-w-0 flex-1 text-[12px] leading-relaxed text-ink-2">
               <p>目录反映当前默认宿主的注册结果。模板、指纹、浏览器依赖与外部服务是否可用，仍以实际执行结果为准。</p>
               {connected && (
-                <p className="tw-break mt-1 font-mono text-[11px] leading-4 text-ink-3">
+                <p className="saker-break mt-1 font-mono text-[11px] leading-4 text-ink-3">
                   {runtime.data?.agent_id} · {runtime.data?.provider || '未报告模型提供方'} / {runtime.data?.model || '未报告模型'} · {fmtTime(runtime.data?.checked_at)}
                 </p>
               )}
@@ -156,7 +156,7 @@ export function Toolbox() {
               <Chip key={id} active={kind === id} onClick={() => setKind(id)}>
                 <Icon className="h-3.5 w-3.5" />
                 {label}
-                <span className="tw-nums font-mono text-[11px] opacity-70">
+                <span className="saker-nums font-mono text-[11px] opacity-70">
                   {commands.filter(command => commandKind(command) === id).length}
                 </span>
               </Chip>
@@ -168,13 +168,13 @@ export function Toolbox() {
           ) : filtered.length > 0 ? (
             <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-3">
               {filtered.map(command => (
-                <article key={command.name} className="tw-inset min-w-0 rounded-lg p-3 transition-colors hover:border-ink-3/30">
-                  <h3 className="tw-break font-mono text-[13px] font-semibold leading-5 text-ink">{command.name}</h3>
+                <article key={command.name} className="saker-inset min-w-0 rounded-lg p-3 transition-colors hover:border-ink-3/30">
+                  <h3 className="saker-break font-mono text-[13px] font-semibold leading-5 text-ink">{command.name}</h3>
                   {command.description && (
-                    <p className="tw-break mt-1.5 whitespace-pre-wrap text-[12px] leading-relaxed text-ink-2">{command.description}</p>
+                    <p className="saker-break mt-1.5 whitespace-pre-wrap text-[12px] leading-relaxed text-ink-2">{command.description}</p>
                   )}
                   {command.usage && (
-                    <p className="tw-break mt-2 rounded-md bg-surface-2/70 px-2.5 py-2 font-mono text-[11px] leading-relaxed text-ink-3">{command.usage}</p>
+                    <p className="saker-break mt-2 rounded-md bg-surface-2/70 px-2.5 py-2 font-mono text-[11px] leading-relaxed text-ink-3">{command.usage}</p>
                   )}
                 </article>
               ))}
@@ -228,16 +228,16 @@ export function Toolbox() {
                     const average = averageMs(row)
                     return (
                       <div key={`${row.local ? 'local' : 'native'}:${row.tool}`} className="flex items-start gap-3">
-                        <span className="tw-nums mt-0.5 w-5 shrink-0 text-right font-mono text-[11px] text-ink-3">
+                        <span className="saker-nums mt-0.5 w-5 shrink-0 text-right font-mono text-[11px] text-ink-3">
                           {String(index + 1).padStart(2, '0')}
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                            <span className="tw-break font-mono text-[12px] text-ink">
+                            <span className="saker-break font-mono text-[12px] text-ink">
                               {row.tool}
                               {row.local && <Badge size="sm" variant="muted" className="ml-2">本机</Badge>}
                             </span>
-                            <span className="tw-nums shrink-0 font-mono text-[11px] text-ink-3">
+                            <span className="saker-nums shrink-0 font-mono text-[11px] text-ink-3">
                               {fmtInt(row.calls)} 次 · {fmtInt(row.runs)} 份日志
                             </span>
                           </div>
@@ -246,7 +246,7 @@ export function Toolbox() {
                             value={Math.max(2, (row.calls / max) * 100)}
                             aria-label={`${row.tool} 调用占比`}
                           />
-                          <p className="tw-nums flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] leading-4 text-ink-3">
+                          <p className="saker-nums flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] leading-4 text-ink-3">
                             <span title="失败数 / 有结果的调用数">
                               失败 {formatRate(rate)}
                               {rate !== null && <span className="opacity-70">（{fmtInt(row.failures ?? 0)}/{fmtInt(row.completed ?? 0)}）</span>}
@@ -264,8 +264,8 @@ export function Toolbox() {
                               </summary>
                               <ul className="mt-1 space-y-0.5 pl-3">
                                 {row.error_kinds.map(kind => (
-                                  <li key={kind.label} className="tw-break flex items-baseline gap-2">
-                                    <span className="tw-nums shrink-0 font-mono text-ink-2">×{kind.count}</span>
+                                  <li key={kind.label} className="saker-break flex items-baseline gap-2">
+                                    <span className="saker-nums shrink-0 font-mono text-ink-2">×{kind.count}</span>
                                     <span className="min-w-0 font-mono">{kind.label}</span>
                                   </li>
                                 ))}
@@ -303,13 +303,13 @@ export function Toolbox() {
                 {arsenal.map(tool => (
                   <div key={tool.name} className="py-2.5 first:pt-0 last:pb-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="tw-break font-mono text-[12px] font-medium text-ink">{tool.name}</span>
+                      <span className="saker-break font-mono text-[12px] font-medium text-ink">{tool.name}</span>
                       {tool.version && <Badge size="sm" variant="secondary">{tool.version}</Badge>}
                       {tool.source && <Badge size="sm" variant="muted">{tool.source}</Badge>}
-                      <span className="tw-nums ml-auto font-mono text-[11px] text-ink-3">{fmtBytes(tool.size)}</span>
+                      <span className="saker-nums ml-auto font-mono text-[11px] text-ink-3">{fmtBytes(tool.size)}</span>
                     </div>
                     {tool.dirs?.map(dir => (
-                      <p key={dir} className="tw-break mt-1 font-mono text-[11px] leading-4 text-ink-3">{dir}</p>
+                      <p key={dir} className="saker-break mt-1 font-mono text-[11px] leading-4 text-ink-3">{dir}</p>
                     ))}
                   </div>
                 ))}
@@ -329,17 +329,17 @@ export function Toolbox() {
                   {roots.map(root => (
                     <div key={`${root.source}:${root.path}`} className="min-w-0 text-[11px] leading-4">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="tw-break font-mono text-ink-2">{root.bin}</span>
+                        <span className="saker-break font-mono text-ink-2">{root.bin}</span>
                         <Badge size="sm" variant="muted">{root.source}</Badge>
                         <Badge size="sm" variant="secondary">{root.exists ? '已装工具' : '未装工具'}</Badge>
                         {root.path_injected && <Badge size="sm" variant="muted">在 PATH</Badge>}
                       </div>
-                      {root.note && <p className="tw-break mt-0.5 text-ink-3">{root.note}</p>}
+                      {root.note && <p className="saker-break mt-0.5 text-ink-3">{root.note}</p>}
                     </div>
                   ))}
                 </div>
                 {data.data?.tool_roots_note && (
-                  <p className="tw-break mt-1.5 text-[11px] leading-4 text-ink-3">{data.data.tool_roots_note}</p>
+                  <p className="saker-break mt-1.5 text-[11px] leading-4 text-ink-3">{data.data.tool_roots_note}</p>
                 )}
               </div>
             )}

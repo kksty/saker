@@ -3,7 +3,7 @@ package api
 import (
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 func summaryCategory(t *testing.T, summary operatorInboxSummary, kind string) operatorInboxCategory {

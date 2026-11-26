@@ -12,7 +12,7 @@ import (
 
 	"google.golang.org/protobuf/encoding/protojson"
 
-	"github.com/kksty/tianwu/internal/aop"
+	"github.com/kksty/saker/internal/aop"
 )
 
 func main() {
@@ -37,7 +37,7 @@ func main() {
 	defer conn.Close()
 	fmt.Println("dialed", *url)
 
-	sess, err := conn.OpenSession(ctx, *node, "tianwu spike", "")
+	sess, err := conn.OpenSession(ctx, *node, "saker spike", "")
 	if err != nil {
 		log.Fatalf("open session: %v", err)
 	}

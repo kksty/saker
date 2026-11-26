@@ -58,7 +58,7 @@ export function SettingsPage() {
   return () => window.removeEventListener('beforeunload', prevent)
  }, [hasProjectDrafts])
  return <Page title="设置" subtitle="管理模型网关、扩展工具和各项目的运行参数。">
-  <div className="tw-settings @container mx-auto w-full max-w-[104rem] space-y-6">
+  <div className="saker-settings @container mx-auto w-full max-w-[104rem] space-y-6">
    <SettingsTabs tab={tab} onTab={setTab} />
    <div role="tabpanel" id="settings-panel-model" aria-labelledby="settings-tab-model" hidden={tab !== 'model'} className="space-y-7">
     <section aria-label="模型与扩展" className="space-y-3">
@@ -115,7 +115,7 @@ function SettingsTabs({ tab, onTab }: { tab: SettingsTab; onTab: (tab: SettingsT
    default: break
   }
  }
- return <div role="tablist" aria-label="设置分栏" onKeyDown={onKeyDown} className="tw-settings-tabs inline-flex max-w-full gap-1 rounded-xl border border-hairline bg-surface-2/60 p-1">
+ return <div role="tablist" aria-label="设置分栏" onKeyDown={onKeyDown} className="saker-settings-tabs inline-flex max-w-full gap-1 rounded-xl border border-hairline bg-surface-2/60 p-1">
   {SETTINGS_TABS.map(({ icon: Icon, ...item }, index) => (
    <Button
     key={item.id}
@@ -299,7 +299,7 @@ function ModelConnection({settings}:{settings:AsyncState<SettingsView>}) {
   <div aria-live="polite" className="space-y-2">
    {error && <Callout tone="destructive">{error}</Callout>}
    {apply && <Callout tone={apply.tone}>{apply.text}</Callout>}
-   {probeSummary && <Callout tone={probeSummary.tone}><span className="tw-break">{probeSummary.text}</span></Callout>}
+   {probeSummary && <Callout tone={probeSummary.tone}><span className="saker-break">{probeSummary.text}</span></Callout>}
   </div>
   {catalogue.length > 0 && (
    <section aria-labelledby={id('catalogue')} className="space-y-2 rounded-lg border border-hairline bg-surface-2/40 p-3">
@@ -307,7 +307,7 @@ function ModelConnection({settings}:{settings:AsyncState<SettingsView>}) {
      <p id={id('catalogue')} className="text-ui font-medium text-ink">可用模型（{catalogue.length}）</p>
      <p className="text-caption text-ink-3">点选即可填入模型名称。保存后可检测新模型。</p>
     </div>
-    <ul role="list" className="tw-scroll max-h-48 space-y-1.5 overflow-y-auto p-1">
+    <ul role="list" className="saker-scroll max-h-48 space-y-1.5 overflow-y-auto p-1">
      {catalogue.map(model => (
       <li key={model}>
        <Button
@@ -318,7 +318,7 @@ function ModelConnection({settings}:{settings:AsyncState<SettingsView>}) {
         onClick={() => change('model', model)}
        >
         {draft.model === model && <Check aria-hidden="true" className="size-3.5 shrink-0" />}
-        <span className="tw-break">{model}</span>
+        <span className="saker-break">{model}</span>
        </Button>
       </li>
      ))}
@@ -326,9 +326,9 @@ function ModelConnection({settings}:{settings:AsyncState<SettingsView>}) {
    </section>
   )}
   {settings.data && (
-   <p className="text-caption text-ink-3">已保存的模型 <strong className="tw-break font-mono font-medium text-ink-2">{settings.data.model || '未配置'}</strong></p>
+   <p className="text-caption text-ink-3">已保存的模型 <strong className="saker-break font-mono font-medium text-ink-2">{settings.data.model || '未配置'}</strong></p>
   )}
-  <div className="tw-settings-actions flex flex-wrap items-center gap-2">
+  <div className="saker-settings-actions flex flex-wrap items-center gap-2">
    <Button onClick={() => void save()} disabled={!!busy || !dirty} aria-busy={busy === 'save'}>
     {busy === 'save' && <Spinner size="sm" />}
     保存并应用
@@ -427,7 +427,7 @@ export function ExtensionsPanel({ settings }: { settings: AsyncState<SettingsVie
     同一 scan 节点上的指挥官和执行者共享这些服务器。
    </span>
   </div>
-  {data?.product_error && <Callout tone="destructive">已保存的产品配置无法解析：<span className="tw-break">{data.product_error}</span></Callout>}
+  {data?.product_error && <Callout tone="destructive">已保存的产品配置无法解析：<span className="saker-break">{data.product_error}</span></Callout>}
   {settings.error && <Callout tone="destructive">读取设置失败：{settings.error}</Callout>}
   <form noValidate onSubmit={(event) => { event.preventDefault(); void save() }} className="space-y-4">
    <fieldset disabled={busy||settings.loading||!data} className="space-y-4">
@@ -450,7 +450,7 @@ export function ExtensionsPanel({ settings }: { settings: AsyncState<SettingsVie
      {error ? (
       <span id={jsonErrorID} className="flex items-start gap-1 text-[11px] leading-4 text-destructive">
        <TriangleAlert aria-hidden="true" className="mt-0.5 h-3 w-3 shrink-0" />
-       <span className="tw-break">{error}</span>
+       <span className="saker-break">{error}</span>
       </span>
      ) : (
       <span id={jsonHintID} className="block text-[11px] leading-4 text-ink-3">
@@ -461,7 +461,7 @@ export function ExtensionsPanel({ settings }: { settings: AsyncState<SettingsVie
     {warnings.length > 0 && (
      <Callout tone="warning">
       <ul role="list" className="space-y-0.5">
-       {warnings.map((warning) => <li key={warning} className="tw-break">{warning}</li>)}
+       {warnings.map((warning) => <li key={warning} className="saker-break">{warning}</li>)}
       </ul>
      </Callout>
     )}
@@ -517,7 +517,7 @@ export function ExtensionsPanel({ settings }: { settings: AsyncState<SettingsVie
    {apply && <Callout tone={apply.tone}>{apply.text}</Callout>}
    {error && <Callout tone="destructive">{error}</Callout>}
   </div>
-  <div className="tw-settings-actions flex flex-wrap items-center gap-2">
+  <div className="saker-settings-actions flex flex-wrap items-center gap-2">
    <Button onClick={() => void save()} disabled={busy||!data||!dirty}>
     {busy && <Spinner size="sm" />} 保存扩展工具
    </Button>
@@ -532,7 +532,7 @@ export function ExtensionsPanel({ settings }: { settings: AsyncState<SettingsVie
  * 流量捕获：the scan node's capture-directory retention cap.
  *
  * One number for the whole node — the capture directory is shared by every
- * project on that machine, so this is not a per-project body quota and tianwu
+ * project on that machine, so this is not a per-project body quota and saker
  * keeps no project-level copy of capture bodies. The wire field is bytes
  * (`traffic_body_retention_bytes`); the operator edits MiB. 0/absent means the
  * generated default applies and is shown as "默认 2 GiB（未显式设置）", never 0.
@@ -617,7 +617,7 @@ export function TrafficRetentionPanel({ settings }: { settings: AsyncState<Setti
       className="min-w-0 flex-1"
      />
      <span className="shrink-0 text-[11px] text-ink-3">MiB</span>
-     <span className="tw-nums shrink-0 font-mono text-[11px] text-ink-3">{retentionStatusText(storedBytes)}</span>
+     <span className="saker-nums shrink-0 font-mono text-[11px] text-ink-3">{retentionStatusText(storedBytes)}</span>
     </div>
     {fieldError ? (
      <span id={errorID} className="flex items-start gap-1 text-[11px] leading-4 text-destructive">

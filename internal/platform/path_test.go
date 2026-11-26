@@ -107,7 +107,7 @@ func TestContainsPathSegmentBothPlatforms(t *testing.T) {
 	}{
 		{`"C:\tools\cyber-harness.exe" agent --db C:\instances\data-a\host\cyber-web.db`, `C:\instances\data-a`, true},
 		{`"C:\tools\cyber-harness.exe" agent --db C:\instances\data-ab\host\cyber-web.db`, `C:\instances\data-a`, false},
-		{`cyber-scan.exe --data "C:\Program Files\tw\data-a"`, `C:\Program Files\tw\data-a`, true},
+		{`cyber-scan.exe --data "C:\Program Files\saker\data-a"`, `C:\Program Files\saker\data-a`, true},
 		{`--db=c:\INSTANCES\DATA-A\host.db`, `C:\instances\data-a`, true},
 		{`--config C:\instances\data-a2\x.yaml`, `C:\instances\data-a`, false},
 		{`--db C:\instances\data-a`, ``, false},

@@ -76,9 +76,9 @@ test('scroll regions reserve their gutter and never chain their scroll', () => {
   assert.match(root, /overscroll-behavior:\s*none/)
   assert.doesNotMatch(root, /scrollbar-gutter/)
   // Nested regions contain instead: inner scrolling must not move the page.
-  assert.match(css, /\.tw-scroll\s*\{[^}]*overscroll-behavior:\s*contain/)
-  assert.match(css, /\.tw-scroll\s*\{[^}]*scrollbar-gutter:\s*stable/)
-  assert.match(css, /\.tw-graph-overlay-scroll\s*\{[^}]*overscroll-behavior:\s*contain/)
+  assert.match(css, /\.saker-scroll\s*\{[^}]*overscroll-behavior:\s*contain/)
+  assert.match(css, /\.saker-scroll\s*\{[^}]*scrollbar-gutter:\s*stable/)
+  assert.match(css, /\.saker-graph-overlay-scroll\s*\{[^}]*overscroll-behavior:\s*contain/)
 })
 
 test('the graph stage is a size container, not a viewport breakpoint', () => {
@@ -95,12 +95,12 @@ test('the graph stage is a size container, not a viewport breakpoint', () => {
   }
   assert.match(css, /@container graph \(inline-size >= 44rem\)/)
   // Coarse pointers get the 24px minimum target for the dock resize handle.
-  assert.match(css, /@media \(pointer: coarse\)\s*\{[^}]*tw-dock-handle/)
+  assert.match(css, /@media \(pointer: coarse\)\s*\{[^}]*saker-dock-handle/)
   // The bottom-left overlay stack is bounded to the map box, so an expanded
   // legend scrolls inside the map instead of being clipped under the page
   // banner with its collapse control unreachable.
   assert.match(css, /--graph-overlay-height:\s*calc\(100cqb[^;]*--graph-footer-space/)
-  assert.match(css, /\.tw-graph-stack\s*\{[^}]*max-block-size:[^;]*--graph-overlay-height/)
+  assert.match(css, /\.saker-graph-stack\s*\{[^}]*max-block-size:[^;]*--graph-overlay-height/)
 })
 
 test('reduced motion is a global backstop, not the forbidden duration override', () => {
@@ -123,22 +123,22 @@ test('navigation and page bodies are not animated', () => {
   // The decorative primitives that used to fade/stagger/scan panel content in.
   // Panels, rows and notices now appear in place, instantly.
   for (const legacy of [
-    'tw-rise',
-    'tw-stagger',
-    'tw-scan-track',
-    'tw-slide-in',
-    'tw-live',
-    'tw-breath',
-    'tw-ripple',
-    'tw-operation-dialog',
-    'tw-operation-success',
+    'saker-rise',
+    'saker-stagger',
+    'saker-scan-track',
+    'saker-slide-in',
+    'saker-live',
+    'saker-breath',
+    'saker-ripple',
+    'saker-operation-dialog',
+    'saker-operation-success',
   ]) {
     assert.equal(css.includes(`.${legacy}`), false, `.${legacy} must stay removed`)
   }
   // One animation is left, and it reports a real in-flight state: the progress
   // bar of a pending destructive action.
-  const animations = [...css.matchAll(/animation:\s*(tw-[\w-]+)/g)].map((match) => match[1])
-  assert.deepEqual(animations, ['tw-progress'], 'the pending-action progress bar is the only keyframe animation')
+  const animations = [...css.matchAll(/animation:\s*(saker-[\w-]+)/g)].map((match) => match[1])
+  assert.deepEqual(animations, ['saker-progress'], 'the pending-action progress bar is the only keyframe animation')
   // It still parks under reduced motion.
-  assert.match(css, /\.tw-progress-indeterminate\s*\{[^}]*animation:\s*none/)
+  assert.match(css, /\.saker-progress-indeterminate\s*\{[^}]*animation:\s*none/)
 })

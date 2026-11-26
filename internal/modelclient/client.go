@@ -178,7 +178,7 @@ func NewWithProvider(base, key, model, provider string) (*Client, error) {
 		Model:     model,
 		HTTP:      &http.Client{Timeout: 300 * time.Second},
 		MaxTokens: maxTokens,
-		SessionID: "tw-" + rand.Text(),
+		SessionID: "saker-" + rand.Text(),
 	}, nil
 }
 

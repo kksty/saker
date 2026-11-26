@@ -1,4 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="天吴">
+<!-- 占位图标（几何标记）：正式 logo 素材到位后整份替换，不自造图案。 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Saker">
   <style>
     svg {
       --mark: #14161b;

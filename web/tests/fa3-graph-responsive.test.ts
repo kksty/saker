@@ -76,9 +76,9 @@ test('toolbar wraps by container width, not by window width', async () => {
   })
   const toolbar = renderer!.root.findByProps({ role: 'toolbar' })
   const className = String(toolbar.props.className)
-  assert.ok(className.includes('tw-graph-toolbar'), 'toolbar uses the container-driven layout')
-  assert.ok(className.includes('tw-graph-corner-tr'), 'toolbar is placed by the safe-area corner recipe')
-  assert.ok(html().includes('tw-graph-corner-tr'))
+  assert.ok(className.includes('saker-graph-toolbar'), 'toolbar uses the container-driven layout')
+  assert.ok(className.includes('saker-graph-corner-tr'), 'toolbar is placed by the safe-area corner recipe')
+  assert.ok(html().includes('saker-graph-corner-tr'))
   // The old viewport breakpoints must be gone from this element.
   assert.equal(/\bsm:|\bmd:/.test(className), false, 'toolbar has no viewport breakpoints')
 })
@@ -89,11 +89,11 @@ test('the chat dock is clamped by the map width and the safe area', async () => 
   })
   const root = renderer!.root.findByProps({ 'data-graph-chat': true })
   const className = String(root.props.className)
-  assert.ok(className.includes('tw-graph-dock'), 'dock width is clamped against the stage (100cqi)')
-  assert.ok(className.includes('tw-graph-dock-right'), 'right inset includes the device safe area')
+  assert.ok(className.includes('saker-graph-dock'), 'dock width is clamped against the stage (100cqi)')
+  assert.ok(className.includes('saker-graph-dock-right'), 'right inset includes the device safe area')
   assert.equal(className.includes('100vw'), false, 'no viewport-width clamp on the dock')
   // The resize handle is a touch target on a coarse pointer (styled in app.css).
-  assert.ok(html().includes('tw-dock-handle'))
+  assert.ok(html().includes('saker-dock-handle'))
 })
 
 test('the list view switches its wide columns with container queries', async () => {
@@ -109,11 +109,11 @@ test('the list view switches its wide columns with container queries', async () 
     )
   })
   const markup = html()
-  for (const cls of ['tw-graph-list-id', 'tw-graph-list-hint']) {
+  for (const cls of ['saker-graph-list-id', 'saker-graph-list-hint']) {
     assert.ok(markup.includes(cls), `list view emits ${cls}`)
   }
   // Scroll region: reserved gutter + contained scroll.
-  assert.ok(markup.includes('tw-scroll'))
+  assert.ok(markup.includes('saker-scroll'))
   // No column may still answer to the window width.
   assert.equal(/\bsm:|\bmd:|\bxl:/.test(markup), false, 'list view has no viewport breakpoints')
 })
@@ -124,7 +124,7 @@ test('the legend pins its title row and scrolls its body inside the bounded stac
   })
   const legend = renderer!.root.findByProps({ 'data-testid': 'graph-legend' })
   const card = String(legend.props.className)
-  assert.ok(card.includes('tw-graph-dock'), 'width is clamped by the map')
+  assert.ok(card.includes('saker-graph-dock'), 'width is clamped by the map')
   assert.ok(card.includes('flex'), 'the card is a column so its body can shrink')
   assert.ok(card.includes('min-h-10'), 'it shrinks inside the stack, but never below its title row')
 
@@ -140,9 +140,9 @@ test('the legend pins its title row and scrolls its body inside the bounded stac
   const markup = html()
   assert.ok(markup.includes('flex-1'), 'the body takes the height the stack leaves it')
   assert.ok(markup.includes('overflow-y-auto'))
-  assert.ok(markup.includes('tw-scroll'), 'the body is a contained scroll region')
+  assert.ok(markup.includes('saker-scroll'), 'the body is a contained scroll region')
   assert.equal(
-    markup.includes('tw-graph-overlay-scroll'),
+    markup.includes('saker-graph-overlay-scroll'),
     false,
     'the legend is bounded by its stack, not by a fixed height the banner can cover',
   )

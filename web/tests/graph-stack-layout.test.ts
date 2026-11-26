@@ -18,10 +18,10 @@ const commander = await read('../src/components/CommanderCard.tsx')
 const css = await read('../src/app.css')
 
 test('the stack is one bounded column with room for all three cards', () => {
-  assert.match(panel, /tw-graph-corner-bl tw-graph-dock tw-graph-stack absolute flex flex-col/)
-  assert.match(panel, /tw-scroll flex min-h-0 flex-1 flex-col gap-1\.5 overflow-y-auto/)
-  assert.match(css, /\.tw-graph-stack \{[\s\S]*?inline-size: clamp\(16rem, 18cqi, 20rem\)/)
-  assert.match(css, /\.tw-graph-stack \{[\s\S]*?max-block-size: max\(3\.5rem, calc\(var\(--graph-overlay-height\) \* 0\.72\)\)/)
+  assert.match(panel, /saker-graph-corner-bl saker-graph-dock saker-graph-stack absolute flex flex-col/)
+  assert.match(panel, /saker-scroll flex min-h-0 flex-1 flex-col gap-1\.5 overflow-y-auto/)
+  assert.match(css, /\.saker-graph-stack \{[\s\S]*?inline-size: clamp\(16rem, 18cqi, 20rem\)/)
+  assert.match(css, /\.saker-graph-stack \{[\s\S]*?max-block-size: max\(3\.5rem, calc\(var\(--graph-overlay-height\) \* 0\.72\)\)/)
 })
 
 test('the commander card sits at the bottom, below the target and legend', () => {
@@ -40,13 +40,13 @@ test('the commander card sits at the bottom, below the target and legend', () =>
 test('a narrow map hides the stack under an open node panel, like the filter card', () => {
   assert.match(
     css,
-    /\.tw-graph-stage:has\(\.tw-graph-panel, \[data-graph-chat\]\) \.tw-graph-filter,\s*\.tw-graph-stage:has\(\.tw-graph-panel, \[data-graph-chat\]\) \.tw-graph-stack \{[\s\S]*?display: none;/,
+    /\.saker-graph-stage:has\(\.saker-graph-panel, \[data-graph-chat\]\) \.saker-graph-filter,\s*\.saker-graph-stage:has\(\.saker-graph-panel, \[data-graph-chat\]\) \.saker-graph-stack \{[\s\S]*?display: none;/,
   )
 })
 
 test('an expanded legend takes the column remainder and scrolls its own body', () => {
-  assert.match(legend, /tw-graph-dock flex min-h-10 w-full flex-col/)
+  assert.match(legend, /saker-graph-dock flex min-h-10 w-full flex-col/)
   assert.match(legend, /open \? 'min-h-40 flex-1' : 'shrink-0'/)
-  assert.match(legend, /tw-scroll tw-graph-legend-body min-h-0 flex-1 overflow-y-auto/)
-  assert.match(css, /\.tw-graph-legend-body \{[\s\S]*?overscroll-behavior: contain/)
+  assert.match(legend, /saker-scroll saker-graph-legend-body min-h-0 flex-1 overflow-y-auto/)
+  assert.match(css, /\.saker-graph-legend-body \{[\s\S]*?overscroll-behavior: contain/)
 })

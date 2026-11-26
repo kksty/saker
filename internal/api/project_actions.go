@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/model"
 )
 
 // Operator-facing project state. The console used to derive "the project is

@@ -1,8 +1,8 @@
 package lifecycle
 
 import (
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/model"
 )
 
 // uncountAttempt reverses the claim counter for a run we ended ourselves. A

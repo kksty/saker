@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/host"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/project"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/host"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/project"
 )
 
 func TestNodeListShowsModelFailureWithoutInventingAnUnboundNode(t *testing.T) {
@@ -79,7 +79,7 @@ func (nodeExec) TerminalEndpoint(id string) (baseURL, token, agent string, ok bo
 // best-effort remove does, without hiding it behind a sleep.
 func testDir(t *testing.T) string {
 	t.Helper()
-	dir, err := os.MkdirTemp("", "tw-api-*")
+	dir, err := os.MkdirTemp("", "saker-api-*")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // proposalFixture is one well-formed suggestion. Callers override the fields

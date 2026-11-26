@@ -1,5 +1,5 @@
 // Wire types for the ledger API. They mirror internal/model, internal/board and
-// the handler payloads in internal/api + cmd/tw/hub.go one for one: the console
+// the handler payloads in internal/api + cmd/saker/hub.go one for one: the console
 // adds no interpretation the server does not already make.
 
 export type IntentStatus =

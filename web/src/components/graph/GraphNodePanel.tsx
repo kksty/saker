@@ -55,7 +55,7 @@ function Section({ title, extra, children }: { title: ReactNode; extra?: ReactNo
   return (
     <section className="border-t border-hairline pt-3 first:border-t-0 first:pt-0">
       <div className="mb-1.5 flex items-center gap-1.5">
-        <h3 className="tw-eyebrow min-w-0 normal-case tracking-normal text-ink-2">{title}</h3>
+        <h3 className="saker-eyebrow min-w-0 normal-case tracking-normal text-ink-2">{title}</h3>
         {extra && <div className="ml-auto flex items-center gap-1.5">{extra}</div>}
       </div>
       <div className="min-w-0 space-y-1.5">{children}</div>
@@ -107,7 +107,7 @@ function Prop({
       <span
         className={cn(
           'min-w-0 flex-1 text-[13px] leading-5 text-ink-2',
-          mono ? 'tw-nums font-mono' : '',
+          mono ? 'saker-nums font-mono' : '',
         )}
       >
         {value}
@@ -400,7 +400,7 @@ function NodeWorkspace({
     // column only clamps the box — the content kept its height and was simply
     // clipped, so a long fact had unreachable rows and no wheel scrolling.
     <div
-      className="tw-graph-dock tw-graph-dock-right tw-graph-panel tw-graph-under-toolbar absolute flex flex-col overflow-hidden rounded-xl border border-hairline bg-card/95 shadow-elevated backdrop-blur"
+      className="saker-graph-dock saker-graph-dock-right saker-graph-panel saker-graph-under-toolbar absolute flex flex-col overflow-hidden rounded-xl border border-hairline bg-card/95 shadow-elevated backdrop-blur"
       style={{ width: dock.width }}
       onKeyDown={onPanelKeyDown}
     >
@@ -449,8 +449,8 @@ function NodeWorkspace({
       <ScrollArea className="min-h-0 flex-1 [&_[data-radix-scroll-area-viewport]>div]:!block">
         <div className="min-w-0 space-y-4 p-4 text-[12px] leading-5">
           <div className="min-w-0">
-            <div className="tw-break text-[14px] font-semibold leading-5 text-ink">{node.label}</div>
-            {node.sub && <div className="tw-break mt-1 text-[12px] leading-relaxed text-ink-2">{node.sub}</div>}
+            <div className="saker-break text-[14px] font-semibold leading-5 text-ink">{node.label}</div>
+            {node.sub && <div className="saker-break mt-1 text-[12px] leading-relaxed text-ink-2">{node.sub}</div>}
           </div>
           {/* Why the direction is stopped, in the same words the run page uses.
               Only a cancelled executor run has this text, and only a held
@@ -500,7 +500,7 @@ function NodeWorkspace({
               <div className="text-[12px] font-semibold">{reviewFailureLabel(reviewFailure.data)}</div>
               <div className="mt-0.5 text-[11px] leading-relaxed">{reviewFailureHint(reviewFailure.data)}</div>
               {latestReviewNote && (
-                <div className="tw-break mt-1 text-[11px] leading-relaxed">{latestReviewNote.text}</div>
+                <div className="saker-break mt-1 text-[11px] leading-relaxed">{latestReviewNote.text}</div>
               )}
               {(intent.review_failed_facts?.length ?? 0) > 0 && (
                 <div className="mt-1.5 flex flex-wrap items-center gap-1">
@@ -599,7 +599,7 @@ function NodeWorkspace({
             >
               <pre
                 className={cn(
-                  'tw-mono tw-break overflow-auto whitespace-pre-wrap rounded-lg border border-hairline bg-surface-2 p-2 text-[11px] leading-relaxed',
+                  'saker-mono saker-break overflow-auto whitespace-pre-wrap rounded-lg border border-hairline bg-surface-2 p-2 text-[11px] leading-relaxed',
                   // Expanded is the default and stays readable: scroll inside the
                   // body rather than clipping it to a sliver. 收起 is the short view.
                   docCollapsed ? 'max-h-40' : 'max-h-[70vh]',
@@ -627,9 +627,9 @@ function NodeWorkspace({
                     className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 text-left"
                   >
                     <Eye className="h-3.5 w-3.5 shrink-0 text-ink-3" />
-                    <span className="tw-break min-w-0 flex-1 font-mono text-[11px] text-ink-2">{ev.uri}</span>
+                    <span className="saker-break min-w-0 flex-1 font-mono text-[11px] text-ink-2">{ev.uri}</span>
                   </button>
-                  <span className="tw-nums shrink-0 font-mono text-[11px] text-ink-3">
+                  <span className="saker-nums shrink-0 font-mono text-[11px] text-ink-3">
                     {fmtBytes(ev.size)}
                   </span>
                   <a
@@ -658,7 +658,7 @@ function NodeWorkspace({
                   <span className="shrink-0 rounded bg-surface-2 px-1.5 font-mono text-[11px] text-ink-3">
                     {ref.scheme}
                   </span>
-                  <span className="tw-break min-w-0 flex-1 font-mono text-[11px] text-ink-2">{ref.locator}</span>
+                  <span className="saker-break min-w-0 flex-1 font-mono text-[11px] text-ink-2">{ref.locator}</span>
                 </div>
               ))}
               <div className="text-[11px] leading-relaxed text-ink-3">
@@ -690,9 +690,9 @@ function NodeWorkspace({
           {helpers && helpers.calls > 0 && (
             <Section title="本轮助手">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[12px] text-ink-2">
-                <span className="tw-nums">{`调用 ${fmtInt(helpers.calls)} 次`}</span>
-                <span className="tw-nums">{`活跃 ${fmtInt(helpers.active)}`}</span>
-                <span className="tw-nums">{`累计 ${helperDuration(helpers.durationMs)}`}</span>
+                <span className="saker-nums">{`调用 ${fmtInt(helpers.calls)} 次`}</span>
+                <span className="saker-nums">{`活跃 ${fmtInt(helpers.active)}`}</span>
+                <span className="saker-nums">{`累计 ${helperDuration(helpers.durationMs)}`}</span>
               </div>
               <div className="text-[11px] leading-relaxed text-ink-3">
                 助手归父回合管理，不登记 run/usage、不产生事实；结论仍由本意图声明。
@@ -708,7 +708,7 @@ function NodeWorkspace({
               </summary>
               <div className="mt-1.5 space-y-1">
                 {node.warnings!.map((w, i) => (
-                  <div key={i} className="tw-break text-[12px] leading-relaxed text-ink-2">
+                  <div key={i} className="saker-break text-[12px] leading-relaxed text-ink-2">
                     {/subagent/i.test(w) && (
                       <Badge size="sm" variant="warning" className="mr-1">
                         原生 subagent
@@ -743,7 +743,7 @@ function NodeWorkspace({
               </Callout>
             )}
           {intent?.doc && (
-            <pre className="tw-mono tw-break max-h-32 overflow-auto whitespace-pre-wrap rounded-lg border border-hairline bg-surface-2 p-2.5 text-[11px] leading-relaxed text-ink-2">
+            <pre className="saker-mono saker-break max-h-32 overflow-auto whitespace-pre-wrap rounded-lg border border-hairline bg-surface-2 p-2.5 text-[11px] leading-relaxed text-ink-2">
               {intent.doc}
             </pre>
           )}
@@ -771,8 +771,8 @@ function NodeWorkspace({
             <Section title="token 用量">
               {usageDirect ? (
                 <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[12px] text-ink-2">
-                  <span className="tw-nums">直接 {fmtInt(usageDirect.total_tokens)} tok</span>
-                  <span className="tw-nums">{usageDirect.runs} run</span>
+                  <span className="saker-nums">直接 {fmtInt(usageDirect.total_tokens)} tok</span>
+                  <span className="saker-nums">{usageDirect.runs} run</span>
                   {usageDirect.unknown_usage_runs > 0 && (
                     <span className="text-ink-3">{usageDirect.unknown_usage_runs} 个用量未知</span>
                   )}
@@ -786,7 +786,7 @@ function NodeWorkspace({
           {intent && (
             <div className="rounded-lg border border-hairline bg-surface-2/40 px-2.5 py-2">
               <div className="flex items-center gap-1.5">
-                <span className="tw-eyebrow normal-case tracking-normal text-ink-2">新执行者接班</span>
+                <span className="saker-eyebrow normal-case tracking-normal text-ink-2">新执行者接班</span>
                 <Badge size="sm" variant="muted">交接 v{intent.handoff_version ?? 0}</Badge>
                 {<Button
                   size="xs"
@@ -832,10 +832,10 @@ function NodeWorkspace({
                     <Badge size="sm" variant={n.kind === 'retry' || n.kind === 'restart' || n.kind === 'review' || n.kind === 'bootstrap' ? 'warning' : 'info'}>
                       {n.kind === 'retry' ? '重派' : n.kind === 'restart' ? '重启' : n.kind === 'steer' ? '续话' : n.kind === 'review' ? '复核' : n.kind === 'bootstrap' ? '首触确认' : n.kind}
                     </Badge>
-                    <span className="tw-nums font-mono">{fmtTime(n.at)}</span>
+                    <span className="saker-nums font-mono">{fmtTime(n.at)}</span>
                     {n.ref_fact && <span className="ml-auto truncate font-mono">依据 {n.ref_fact}</span>}
                   </div>
-                  <div className="tw-break mt-1 line-clamp-3 text-[12px] leading-relaxed text-ink-2" title={n.text}>
+                  <div className="saker-break mt-1 line-clamp-3 text-[12px] leading-relaxed text-ink-2" title={n.text}>
                     {n.text}
                   </div>
                 </div>
@@ -851,7 +851,7 @@ function NodeWorkspace({
               {intent.interjections.map((it, i) => (
                 <div key={`${it.at}:${i}`} className="rounded-lg border border-hairline px-2.5 py-2">
                   <div className="flex items-center gap-1.5 text-[11px] text-ink-3">
-                    <span className="tw-nums font-mono">{fmtTime(it.at)}</span>
+                    <span className="saker-nums font-mono">{fmtTime(it.at)}</span>
                     {it.interrupt && (
                       <Badge size="sm" variant="warning">
                         打断
@@ -859,7 +859,7 @@ function NodeWorkspace({
                     )}
                     {it.message_id && <span className="ml-auto truncate font-mono">{it.message_id}</span>}
                   </div>
-                  <div className="tw-break mt-1 line-clamp-3 text-[12px] leading-relaxed text-ink-2" title={it.text}>
+                  <div className="saker-break mt-1 line-clamp-3 text-[12px] leading-relaxed text-ink-2" title={it.text}>
                     {it.text}
                   </div>
                 </div>
@@ -876,13 +876,13 @@ function NodeWorkspace({
                 </Badge>
               }
             >
-              <div className="tw-break text-[12.5px] font-medium leading-relaxed text-ink">{goal.statement}</div>
+              <div className="saker-break text-[12.5px] font-medium leading-relaxed text-ink">{goal.statement}</div>
               {goal.start ? (
-                <div className="tw-break mt-1 whitespace-pre-wrap text-[12px] leading-relaxed text-ink-2">
+                <div className="saker-break mt-1 whitespace-pre-wrap text-[12px] leading-relaxed text-ink-2">
                   起点：{goal.start}
                 </div>
               ) : goal.quantified_target ? (
-                <div className="tw-break mt-1 whitespace-pre-wrap text-[12px] leading-relaxed text-ink-2">
+                <div className="saker-break mt-1 whitespace-pre-wrap text-[12px] leading-relaxed text-ink-2">
                   口径（旧记录）：{goal.quantified_target}
                 </div>
               ) : null}
@@ -893,15 +893,15 @@ function NodeWorkspace({
               />
               {goal.met && (
                 <div className="mt-1.5 space-y-1.5 border-t border-hairline pt-2">
-                  <div className="tw-eyebrow normal-case tracking-normal text-ink-2">为什么达成</div>
+                  <div className="saker-eyebrow normal-case tracking-normal text-ink-2">为什么达成</div>
                   {goal.note ? (
-                    <div className="tw-break whitespace-pre-wrap text-[12px] leading-relaxed text-ink-2">
+                    <div className="saker-break whitespace-pre-wrap text-[12px] leading-relaxed text-ink-2">
                       {goal.note}
                     </div>
                   ) : (
                     <div className="text-[12px] italic text-ink-3">达成理由未记录（旧数据）</div>
                   )}
-                  <div className="tw-eyebrow normal-case tracking-normal text-ink-2">
+                  <div className="saker-eyebrow normal-case tracking-normal text-ink-2">
                     依据{goalRefs.legacy ? '（证据所在结论）' : ''}
                   </div>
                   {goalRefs.items.length > 0 ? (
@@ -915,7 +915,7 @@ function NodeWorkspace({
                           title={refFact ? `${id} · ${refFact.title}` : `${id}（事实不在当前列表）`}
                         >
                           <span className="shrink-0 pt-px font-mono text-[11px] leading-relaxed text-info">{id}</span>
-                          <span className="tw-break min-w-0 flex-1 text-[12px] text-ink-2">
+                          <span className="saker-break min-w-0 flex-1 text-[12px] text-ink-2">
                             {refFact?.title ?? '事实不在当前列表'}
                           </span>
                         </button>
@@ -964,7 +964,7 @@ function NodeWorkspace({
           {/* actions: one soft main action per state, the rest outline/ghost.
               Disabled buttons keep their label, so the state is readable. */}
           <div className="space-y-2 border-t border-hairline pt-3">
-            <div className="tw-eyebrow">操作</div>
+            <div className="saker-eyebrow">操作</div>
             <div className="flex flex-wrap gap-2">
             {/* A done direction cannot be claimed for a fresh run; "续跑" below
                 continues its session instead. Showing 派发 on done only produced

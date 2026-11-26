@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/testutil"
+	"github.com/kksty/saker/internal/testutil"
 )
 
 // livenessWait bounds the "it has to happen at all" waits in this package's

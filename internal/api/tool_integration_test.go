@@ -3,14 +3,14 @@ package api
 // Real-harness integration coverage for P0-2: the console's tool roots must be
 // the directories the running scan actually resolves, and tool/model
 // availability must come from the live AOP catalogue — not from a file that
-// happens to exist. Opt in with TW_HARNESS_BIN (+ TW_SCAN_BIN); without the
+// happens to exist. Opt in with SAKER_HARNESS_BIN (+ SAKER_SCAN_BIN); without the
 // pair the test skips, so the default `go test ./...` stays hermetic.
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/kksty/tianwu/internal/testutil"
+	"github.com/kksty/saker/internal/testutil"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -21,11 +21,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/aop"
-	"github.com/kksty/tianwu/internal/host"
-	"github.com/kksty/tianwu/internal/node"
-	"github.com/kksty/tianwu/internal/skills"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/aop"
+	"github.com/kksty/saker/internal/host"
+	"github.com/kksty/saker/internal/node"
+	"github.com/kksty/saker/internal/skills"
+	"github.com/kksty/saker/internal/store"
 )
 
 // sameDirAsRuntime mirrors host.sameWorkingDir: Windows compares
@@ -42,13 +42,13 @@ func sameDirAsRuntime(a, b string) bool {
 }
 
 func TestHarnessToolRootsMatchRuntimeCatalogue(t *testing.T) {
-	bin := os.Getenv("TW_HARNESS_BIN")
+	bin := os.Getenv("SAKER_HARNESS_BIN")
 	if bin == "" {
-		bin = os.Getenv("TW_AISCAN_BIN")
+		bin = os.Getenv("SAKER_AISCAN_BIN")
 	}
-	scan := os.Getenv("TW_SCAN_BIN")
+	scan := os.Getenv("SAKER_SCAN_BIN")
 	if bin == "" || scan == "" {
-		t.Skip("set TW_HARNESS_BIN and TW_SCAN_BIN to check the real harness tool roots")
+		t.Skip("set SAKER_HARNESS_BIN and SAKER_SCAN_BIN to check the real harness tool roots")
 	}
 
 	// A local fixture model: the hub must bind a provider/model for readiness.
@@ -58,7 +58,7 @@ func TestHarnessToolRootsMatchRuntimeCatalogue(t *testing.T) {
 	}))
 	defer gateway.Close()
 
-	// tianwu's production layout: data dir holds projects/<id>/; the supervised
+	// saker's production layout: data dir holds projects/<id>/; the supervised
 	// scan is started with its working directory at the data dir
 	// (internal/host/host.go execLaunch). The commander skill creates
 	// <data>/.cyber/skills, which is exactly the directory that makes the
@@ -81,7 +81,7 @@ func TestHarnessToolRootsMatchRuntimeCatalogue(t *testing.T) {
 	h, err := host.Start(ctx, host.Config{
 		Bin: bin, NodeBin: scan, Dir: dataDir,
 		Args:            []string{"--config", config},
-		DropEnvPrefixes: []string{"CYBER_", "TW_CONSOLE_TOKEN", "TW_AGENT_TOKEN"},
+		DropEnvPrefixes: []string{"CYBER_", "SAKER_CONSOLE_TOKEN", "SAKER_AGENT_TOKEN"},
 		RequireProvider: true, ReadyTimeout: 45 * time.Second, Logf: t.Logf,
 	})
 	if err != nil {

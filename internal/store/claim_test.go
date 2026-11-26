@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // A review proves one assertion version. Display-only edits (title) keep it,

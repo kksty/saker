@@ -143,9 +143,9 @@ export function FocusPanel({
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-hairline px-5 py-2 text-[11px] text-ink-3 sm:px-6 lg:px-8" data-testid="focus-counts">
-        <span className="tw-nums font-mono">热 {counts.hot}</span>
-        <span className="tw-nums font-mono">温 {counts.warm}</span>
-        <span className="tw-nums font-mono">冷 {counts.cold}</span>
+        <span className="saker-nums font-mono">热 {counts.hot}</span>
+        <span className="saker-nums font-mono">温 {counts.warm}</span>
+        <span className="saker-nums font-mono">冷 {counts.cold}</span>
         <span>{focusSnapshotLabel(page)}</span>
         <span>本页 {focusLayerLabel(layer)}</span>
       </div>
@@ -201,7 +201,7 @@ export function FocusPanel({
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-hairline px-5 py-2 sm:px-6 lg:px-8">
-        <span role="status" aria-live="polite" className="tw-nums font-mono text-[11px] text-ink-3">
+        <span role="status" aria-live="polite" className="saker-nums font-mono text-[11px] text-ink-3">
           已载入 {page?.facts.length ?? 0} / {page?.total ?? 0}
         </span>
         {page?.has_more && page.next_cursor ? (
@@ -247,8 +247,8 @@ function FocusRow({
         <span className="font-mono text-ink-3">{fact.id}</span>
         {fact.kind ? <span className="text-ink-3">{fact.kind}</span> : null}
       </div>
-      {fact.title ? <p className="tw-break mt-1 line-clamp-2 text-[12px] font-medium leading-relaxed text-ink">{fact.title}</p> : null}
-      {fact.summary ? <p className="tw-break mt-0.5 line-clamp-3 text-[12px] leading-relaxed text-ink-2">{fact.summary}</p> : null}
+      {fact.title ? <p className="saker-break mt-1 line-clamp-2 text-[12px] font-medium leading-relaxed text-ink">{fact.title}</p> : null}
+      {fact.summary ? <p className="saker-break mt-0.5 line-clamp-3 text-[12px] leading-relaxed text-ink-2">{fact.summary}</p> : null}
       <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-ink-3">
         {fact.reasons.map((reason) => (
           <span key={reason} className="rounded border border-hairline bg-surface-2 px-1.5 py-0.5">
@@ -257,8 +257,8 @@ function FocusRow({
         ))}
         {fact.source_run_id ? <span className="font-mono">来源 run {fact.source_run_id}</span> : null}
         {fact.observed_at ? <span className="font-mono">观察于 {fact.observed_at}</span> : null}
-        <span className="tw-nums font-mono">断言版本 v{fact.claim_version ?? '—'}</span>
-        <span className="tw-nums font-mono">{fact.record_version === undefined ? '记录版本未知' : `记录版本 v${fact.record_version}`}</span>
+        <span className="saker-nums font-mono">断言版本 v{fact.claim_version ?? '—'}</span>
+        <span className="saker-nums font-mono">{fact.record_version === undefined ? '记录版本未知' : `记录版本 v${fact.record_version}`}</span>
         <a className="underline decoration-hairline underline-offset-2 hover:text-ink" href={focusFactQueryHref(fact.query, project)} target="_blank" rel="noreferrer">
           按 id 查询
         </a>

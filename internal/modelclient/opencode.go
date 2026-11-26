@@ -28,7 +28,7 @@ func ApplyEndpointHeaders(req *http.Request, sessionID string) {
 	if !IsOpenCodeEndpoint(req.URL.String()) {
 		return
 	}
-	req.Header.Set("User-Agent", "tianwu/0.x")
+	req.Header.Set("User-Agent", "saker/0.x")
 	if sessionID != "" {
 		req.Header.Set("x-opencode-session", sessionID)
 	}

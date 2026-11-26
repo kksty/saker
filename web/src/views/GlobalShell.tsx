@@ -138,7 +138,7 @@ export function GlobalShell() {
           <div className="shrink-0 px-5 pt-4 sm:px-6 lg:px-8" role="alert">
             <Callout tone="destructive" icon={<TriangleAlert className="h-4 w-4" />}>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <span className="min-w-0 tw-break">项目列表读取失败：{projects.error}</span>
+                <span className="min-w-0 saker-break">项目列表读取失败：{projects.error}</span>
                 <Button
                   size="xs"
                   variant="outline"

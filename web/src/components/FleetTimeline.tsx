@@ -121,7 +121,7 @@ export function FleetTimeline({
             return (
               <span
                 key={i}
-                className={`tw-nums absolute top-0 whitespace-nowrap font-mono leading-4 ${
+                className={`saker-nums absolute top-0 whitespace-nowrap font-mono leading-4 ${
                   first ? 'left-0' : last ? 'right-0' : ''
                 }`}
                 style={first || last ? undefined : { left: `${i * 25}%`, transform: 'translateX(-50%)' }}
@@ -148,7 +148,7 @@ export function FleetTimeline({
               >
                 <span className="truncate text-[11px]">{project.name}</span>
                 {project.intents.running > 0 && (
-                  <span className="tw-nums ml-auto shrink-0 font-mono text-[11px] text-info">
+                  <span className="saker-nums ml-auto shrink-0 font-mono text-[11px] text-info">
                     {project.intents.running}
                   </span>
                 )}

@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	pb "github.com/kksty/tianwu/internal/aop/pb"
-	"github.com/kksty/tianwu/internal/connectretry"
-	"github.com/kksty/tianwu/internal/ws"
+	pb "github.com/kksty/saker/internal/aop/pb"
+	"github.com/kksty/saker/internal/connectretry"
+	"github.com/kksty/saker/internal/ws"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 

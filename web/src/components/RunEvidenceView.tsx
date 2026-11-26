@@ -32,9 +32,9 @@ export function RunEvidenceView({
   onSelectFact?: (factID: string) => void
 }) {
   return (
-    <div className="tw-inset space-y-2 rounded-md px-2.5 py-2" data-run-evidence>
+    <div className="saker-inset space-y-2 rounded-md px-2.5 py-2" data-run-evidence>
       <div className="flex items-center gap-2">
-        <span className="tw-eyebrow normal-case tracking-normal">本次运行读到的版本</span>
+        <span className="saker-eyebrow normal-case tracking-normal">本次运行读到的版本</span>
         <span className="ml-auto min-w-0 truncate font-mono text-[11px] text-ink-3" title={run.id}>
           {run.id}
         </span>
@@ -95,7 +95,7 @@ function VersionBlock({
     <div>
       <div className="flex items-center gap-2" title={evidenceVersionHint(kind)}>
         <span className="text-[12px] font-medium text-ink-2">{title}</span>
-        <Badge size="sm" variant="muted" className="tw-nums font-mono">{rows.length}</Badge>
+        <Badge size="sm" variant="muted" className="saker-nums font-mono">{rows.length}</Badge>
         <span className="truncate text-[11px] text-ink-3">{hint}</span>
       </div>
       {state === 'not_recorded' && (
@@ -125,7 +125,7 @@ function VersionBlock({
               <Badge
                 size="sm"
                 variant={row.version > 0 ? 'primary' : 'muted'}
-                className="tw-nums shrink-0 font-mono"
+                className="saker-nums shrink-0 font-mono"
                 title={row.version > 0 ? `${row.id} 的冻结版本` : `${row.id} 没有记录版本`}
               >
                 {evidenceVersionLabel(row.kind, row.version)}

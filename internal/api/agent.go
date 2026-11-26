@@ -23,10 +23,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/aopexec"
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/aopexec"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 type identityCtxKey struct{}
@@ -45,7 +45,7 @@ func identityOf(r *http.Request) (collab.Identity, bool) {
 type agentSurfaceCtxKey struct{}
 
 // WithAgentSurface marks a request that authenticated with the harness session
-// credential (cmd/tw's roleAgent) instead of the operator's console token. The
+// credential (cmd/saker's roleAgent) instead of the operator's console token. The
 // credential can carry a per-session identity, but the gate mounts it only on
 // the routes whose handler needs the run; this marker is what tells every other
 // handler that the caller is still a session. Handlers must not infer the role
@@ -66,7 +66,7 @@ func IsAgentSurface(ctx context.Context) bool {
 type reviewerSurfaceCtxKey struct{}
 
 // WithReviewerSurface marks a request authenticated by a review run's read-only
-// credential (cmd/tw's roleVerifier). A reviewer is deliberately not a harness
+// credential (cmd/saker's roleVerifier). A reviewer is deliberately not a harness
 // session: it carries no identity and no intent, so it cannot speak for a
 // direction. The marker exists for the opposite reason — the handlers that keep
 // support runs (report/verifier) absent from a session's view must answer the
@@ -110,7 +110,7 @@ const identityFile = ".tw/identity.json"
 // authFile is the same credential as one ready-to-use Authorization header line.
 // A session shells out once per command, so a line it can `cat` is less work and
 // less error-prone than parsing the JSON with sed. The host's shell init exports
-// it as $TW_AUTH at shell start, so a model normally never touches the file; it
+// it as $SAKER_AUTH at shell start, so a model normally never touches the file; it
 // is the fallback for a shell that did not source the init.
 const authFile = ".tw/auth"
 
@@ -206,8 +206,8 @@ const (
 // registerAgent is the route table of the participant face
 // (/agent/<p>/api/...): what actually exists there. It does not decide what an
 // agent identity may see on the project face (/p/<id>/api/...) — that is
-// agentRouteHidden in cmd/tw/auth.go — and it does not mount or authenticate
-// the face, which is hub.serveAgent in cmd/tw/hub.go.
+// agentRouteHidden in cmd/saker/auth.go — and it does not mount or authenticate
+// the face, which is hub.serveAgent in cmd/saker/hub.go.
 //
 // Maintenance: when adding or removing a route here, check that allowlist too,
 // and the reverse. The project board is only on the project surface.
@@ -833,7 +833,7 @@ func formatPeerMessage(m model.Message) string {
 // participant-authenticated: the console token already gates /p/<id>/api.
 //
 // A harness executor can reach this same route with its per-run credential:
-// cmd/tw admits project reads for sessions and attaches the executor identity so
+// cmd/saker admits project reads for sessions and attaches the executor identity so
 // direction-scoped handlers can narrow (see auth.go). Without narrowing here the
 // route would hand one direction every other direction's conversation, while the
 // participant surface (/agent/.../api/messages) returns only the caller's own

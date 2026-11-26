@@ -470,14 +470,14 @@ func writePromptFile(workDir, name, prompt string) (string, error) {
 	return name, nil
 }
 
-// ResolveBin finds the harness binary next to tw first, then on PATH. It keeps
+// ResolveBin finds the harness binary next to saker first, then on PATH. It keeps
 // Windows and Linux deployments identical: no hardcoded ".exe".
 func ResolveBin(name string) string {
 	candidates := []string{name}
 	if runtime.GOOS == "windows" && !strings.HasSuffix(name, ".exe") {
 		candidates = []string{name + ".exe", name}
 	}
-	// Next to the binary, then the repo's own ./bin: `go run ./cmd/tw` puts the
+	// Next to the binary, then the repo's own ./bin: `go run ./cmd/saker` puts the
 	// temp binary somewhere else, so the second check is what makes
 	// "build once, then just go run" work from the repo root.
 	dirs := []string{"bin"}

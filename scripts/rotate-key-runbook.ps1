@@ -28,7 +28,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Data,
 
-    [string]$HarnessConfig = $env:TW_HARNESS_CONFIG,
+    [string]$HarnessConfig = $env:SAKER_HARNESS_CONFIG,
 
     [string[]]$Secret = @(),
 

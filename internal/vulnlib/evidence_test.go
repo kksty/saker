@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/evidence"
+	"github.com/kksty/saker/internal/evidence"
 )
 
 func preservedLibraryFixture(t *testing.T, body string) (*Library, string, evidence.Preserved) {

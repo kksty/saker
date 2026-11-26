@@ -21,7 +21,7 @@ package store
 import (
 	"slices"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // premiseLostReason prefixes the version-journal reason written on the rows a

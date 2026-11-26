@@ -42,7 +42,7 @@ export function IntentContextEditor({
   return (
     <div className="rounded-lg border border-hairline bg-surface-2/40 px-2.5 py-2" data-intent-context-editor>
       <div className="flex items-center gap-1.5">
-        <span className="tw-eyebrow normal-case tracking-normal text-ink-2">上下文（引用/固定）</span>
+        <span className="saker-eyebrow normal-case tracking-normal text-ink-2">上下文（引用/固定）</span>
         <Badge size="sm" variant="muted" title="context_version：每次成功修改 +1；保存时带上打开时的版本">
           上下文 v{version}
         </Badge>
@@ -51,9 +51,9 @@ export function IntentContextEditor({
         </Button>
       </div>
       <div className="mt-1 text-[11px] leading-relaxed text-ink-3">
-        引用 <span className="tw-nums font-mono text-ink-2">{intent.context_fact_ids?.length ?? 0}</span> · 固定{' '}
-        <span className="tw-nums font-mono text-ink-2">{intent.pinned_fact_ids?.length ?? 0}</span> · 实体{' '}
-        <span className="tw-nums font-mono text-ink-2">{intent.interest_entity_refs?.length ?? 0}</span>
+        引用 <span className="saker-nums font-mono text-ink-2">{intent.context_fact_ids?.length ?? 0}</span> · 固定{' '}
+        <span className="saker-nums font-mono text-ink-2">{intent.pinned_fact_ids?.length ?? 0}</span> · 实体{' '}
+        <span className="saker-nums font-mono text-ink-2">{intent.interest_entity_refs?.length ?? 0}</span>
         。引用/固定只决定这次读什么，不改硬前提。
       </div>
       {open && <ContextEditorBody key={intent.id} intent={intent} onSaved={onSaved} onSelectFact={onSelectFact} />}
@@ -232,7 +232,7 @@ function ContextEditorBody({
       <div>
         <div className="mb-1 flex items-center gap-1.5">
           <span className="text-[12px] font-medium text-ink-2">添加引用/固定</span>
-          <span className="tw-nums ml-auto font-mono text-[11px] text-ink-3">
+          <span className="saker-nums ml-auto font-mono text-[11px] text-ink-3">
             已载入 {factRows.length} 条事实
           </span>
         </div>
@@ -261,7 +261,7 @@ function ContextEditorBody({
               key={fact.id}
               className="flex items-center gap-1.5 rounded-lg border border-hairline bg-card/40 px-2 py-1 transition-colors hover:bg-surface-2/60"
             >
-              <span className="tw-break shrink-0 font-mono text-[11px] text-ink-3">{fact.id}</span>
+              <span className="saker-break shrink-0 font-mono text-[11px] text-ink-3">{fact.id}</span>
               <span className="min-w-0 flex-1 truncate text-[11px] text-ink-2" title={fact.title}>
                 {fact.title}
               </span>
@@ -299,7 +299,7 @@ function ContextEditorBody({
         <Button size="sm" variant="ghost" disabled={busy || !dirty} onClick={() => adopt(base)}>
           撤销修改
         </Button>
-        <span className="tw-nums font-mono text-[11px] text-ink-3">将以 v{base.version} 保存</span>
+        <span className="saker-nums font-mono text-[11px] text-ink-3">将以 v{base.version} 保存</span>
         {dirty && (
           <Badge size="sm" variant="warning">
             未保存
@@ -363,7 +363,7 @@ function ContextList({
                 {contextFactLabel(id, facts)}
               </span>
             )}
-            <span className="tw-break shrink-0 font-mono text-[11px] text-ink-3">{id}</span>
+            <span className="saker-break shrink-0 font-mono text-[11px] text-ink-3">{id}</span>
             <Button
               size="xs"
               variant="ghost"
@@ -410,7 +410,7 @@ function HardPremises({
               className="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left transition-colors enabled:hover:bg-surface-2 disabled:cursor-default"
               title={id}
             >
-              <span className="tw-break shrink-0 font-mono text-[11px] text-ink-3">{id}</span>
+              <span className="saker-break shrink-0 font-mono text-[11px] text-ink-3">{id}</span>
               <span className="min-w-0 flex-1 truncate text-[11px] text-ink-2">
                 {contextFactLabel(id, facts)}
               </span>

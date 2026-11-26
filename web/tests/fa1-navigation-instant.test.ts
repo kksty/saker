@@ -44,7 +44,7 @@ function harness(): Harness {
     addEventListener: events.addEventListener.bind(events),
     removeEventListener: events.removeEventListener.bind(events),
     dispatchEvent: (event: Event) => {
-      if (event.type === 'tw:navigate') state.events++
+      if (event.type === 'saker:navigate') state.events++
       return events.dispatchEvent(event)
     },
   }

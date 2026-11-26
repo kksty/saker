@@ -137,14 +137,14 @@ export function GuardrailCard({
         <SkeletonList count={2} />
       ) : pending.error ? (
         <Callout tone="warning">
-          <span className="tw-break">读取工具审批失败：{pending.error}</span>
+          <span className="saker-break">读取工具审批失败：{pending.error}</span>
           <Button type="button" size="xs" variant="outline" className="ml-2" onClick={() => pending.reload()}>
             重试
           </Button>
         </Callout>
       ) : data && data.state === 'available' ? (
         <>
-          {data.reason && <p className="tw-break text-[11px] leading-relaxed text-warning">{data.reason}</p>}
+          {data.reason && <p className="saker-break text-[11px] leading-relaxed text-warning">{data.reason}</p>}
           {!Array.isArray(data.pending) ? (
             <p className="text-[11px] leading-relaxed text-ink-3">
               待审批清单没读全：宿主回了 available，但没有条目清单，不能当成「没有待审批」。
@@ -168,12 +168,12 @@ export function GuardrailCard({
                     </div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 font-mono text-[11px] text-ink-3">
                       <span title={item.session_id}>会话 {guardrailSessionShort(item.session_id)}</span>
-                      <span className="tw-break">操作 {item.operation_id}</span>
-                      {item.call_id && <span className="tw-break">调用 {item.call_id}</span>}
+                      <span className="saker-break">操作 {item.operation_id}</span>
+                      {item.call_id && <span className="saker-break">调用 {item.call_id}</span>}
                     </div>
                     <details className="mt-1">
                       <summary className="cursor-pointer select-none text-[11px] text-ink-3">参数（宿主转发的原始 JSON）</summary>
-                      <pre className="tw-inset tw-break mt-1 max-h-40 overflow-auto overscroll-contain whitespace-pre-wrap rounded p-2 font-mono text-[11px] leading-5 text-ink-2 [scrollbar-width:thin]">
+                      <pre className="saker-inset saker-break mt-1 max-h-40 overflow-auto overscroll-contain whitespace-pre-wrap rounded p-2 font-mono text-[11px] leading-5 text-ink-2 [scrollbar-width:thin]">
                         {guardrailArgumentsText(item)}
                       </pre>
                     </details>
@@ -208,7 +208,7 @@ export function GuardrailCard({
           )}
         </>
       ) : (
-        <p className="tw-break text-[11px] leading-relaxed text-ink-3">{reason}</p>
+        <p className="saker-break text-[11px] leading-relaxed text-ink-3">{reason}</p>
       )}
 
       <div aria-live="polite">
@@ -288,7 +288,7 @@ export function GuardrailApprovalButtons({
     )
   }
   if (item === null) {
-    return <span className="tw-break text-[11px] leading-relaxed text-ink-3">{message}</span>
+    return <span className="saker-break text-[11px] leading-relaxed text-ink-3">{message}</span>
   }
   return (
     <div className="flex flex-wrap items-center gap-1.5">
@@ -390,23 +390,23 @@ function GuardrailResolveDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <dl className="tw-inset grid grid-cols-1 gap-x-4 gap-y-1 rounded-lg p-3 font-mono text-[11px] leading-5 text-ink-3">
+        <dl className="saker-inset grid grid-cols-1 gap-x-4 gap-y-1 rounded-lg p-3 font-mono text-[11px] leading-5 text-ink-3">
           <div className="flex min-w-0 items-baseline gap-1.5">
             <dt>工具</dt>
-            <dd className="tw-break min-w-0 text-ink-2">{guardrailItemTitle(item)}</dd>
+            <dd className="saker-break min-w-0 text-ink-2">{guardrailItemTitle(item)}</dd>
           </div>
           <div className="flex min-w-0 items-baseline gap-1.5">
             <dt>会话</dt>
-            <dd className="tw-break min-w-0 text-ink-2" title={item.session_id}>{item.session_id}</dd>
+            <dd className="saker-break min-w-0 text-ink-2" title={item.session_id}>{item.session_id}</dd>
           </div>
           <div className="flex min-w-0 items-baseline gap-1.5">
             <dt>操作</dt>
-            <dd className="tw-break min-w-0 text-ink-2">{item.operation_id}</dd>
+            <dd className="saker-break min-w-0 text-ink-2">{item.operation_id}</dd>
           </div>
           {item.call_id && (
             <div className="flex min-w-0 items-baseline gap-1.5">
               <dt>调用</dt>
-              <dd className="tw-break min-w-0 text-ink-2">{item.call_id}</dd>
+              <dd className="saker-break min-w-0 text-ink-2">{item.call_id}</dd>
             </div>
           )}
           <div className="flex min-w-0 items-baseline gap-1.5">
@@ -417,7 +417,7 @@ function GuardrailResolveDialog({
 
         <details>
           <summary className="cursor-pointer select-none text-[12px] text-ink-3">参数</summary>
-          <pre className="tw-inset tw-break mt-1 max-h-48 overflow-auto overscroll-contain whitespace-pre-wrap rounded-lg p-3 font-mono text-[11px] leading-5 text-ink-2 [scrollbar-width:thin]">
+          <pre className="saker-inset saker-break mt-1 max-h-48 overflow-auto overscroll-contain whitespace-pre-wrap rounded-lg p-3 font-mono text-[11px] leading-5 text-ink-2 [scrollbar-width:thin]">
             {guardrailArgumentsText(item, 2000)}
           </pre>
         </details>

@@ -45,7 +45,7 @@ function Figure({ label, value }: { label: string; value: string }) {
   return (
     <>
       <span className="text-ink-3">{label}</span>
-      <span className="tw-nums text-right font-medium text-ink-2">{value}</span>
+      <span className="saker-nums text-right font-medium text-ink-2">{value}</span>
     </>
   )
 }
@@ -70,7 +70,7 @@ export function ProjectTokens({ usage }: { usage?: ProjectTokenUsage }) {
         </span>
       ) : (
         <span>
-          tokens <span className="tw-nums text-[11px] font-semibold text-ink">{num(usage.total_tokens)}</span>
+          tokens <span className="saker-nums text-[11px] font-semibold text-ink">{num(usage.total_tokens)}</span>
         </span>
       )}
       <ChevronDown className="h-3.5 w-3.5 text-ink-3 transition-transform motion-reduce:transition-none group-hover:rotate-180 group-focus-within:rotate-180" />

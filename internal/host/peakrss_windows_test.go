@@ -14,12 +14,12 @@ import (
 // placeholder. The helper is this test binary itself, so the expected process
 // name is known and the child cannot exit on its own within the window.
 func TestWindowsPeakRSSReadsARealChild(t *testing.T) {
-	if os.Getenv("TW_PEAK_HELPER") == "1" {
+	if os.Getenv("SAKER_PEAK_HELPER") == "1" {
 		time.Sleep(60 * time.Second)
 		os.Exit(0)
 	}
 	cmd := exec.Command(os.Args[0], "-test.run=TestWindowsPeakRSSReadsARealChild")
-	cmd.Env = append(os.Environ(), "TW_PEAK_HELPER=1")
+	cmd.Env = append(os.Environ(), "SAKER_PEAK_HELPER=1")
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -57,15 +57,15 @@ func TestWindowsPeakRSSReportsUnavailableInsteadOfZero(t *testing.T) {
 }
 
 // The job object is what makes a tool-spawned PoC process visible: it is a
-// grandchild of the scan node, never a direct child of tw. This asserts the
+// grandchild of the scan node, never a direct child of saker. This asserts the
 // sample path finds a job member by membership, not by executable name.
 func TestChildPeakRSSIncludesJobMembers(t *testing.T) {
-	if os.Getenv("TW_PEAK_HELPER") == "1" {
+	if os.Getenv("SAKER_PEAK_HELPER") == "1" {
 		time.Sleep(60 * time.Second)
 		os.Exit(0)
 	}
 	cmd := exec.Command(os.Args[0], "-test.run=TestChildPeakRSSIncludesJobMembers")
-	cmd.Env = append(os.Environ(), "TW_PEAK_HELPER=1")
+	cmd.Env = append(os.Environ(), "SAKER_PEAK_HELPER=1")
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}

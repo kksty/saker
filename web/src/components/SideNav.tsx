@@ -43,7 +43,7 @@ export function SideNav({
       onFocus={onIntent}
       onPointerDown={onIntent}
       className={cn(
-        'tw-nav-item group relative flex min-h-10 w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left text-ui transition-colors min-[2200px]:min-h-11',
+        'saker-nav-item group relative flex min-h-10 w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left text-ui transition-colors min-[2200px]:min-h-11',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
         active ? 'font-semibold text-ink' : 'font-normal text-ink-2 hover:bg-surface-2 hover:text-ink',
       )}
@@ -63,7 +63,7 @@ export function SideNav({
       ) : badge !== undefined && badge > 0 ? (
         <span
           title={badgeTitle}
-          className="tw-nums rounded-full bg-warning/15 px-1.5 py-0.5 font-mono text-[11px] leading-none text-warning"
+          className="saker-nums rounded-full bg-warning/15 px-1.5 py-0.5 font-mono text-[11px] leading-none text-warning"
         >
           {badge}
         </span>

@@ -4,7 +4,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // maxRedispatches bounds how many times one direction may be restarted after an

@@ -21,15 +21,15 @@ const buttonVariants = cva(
         soft: 'bg-primary/12 text-primary hover:bg-primary/18',
       },
       size: {
-        default: 'h-[var(--tw-control,36px)] gap-2 px-3.5 py-2',
-        sm: 'h-[var(--tw-control-sm,32px)] gap-1.5 rounded-md px-3 text-ui',
+        default: 'h-[var(--saker-control,36px)] gap-2 px-3.5 py-2',
+        sm: 'h-[var(--saker-control-sm,32px)] gap-1.5 rounded-md px-3 text-ui',
         // Dense micro-action (rail/toolbar rows): shorter than `sm`, 11px text.
         // Replaces the hand-rolled `h-6 px-2 text-[10px]` buttons in SessionList
         // /App that had no matching Button size.
         xs: 'h-6 gap-1 rounded px-2 text-[11px]',
         lg: 'h-11 gap-2 rounded-lg px-5',
-        icon: 'h-[var(--tw-control,36px)] w-[var(--tw-control,36px)]',
-        'icon-sm': 'h-[var(--tw-control-sm,32px)] w-[var(--tw-control-sm,32px)]',
+        icon: 'h-[var(--saker-control,36px)] w-[var(--saker-control,36px)]',
+        'icon-sm': 'h-[var(--saker-control-sm,32px)] w-[var(--saker-control-sm,32px)]',
         'icon-xs': 'h-7 w-7',
       },
     },

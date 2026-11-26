@@ -24,7 +24,7 @@ export function WorkspaceSidebar({ label, summary, expanded, onToggle, children 
         className="h-9 w-full justify-start gap-2 rounded-lg bg-card text-left @3xl:hidden"
       >
         <span className="min-w-0 flex-1 truncate">{label}</span>
-        {summary && <span className="tw-nums truncate text-[11px] text-ink-3">{summary}</span>}
+        {summary && <span className="saker-nums truncate text-[11px] text-ink-3">{summary}</span>}
         <ChevronDown aria-hidden="true" className={cn('size-4 shrink-0 text-ink-3', expanded && 'rotate-180')} />
       </Button>
       <div id={contentID} className={cn('min-h-0 flex-1 flex-col gap-3 @3xl:flex', expanded ? 'flex' : 'hidden')}>

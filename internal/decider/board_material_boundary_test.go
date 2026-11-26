@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/board"
+	"github.com/kksty/saker/internal/board"
 )
 
 func TestCommanderRoundMarksTheBoardAsMaterial(t *testing.T) {

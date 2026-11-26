@@ -37,9 +37,9 @@ node scripts/acceptance/console-gallery.cjs
 从独立 fork 构建 `cyber-harness` 和 `cyber-scan` 后，可显式启用集成测试：
 
 ```powershell
-$env:TW_HARNESS_BIN = (Resolve-Path ./bin/cyber-harness.exe).Path
-$env:TW_SCAN_BIN = (Resolve-Path ./bin/cyber-scan.exe).Path
-go test ./internal/api ./internal/host ./internal/node ./cmd/tw -run 'Harness|SplitHost|NativeMultiScan' -count=1 -v
+$env:SAKER_HARNESS_BIN = (Resolve-Path ./bin/cyber-harness.exe).Path
+$env:SAKER_SCAN_BIN = (Resolve-Path ./bin/cyber-scan.exe).Path
+go test ./internal/api ./internal/host ./internal/node ./cmd/saker -run 'Harness|SplitHost|NativeMultiScan' -count=1 -v
 ```
 
 测试使用临时项目、本地假模型网关和受控 fixture，启动测试宿主并在退出时停止它。它们验证 Skill 展开、协议和宿主适配，不证明实际漏洞发现能力。未设置变量时相关测试跳过。
@@ -49,7 +49,7 @@ go test ./internal/api ./internal/host ./internal/node ./cmd/tw -run 'Harness|Sp
 `target.py` 是含预置缺陷的虚构站点，仅供本机隔离验收。在专用终端中运行：
 
 ```powershell
-$env:TW_TARGET_HOST = '127.0.0.1'
+$env:SAKER_TARGET_HOST = '127.0.0.1'
 python scripts/acceptance/target.py
 ```
 

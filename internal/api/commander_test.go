@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/project"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/project"
+	"github.com/kksty/saker/internal/store"
 )
 
 type commanderExec struct {
@@ -87,7 +87,7 @@ func TestStartCommanderInjectsOneShotResumeScope(t *testing.T) {
 }
 
 // A first commander turn must load the skill through harness and carry the
-// control-plane coordinates; tianwu never pastes the skill body itself (D78).
+// control-plane coordinates; saker never pastes the skill body itself (D78).
 func TestStartCommanderLoadsSkillOnFirstTurn(t *testing.T) {
 	s, ex, st := newCommanderServer(t)
 	if _, _, err := s.StartCommander(context.Background(), withBoardAnchor("## 本轮\nboard"), false); err != nil {
@@ -96,7 +96,7 @@ func TestStartCommanderLoadsSkillOnFirstTurn(t *testing.T) {
 	if !strings.HasPrefix(ex.req.Prompt, "/skill:commander ") {
 		t.Fatalf("prompt = %q", ex.req.Prompt)
 	}
-	for _, needle := range []string{"http://127.0.0.1:9000", "$TW_AUTH", "$TW_BATTLE", ".tw/auth", "## 本轮"} {
+	for _, needle := range []string{"http://127.0.0.1:9000", "$SAKER_AUTH", "$SAKER_BATTLE", ".tw/auth", "## 本轮"} {
 		if !strings.Contains(ex.req.Prompt, needle) {
 			t.Fatalf("prompt missing %q: %q", needle, ex.req.Prompt)
 		}
@@ -400,7 +400,7 @@ func TestStateWriteIsRecordedAsAnAction(t *testing.T) {
 }
 
 // The commander's credential is per session, not per round: the shell init
-// exports TW_AUTH once, so a per-round rotation would leave a long-lived shell
+// exports SAKER_AUTH once, so a per-round rotation would leave a long-lived shell
 // on a stale token. A replacement session revokes the old credential.
 func TestCommanderSessionKeepsItsNoteIdentity(t *testing.T) {
 	s, ex, _ := newCommanderServer(t)
@@ -422,7 +422,7 @@ func TestCommanderSessionKeepsItsNoteIdentity(t *testing.T) {
 			t.Errorf("identity = %+v", ident)
 		}
 		// The token is reused, but its run binding follows the live round: a
-		// message or audit event sent through $TW_AGENT must name this round,
+		// message or audit event sent through $SAKER_AGENT must name this round,
 		// not the first one that ever received the session token.
 		if runs := s.Store.Runs(); len(runs) == 0 || ident.RunID != runs[len(runs)-1].ID {
 			t.Errorf("identity run = %q, live round = %+v", ident.RunID, runs)
@@ -461,7 +461,7 @@ func TestCommanderSessionKeepsItsNoteIdentity(t *testing.T) {
 	if _, ok := s.Collab.Resolve(tokens[2]); !ok {
 		t.Fatal("the replacement session's token does not resolve")
 	}
-	if !strings.Contains(ex.req.Prompt, "$TW_BATTLE") {
+	if !strings.Contains(ex.req.Prompt, "$SAKER_BATTLE") {
 		t.Fatalf("prompt has no battlefield/note base: %q", ex.req.Prompt)
 	}
 }

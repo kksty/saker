@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/aop"
+	"github.com/kksty/saker/internal/aop"
 )
 
 // The liveness tests drive the supervisor through the two package seams:
@@ -525,7 +525,7 @@ func TestHostUpdateRevivesUnhealthySupervisor(t *testing.T) {
 	}
 	launchesAtStop := launcher.count()
 	revived.Store(true)
-	h.Update([]string{"TW_TEST=1"}, nil)
+	h.Update([]string{"SAKER_TEST=1"}, nil)
 	deadline = time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
 		st := h.Status()

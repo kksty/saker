@@ -349,19 +349,19 @@
 
   /* ---------------------------------------------------------------- chrome */
 
-  .tw-rail {
+  .saker-rail {
     background: var(--surface-1);
   }
 
-  .tw-rail-brand {
+  .saker-rail-brand {
     background: radial-gradient(ellipse at top left, color-mix(in oklab, var(--primary) 11%, transparent), transparent 74%);
   }
 
-  .tw-nav-item[aria-current="page"] {
+  .saker-nav-item[aria-current="page"] {
     background: color-mix(in oklab, var(--primary) 9%, var(--surface-2));
   }
 
-  .tw-nav-item[aria-current="page"]::before {
+  .saker-nav-item[aria-current="page"]::before {
     position: absolute;
     inset-block: 25%;
     inset-inline-start: 0;
@@ -371,87 +371,87 @@
     content: '';
   }
 
-  .tw-page-header {
+  .saker-page-header {
     background: color-mix(in oklab, var(--card) 72%, var(--background));
   }
 
 
   /* The one card recipe: hairline border on a card tint, no stacked shadows. */
-  .tw-panel {
+  .saker-panel {
     background: var(--card);
     border: 1px solid color-mix(in oklab, var(--border) 63%, var(--hairline));
     box-shadow: 0 1px 2px rgb(15 23 42 / 0.07);
   }
 
-  .dark .tw-panel {
+  .dark .saker-panel {
     box-shadow: var(--shadow-soft);
   }
 
-  .tw-panel-header {
+  .saker-panel-header {
     border-start-start-radius: inherit;
     border-start-end-radius: inherit;
     background: color-mix(in oklab, var(--surface-2) 27%, var(--card));
   }
 
-  .tw-metric-grid {
+  .saker-metric-grid {
     display: grid;
     gap: 1px;
     background: var(--hairline);
   }
 
-  .tw-metric-grid > * {
+  .saker-metric-grid > * {
     background: var(--card);
     padding: clamp(0.65rem, 1.2vi, 1rem) clamp(0.5rem, 1.65vi, 1.25rem);
   }
 
-  .tw-metric-grid > * > .tw-nums {
+  .saker-metric-grid > * > .saker-nums {
     font-size: clamp(1.35rem, 1.15rem + 0.85vi, 1.9rem);
     line-height: 1.1;
   }
 
-  .tw-metric-cards {
+  .saker-metric-cards {
     gap: clamp(0.375rem, 1vi, 0.875rem);
     background: transparent;
   }
 
-  .tw-metric-cards > * {
+  .saker-metric-cards > * {
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
     background: linear-gradient(155deg, color-mix(in oklab, var(--surface-2) 46%, var(--card)), var(--card) 72%);
   }
 
   @media (width < 40rem) {
-    .tw-fleet-metrics > * {
+    .saker-fleet-metrics > * {
       grid-column: span 2;
     }
 
-    .tw-fleet-metrics > :nth-child(n + 4) {
+    .saker-fleet-metrics > :nth-child(n + 4) {
       grid-column: span 3;
     }
   }
 
-  .tw-project-card {
+  .saker-project-card {
     background: linear-gradient(155deg, color-mix(in oklab, var(--surface-2) 59%, var(--card)), var(--card) 78%);
   }
 
-  .tw-project-card:hover,
-  .tw-project-card:focus-within {
+  .saker-project-card:hover,
+  .saker-project-card:focus-within {
     border-color: color-mix(in oklab, var(--ink-3) 46%, var(--border));
   }
 
-  .tw-project-emblem {
+  .saker-project-emblem {
     background: color-mix(in oklab, var(--primary) 12%, var(--surface-2));
     border: 1px solid color-mix(in oklab, var(--primary) 24%, var(--hairline));
   }
 
   /* A recessed block inside a card (metric strip, log well, list table). */
-  .tw-inset {
+  .saker-inset {
     background: color-mix(in oklab, var(--surface-2) 72%, transparent);
     border: 1px solid var(--hairline);
   }
 
   /* The rail's faint grid: reads as graph paper under the nav, not as texture. */
-  .tw-grid {
+  .saker-grid {
     background-image: linear-gradient(
         to right,
         color-mix(in oklab, var(--border) 40%, transparent) 1px,
@@ -465,13 +465,13 @@
     background-size: 24px 24px;
   }
 
-  .tw-mono {
+  .saker-mono {
     font-family: var(--font-mono);
     font-variant-ligatures: none;
   }
 
   /* Numerals in metrics must align column to column. */
-  .tw-nums {
+  .saker-nums {
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
   }
@@ -479,7 +479,7 @@
   /* ------------------------------------------------------------ typography */
 
   /* Small all-caps-ish label above a title or a metric. CJK keeps its case. */
-  .tw-eyebrow {
+  .saker-eyebrow {
     font-size: 11px;
     line-height: 16px;
     font-weight: 500;
@@ -488,7 +488,7 @@
   }
 
   /* Section heading inside a card / panel header. */
-  .tw-section-title {
+  .saker-section-title {
     font-size: 14px;
     line-height: 20px;
     font-weight: 600;
@@ -496,7 +496,7 @@
   }
 
   /* Secondary explanatory line under a title. */
-  .tw-subtitle {
+  .saker-subtitle {
     font-size: 12.5px;
     line-height: 19px;
     color: var(--ink-2);
@@ -504,7 +504,7 @@
   }
 
   /* Metric value: mono, tabular, tight. */
-  .tw-stat {
+  .saker-stat {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     font-size: 26px;
@@ -517,15 +517,15 @@
   /* ------------------------------------------------------------ behaviours */
 
   /* Long evidence names and tool output must never widen the layout. */
-  .tw-break {
+  .saker-break {
     overflow-wrap: anywhere;
     word-break: break-word;
   }
 
-  .tw-hover-row {
+  .saker-hover-row {
     transition: background-color 120ms ease, border-color 120ms ease;
   }
-  .tw-hover-row:hover {
+  .saker-hover-row:hover {
     background: color-mix(in oklab, var(--surface-2) 80%, transparent);
   }
 
@@ -535,7 +535,7 @@
    * jump a scrollbar-width sideways when the scrollbar appears, and keep a
    * nested scroll from chaining out into the page.
    */
-  .tw-scroll {
+  .saker-scroll {
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
   }
@@ -550,25 +550,25 @@
    * the latin caption is its fallback, so the caption has to stay legible at
    * 1x (7px read as a smudge beside the 22px mark) while the mark steps back a
    * hair so the pair still reads as one block inside the 216px rail. */
-  .tw-brand-cn {
+  .saker-brand-cn {
     font-family: "Kaiti SC", "STKaiti", "KaiTi", "Noto Serif SC", "Songti SC", serif;
     font-size: 21px;
     font-weight: 700;
     line-height: 1;
     letter-spacing: 0.1em;
-    background: linear-gradient(180deg, var(--tw-brand-top, #6c1a1b), var(--tw-brand-bottom, #b43730));
+    background: linear-gradient(180deg, var(--saker-brand-top, #6c1a1b), var(--saker-brand-bottom, #b43730));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
   }
 
-  .dark .tw-brand-cn {
-    --tw-brand-top: #fff8f2;
-    --tw-brand-bottom: #ff9b84;
+  .dark .saker-brand-cn {
+    --saker-brand-top: #fff8f2;
+    --saker-brand-bottom: #ff9b84;
     filter: drop-shadow(0 1px 0 rgb(110 8 8 / 0.5));
   }
 
-  .tw-brand-latin {
+  .saker-brand-latin {
     font-family: var(--font-mono);
     font-size: 9px;
     font-weight: 600;
@@ -579,7 +579,7 @@
   }
 
   /* The one graphic accent of the wordmark: a stamped vermillion square. */
-  .tw-brand-dot {
+  .saker-brand-dot {
     width: 4px;
     height: 4px;
     margin-top: 4px;
@@ -608,13 +608,13 @@
    * ripples, minimap live rings): there the movement *is* the information.
    */
 
-  @keyframes tw-progress {
+  @keyframes saker-progress {
     from { transform: translateX(-100%); }
     to { transform: translateX(400%); }
   }
 
-  .tw-progress-indeterminate {
-    animation: tw-progress 1.4s ease-in-out infinite;
+  .saker-progress-indeterminate {
+    animation: saker-progress 1.4s ease-in-out infinite;
   }
 
   /*
@@ -635,7 +635,7 @@
     button:not(:disabled):active {
       scale: none;
     }
-    .tw-progress-indeterminate {
+    .saker-progress-indeterminate {
       animation: none;
       transform: translateX(100%);
     }
@@ -653,42 +653,42 @@
 
 /* Radix measures scrollbars with a table wrapper. Use block sizing so a long
    event or toolbar cannot stretch the vertical stream beyond the viewport. */
-.tw-run-stream [data-radix-scroll-area-viewport] > div {
+.saker-run-stream [data-radix-scroll-area-viewport] > div {
   display: block !important;
 }
 
 @media (width >= 1440px) {
   :root {
-    --tw-control: 38px;
-    --tw-control-sm: 34px;
+    --saker-control: 38px;
+    --saker-control-sm: 34px;
   }
 }
 @media (width >= 2200px) {
   :root {
-    --tw-control: 40px;
-    --tw-control-sm: 36px;
+    --saker-control: 40px;
+    --saker-control-sm: 36px;
   }
 }
 
-.tw-settings .tw-panel-header {
+.saker-settings .saker-panel-header {
   min-block-size: 3.25rem;
   padding-inline: 1.125rem;
 }
-.tw-settings .tw-panel-header .tw-section-title {
+.saker-settings .saker-panel-header .saker-section-title {
   font-size: 15px;
 }
-.tw-settings input:not([type="checkbox"]) {
-  block-size: var(--tw-control, 36px);
+.saker-settings input:not([type="checkbox"]) {
+  block-size: var(--saker-control, 36px);
 }
-.tw-settings-tabs [aria-selected="true"] {
+.saker-settings-tabs [aria-selected="true"] {
   background: var(--card);
   color: var(--ink-1);
   box-shadow: var(--shadow-soft);
 }
-.tw-settings-tabs [aria-selected="true"] svg {
+.saker-settings-tabs [aria-selected="true"] svg {
   color: var(--primary);
 }
-.tw-settings-actions {
+.saker-settings-actions {
   padding-block-start: 0.875rem;
   border-block-start: 1px solid var(--hairline);
 }
@@ -706,7 +706,7 @@
  * more specific property.
  * ========================================================================== */
 
-.tw-graph-stage {
+.saker-graph-stage {
   /*
    * Named container so an unrelated `container-type` deeper in the tree cannot
    * capture these queries. `size` (not `inline-size`) is required for the
@@ -719,7 +719,7 @@
   container: graph / size;
 }
 
-.tw-graph-stage > * {
+.saker-graph-stage > * {
   --graph-gutter: clamp(12px, 0.85cqi, 22px);
   --graph-left: calc(var(--graph-gutter) + env(safe-area-inset-left, 0px));
   --graph-right: calc(var(--graph-gutter) + env(safe-area-inset-right, 0px));
@@ -732,57 +732,57 @@
   --graph-footer-space: 0px;
   --graph-overlay-height: calc(100cqb - var(--graph-top) - var(--graph-bottom) - var(--graph-gutter) - var(--graph-footer-space));
 }
-.tw-graph-stage.has-timeline > * {
+.saker-graph-stage.has-timeline > * {
   --graph-footer-space: calc(var(--graph-timeline-height) + var(--graph-gutter));
 }
 
-.tw-graph-corner-tl {
+.saker-graph-corner-tl {
   top: calc(var(--graph-top) + var(--graph-filter-offset));
   left: var(--graph-left);
 }
-.tw-graph-corner-tr {
+.saker-graph-corner-tr {
   top: var(--graph-top);
   right: var(--graph-right);
 }
-.tw-graph-corner-bl {
+.saker-graph-corner-bl {
   bottom: calc(var(--graph-bottom) + var(--graph-footer-space));
   left: var(--graph-left);
 }
-.tw-graph-corner-br {
+.saker-graph-corner-br {
   bottom: calc(var(--graph-bottom) + var(--graph-footer-space));
   right: var(--graph-right);
 }
 
-.tw-graph-overlay-scroll {
+.saker-graph-overlay-scroll {
   overscroll-behavior: contain;
 }
 
 /* A right-hand dock/panel is clamped by the map's width, never by 100vw (which
    ignores the rail and the scrollbar and so can overflow horizontally). */
-.tw-graph-dock {
+.saker-graph-dock {
   max-inline-size: calc(100cqi - var(--graph-left, 12px) - var(--graph-right, 12px));
 }
-.tw-graph-dock-right {
+.saker-graph-dock-right {
   right: var(--graph-right, 12px);
 }
-.tw-graph-under-toolbar {
+.saker-graph-under-toolbar {
   top: calc(var(--graph-top) + var(--graph-tool-row) + var(--graph-gutter));
 }
-.tw-graph-panel {
+.saker-graph-panel {
   bottom: calc(var(--graph-bottom) + var(--graph-footer-space));
 }
 
-.tw-graph-filter,
-.tw-graph-stack {
+.saker-graph-filter,
+.saker-graph-stack {
   min-inline-size: min(12rem, 55cqi);
   max-inline-size: min(32rem, 55cqi);
 }
-.tw-graph-filter {
+.saker-graph-filter {
   inline-size: clamp(12.5rem, 13cqi, 16rem);
   min-block-size: 3.125rem;
   max-block-size: max(3.125rem, calc(var(--graph-overlay-height) * 0.48 - var(--graph-filter-offset)));
 }
-.tw-graph-stack {
+.saker-graph-stack {
   /* Wider than the filter card: the legend is a two-column swatch list and the
      commander card carries a phase line plus running directions. The old
      12.5–17rem column wrapped every status label and forced the cards to grow
@@ -794,35 +794,35 @@
      while open), so the three cards fill this budget instead of fighting it. */
   max-block-size: max(3.5rem, calc(var(--graph-overlay-height) * 0.72));
 }
-.tw-graph-stack > .tw-scroll {
+.saker-graph-stack > .saker-scroll {
   scrollbar-gutter: auto;
 }
 /* The legend body is the card's flexible remainder while open; its rows scroll
    inside that share instead of growing the column past the map. */
-.tw-graph-legend-body {
+.saker-graph-legend-body {
   overscroll-behavior: contain;
 }
-.tw-graph-filter > .tw-graph-grip {
+.saker-graph-filter > .saker-graph-grip {
   translate: 42% 42%;
 }
-.tw-graph-grip {
+.saker-graph-grip {
   background: var(--card);
   border: 1px solid var(--hairline);
   border-radius: 7px;
 }
-.tw-graph-grip:hover,
-.tw-graph-grip:active {
+.saker-graph-grip:hover,
+.saker-graph-grip:active {
   background: var(--surface-2);
   color: var(--ink-1);
 }
 
 /* The dock's left edge is a pointer target: 8px is right for a cursor, but a
    finger needs the 24px minimum target (WCAG 2.5.8). */
-.tw-dock-handle {
+.saker-dock-handle {
   inline-size: 0.5rem;
 }
 @media (pointer: coarse) {
-  .tw-dock-handle {
+  .saker-dock-handle {
     inline-size: 1.5rem;
   }
 }
@@ -832,81 +832,81 @@
  * nothing. These used to be `sm:`/`md:` viewport queries, which are wrong once
  * the rail and a dock shrink the map.
  */
-.tw-graph-minimap {
-  /* Placement belongs to the bottom-right stack (`.tw-graph-corner-br`).
+.saker-graph-minimap {
+  /* Placement belongs to the bottom-right stack (`.saker-graph-corner-br`).
      小地图不再按宽度隐藏：它能被拖到 88px，窄图上正好是「一眼看全图」的那张小卡；
      只有选中节点（右下角归详情面板）或列表视图时才收起，由 GraphPanel 决定。 */
   display: block;
 }
 @container graph (inline-size < 44rem) {
-  .tw-graph-list-id {
+  .saker-graph-list-id {
     display: none;
   }
 }
 @container graph (inline-size < 38rem) {
-  .tw-graph-list-lineage {
+  .saker-graph-list-lineage {
     display: none;
   }
 }
 /* The wide columns are declared the same way in both directions so the window
    width can never re-show a column the map has no room for. */
 @container graph (inline-size >= 44rem) {
-  .tw-graph-list-id {
+  .saker-graph-list-id {
     display: block;
   }
 }
 @container graph (inline-size >= 38rem) {
-  .tw-graph-list-lineage {
+  .saker-graph-list-lineage {
     display: block;
   }
 }
 /* Visible only while the map is wide enough for the shortcut hint to fit. */
-.tw-graph-list-hint {
+.saker-graph-list-hint {
   display: none;
 }
 @container graph (inline-size >= 40rem) {
-  .tw-graph-list-hint {
+  .saker-graph-list-hint {
     display: inline;
   }
 }
 
-.tw-graph-toolbar {
+.saker-graph-toolbar {
   flex-flow: row nowrap;
 }
-.tw-graph-tool {
+.saker-graph-tool {
   inline-size: var(--graph-tool-size);
   block-size: var(--graph-tool-size);
 }
-.tw-graph-tool-icon {
+.saker-graph-tool-icon {
   inline-size: clamp(16px, 1.05cqi, 19px);
   block-size: clamp(16px, 1.05cqi, 19px);
 }
-.tw-graph-tool-text {
+.saker-graph-tool-text {
   inline-size: auto;
   min-inline-size: var(--graph-tool-size);
   gap: 6px;
   padding-inline: 9px;
 }
-.tw-graph-zoom {
+.saker-graph-zoom {
   min-inline-size: 3.25rem;
 }
 @container graph (inline-size < 46rem) {
-  .tw-graph-stage > * {
+  .saker-graph-stage > * {
     --graph-filter-offset: calc(var(--graph-tool-row) + var(--graph-gutter));
   }
-  .tw-graph-filter {
+  .saker-graph-filter {
     max-inline-size: calc(100cqi - var(--graph-left) - var(--graph-right));
   }
-  .tw-graph-tool-text {
+  .saker-graph-tool-text {
     inline-size: var(--graph-tool-size);
     padding-inline: 0;
   }
-  .tw-graph-tool-text > span {
+  .saker-graph-tool-text > span {
     display: none;
   }
 }
 @container graph (inline-size < 40rem) {
-  .tw-graph-stage > * {
+  .saker-graph-stage > * {
     --graph-timeline-height: 6.75rem;
   }
 }
@@ -919,8 +919,8 @@
  * back; clearing the selection brings them straight back.
  */
 @container graph (inline-size < 44rem) {
-  .tw-graph-stage:has(.tw-graph-panel, [data-graph-chat]) .tw-graph-filter,
-  .tw-graph-stage:has(.tw-graph-panel, [data-graph-chat]) .tw-graph-stack {
+  .saker-graph-stage:has(.saker-graph-panel, [data-graph-chat]) .saker-graph-filter,
+  .saker-graph-stage:has(.saker-graph-panel, [data-graph-chat]) .saker-graph-stack {
     display: none;
   }
 }
@@ -933,7 +933,7 @@
  * that state; the strip is taller on a narrow map, where its controls and counts
  * wrap to two rows.
  */
-.tw-graph-timeline {
+.saker-graph-timeline {
   inset-inline: var(--graph-left) var(--graph-right);
   bottom: var(--graph-bottom);
   margin-inline: auto;
@@ -946,21 +946,21 @@
   gap: 2px 14px;
   padding-inline: 14px;
 }
-.tw-graph-timeline-heading {
+.saker-graph-timeline-heading {
   grid-area: heading;
 }
-.tw-graph-timeline-counts {
+.saker-graph-timeline-counts {
   grid-area: counts;
   justify-self: end;
 }
-.tw-graph-timeline-actions {
+.saker-graph-timeline-actions {
   grid-area: actions;
   justify-self: end;
 }
-.tw-graph-timeline-track {
+.saker-graph-timeline-track {
   grid-area: track;
 }
-.tw-graph-timeline-range {
+.saker-graph-timeline-range {
   appearance: none;
   border-radius: 4px;
   background: transparent;
@@ -968,17 +968,17 @@
   --timeline-track-color: color-mix(in oklab, var(--ink-3) 35%, var(--surface-2));
   --timeline-track: linear-gradient(to right, var(--primary) var(--timeline-progress), var(--timeline-track-color) var(--timeline-progress));
 }
-.tw-graph-timeline-range::-webkit-slider-runnable-track {
+.saker-graph-timeline-range::-webkit-slider-runnable-track {
   height: 6px;
   border-radius: 10px;
   background: var(--timeline-track);
 }
-.tw-graph-timeline-range::-moz-range-track {
+.saker-graph-timeline-range::-moz-range-track {
   height: 6px;
   border-radius: 10px;
   background: var(--timeline-track);
 }
-.tw-graph-timeline-range::-webkit-slider-thumb {
+.saker-graph-timeline-range::-webkit-slider-thumb {
   appearance: none;
   width: 15px;
   height: 15px;
@@ -988,7 +988,7 @@
   background: var(--primary);
   box-shadow: 0 0 0 1px var(--primary);
 }
-.tw-graph-timeline-range::-moz-range-thumb {
+.saker-graph-timeline-range::-moz-range-thumb {
   width: 11px;
   height: 11px;
   border: 2px solid var(--card);
@@ -997,24 +997,24 @@
   box-shadow: 0 0 0 1px var(--primary);
 }
 @container graph (inline-size < 40rem) {
-  .tw-graph-timeline {
+  .saker-graph-timeline {
     grid-template: 'heading actions' auto 'track track' auto 'counts counts' auto / minmax(0, 1fr) auto;
     gap: 2px 8px;
     padding-inline: 10px;
   }
-  .tw-graph-timeline-counts {
+  .saker-graph-timeline-counts {
     justify-self: start;
   }
 }
 @container graph (inline-size < 26rem) {
-  .tw-graph-timeline-latest-label,
-  .tw-graph-timeline-endpoint {
+  .saker-graph-timeline-latest-label,
+  .saker-graph-timeline-endpoint {
     display: none;
   }
-  .tw-graph-timeline-track {
+  .saker-graph-timeline-track {
     grid-template-columns: minmax(0, 1fr);
   }
-  .tw-graph-timeline-actions button {
+  .saker-graph-timeline-actions button {
     inline-size: 30px;
     padding-inline: 0;
   }

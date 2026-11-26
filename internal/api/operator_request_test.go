@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/decider"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/decider"
+	"github.com/kksty/saker/internal/model"
 )
 
 // The inbox is the one operator read: the fallback authorization request is

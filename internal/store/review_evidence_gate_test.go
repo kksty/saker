@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // 用例①（写入口）：零证据的 vuln/cred 事实，无论判定从哪里来，都不能被写成 verified。

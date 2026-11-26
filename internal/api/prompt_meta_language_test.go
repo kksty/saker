@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/board"
-	"github.com/kksty/tianwu/internal/contract"
-	"github.com/kksty/tianwu/internal/decider"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/board"
+	"github.com/kksty/saker/internal/contract"
+	"github.com/kksty/saker/internal/decider"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 // retiredPromptPhrases are the meta sentences the team removed on 2026-11-21.
@@ -163,7 +163,7 @@ func TestCommanderRoundCarriesOperatorPriorityOnce(t *testing.T) {
 	if got := strings.Count(prompt, contract.OperatorPriority); got != 1 {
 		t.Fatalf("commander round renders the priority sentence %d times, want 1", got)
 	}
-	role := strings.Index(prompt, "你是天吴项目的指挥官")
+	role := strings.Index(prompt, "你是Saker项目的指挥官")
 	prio := strings.Index(prompt, contract.OperatorPriority)
 	docsAt := strings.Index(prompt, "## 约束")
 	if !(role >= 0 && role < prio && prio < docsAt) {

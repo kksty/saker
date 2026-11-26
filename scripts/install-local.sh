@@ -1,10 +1,10 @@
 #!/usr/bin/env sh
-# Install locally built tianwu programs from a candidate directory into bin/.
+# Install locally built saker programs from a candidate directory into bin/.
 #
 # This is the POSIX counterpart of scripts/install-local.ps1 and has the same
 # contract:
-#   * only the four programs under bin/ are replaced (tw, cyber-harness,
-#     cyber-scan, tw-repair);
+#   * only the four programs under bin/ are replaced (saker, cyber-harness,
+#     cyber-scan, saker-repair);
 #   * no service is started or restarted;
 #   * runtime data (data/, projects, ledgers, evidence) is never read or written.
 #
@@ -24,8 +24,8 @@ usage() {
   cat <<'EOF'
 用法: scripts/install-local.sh [--from <候选目录>]
 
-把候选目录（默认 .build/release）里的 tw、cyber-harness、cyber-scan、
-tw-repair 安装到 bin/。只替换 bin/ 下的程序：不启动服务，不读写运行数据。
+把候选目录（默认 .build/release）里的 saker、cyber-harness、cyber-scan、
+saker-repair 安装到 bin/。只替换 bin/ 下的程序：不启动服务，不读写运行数据。
 EOF
 }
 
@@ -58,7 +58,7 @@ fi
 source_dir=$(CDPATH= cd -- "$from" && pwd -P)
 install_bin="$root/bin"
 
-names="tw cyber-harness cyber-scan tw-repair"
+names="saker cyber-harness cyber-scan saker-repair"
 
 # 1) Refuse to replace a program that is still running. The Windows script uses
 # WMI; here the process table is read directly on Linux (/proc) and through
@@ -166,7 +166,7 @@ if [ -d "$build_dir" ]; then
   for stale in "$build_dir"/*; do
     [ -f "$stale" ] || continue
     case "$(basename "$stale")" in
-      tw*|aiscan*) ;;
+      saker*|aiscan*) ;;
       *) continue ;;
     esac
     stale_dir=$(CDPATH= cd -- "$(dirname -- "$stale")" && pwd -P)

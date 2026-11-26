@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 var ErrActionConflict = errors.New("外部动作版本冲突或已经完成")

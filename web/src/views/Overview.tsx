@@ -213,7 +213,7 @@ export function Overview({
       meta={
         <>
           <span className="text-[11px] text-ink-3">
-            快照 <span className="font-mono tw-nums">{board ? fmtTime(board.generated_at) : '—'}</span>
+            快照 <span className="font-mono saker-nums">{board ? fmtTime(board.generated_at) : '—'}</span>
           </span>
           <MetaDot />
           {/* The two map layouts, where the operator decides to open the map:
@@ -227,7 +227,7 @@ export function Overview({
           </span>
           <MetaDot />
           <span className="text-[11px] text-ink-3" title="项目全部模型调用合计（含裁判），模型上报">
-            Token 合计 <span className="font-mono tw-nums">{usageBreakdownView(usage.data).all.text}</span>
+            Token 合计 <span className="font-mono saker-nums">{usageBreakdownView(usage.data).all.text}</span>
           </span>
         </>
       }
@@ -266,8 +266,8 @@ export function Overview({
             {board?.reviews && (board.reviews.pending > 0 || board.reviews.processing > 0 || board.reviews.paused) && (
               <Callout tone={board.reviews.paused || board.reviews.disabled ? 'warning' : 'info'}>
                 <span className="text-[12px] leading-relaxed">
-                  复核中：<span className="font-mono tw-nums">{board.reviews.processing}</span> 项，
-                  <span className="font-mono tw-nums">{board.reviews.pending}</span> 项待复核
+                  复核中：<span className="font-mono saker-nums">{board.reviews.processing}</span> 项，
+                  <span className="font-mono saker-nums">{board.reviews.pending}</span> 项待复核
                   {board.reviews.cooling > 0 ? `（${board.reviews.cooling} 项等待重试）` : ''}。
                   {board.reviews.disabled
                     ? '复核已关闭：不会再有复核 run，可在结论页开启。'
@@ -281,7 +281,7 @@ export function Overview({
             )}
             {dataError && (
               <Callout tone="warning" icon={<CircleAlert className="h-4 w-4" />}>
-                部分数据读取失败，当前保留上次成功结果：<span className="tw-break">{dataError}</span>
+                部分数据读取失败，当前保留上次成功结果：<span className="saker-break">{dataError}</span>
               </Callout>
             )}
           </div>
@@ -378,20 +378,20 @@ export function Overview({
             {/* Reference material, not the console's foreground: what the next
                 round will be told, delivery/handoff warnings, per-run/model/host
                 details and the guard's sweep. Collapsed unless the operator asks. */}
-            <details open={diagnosticsOpen} onToggle={e=>setDiagnosticsOpen(e.currentTarget.open)} className="tw-panel shrink-0 rounded-xl [&[open]>summary>svg]:rotate-180">
+            <details open={diagnosticsOpen} onToggle={e=>setDiagnosticsOpen(e.currentTarget.open)} className="saker-panel shrink-0 rounded-xl [&[open]>summary>svg]:rotate-180">
               <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
                 <ScrollText className="h-4 w-4 shrink-0 text-ink-3" />
-                <span className="tw-section-title">运行与投递诊断</span>
+                <span className="saker-section-title">运行与投递诊断</span>
                 <span className="hidden text-[11px] text-ink-3 sm:inline">交接告警 · 模型 / 宿主 / 投递积压</span>
                 <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-ink-3 transition-transform" />
               </summary>
               <div className="space-y-4 border-t border-hairline p-4">
-                <details className="tw-inset rounded-lg" data-testid="overview-brief">
+                <details className="saker-inset rounded-lg" data-testid="overview-brief">
                   <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-[12px] font-medium text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden [&[open]>svg]:rotate-180">
                     <ScrollText className="h-3.5 w-3.5 text-ink-3" aria-hidden="true" /> 项目简报
                     <span className="ml-auto text-[11px] font-normal text-ink-3">当前口径，可动态补充</span>
                   </summary>
-                  <p className="tw-break max-h-48 overflow-y-auto whitespace-pre-wrap px-3 pb-3 text-[12.5px] leading-relaxed text-ink-2">
+                  <p className="saker-break max-h-48 overflow-y-auto whitespace-pre-wrap px-3 pb-3 text-[12.5px] leading-relaxed text-ink-2">
                     {scope}
                   </p>
                 </details>
@@ -406,10 +406,10 @@ export function Overview({
                   <Callout tone="warning" icon={<CircleAlert className="h-4 w-4" />}>
                     <div className="space-y-1">
                       <div className="text-[12.5px] font-medium text-ink">
-                        最近 <span className="font-mono tw-nums">{board.handoff_warnings!.length}</span> 个历史 run 有非致命告警（已带入下一轮提示词）
+                        最近 <span className="font-mono saker-nums">{board.handoff_warnings!.length}</span> 个历史 run 有非致命告警（已带入下一轮提示词）
                       </div>
                       {board.handoff_warnings!.slice(0, 3).map((w) => (
-                        <div key={w.run} className="tw-break text-[11px] leading-relaxed text-ink-2">
+                        <div key={w.run} className="saker-break text-[11px] leading-relaxed text-ink-2">
                           <span className="font-mono">{w.run}</span>
                           {w.intent_id ? ` · ${w.intent_id}` : ''}：{w.warnings[0] ?? ''}
                           {w.warnings.length > 1 ? `（共 ${w.warnings.length} 条）` : ''}
@@ -528,8 +528,8 @@ function KeyMetrics({
   const blocked = (board.operator_frontier ?? board.frontier ?? []).filter((f) => !f.ready).length
   const limit = project?.max_runs_effective
   return (
-    <section className="tw-panel shrink-0 overflow-hidden rounded-xl" aria-label="关键指标">
-      <div className="tw-metric-grid grid-cols-2 sm:grid-cols-3">
+    <section className="saker-panel shrink-0 overflow-hidden rounded-xl" aria-label="关键指标">
+      <div className="saker-metric-grid grid-cols-2 sm:grid-cols-3">
 
         <StatTile
           size="lg"
@@ -593,7 +593,7 @@ function ProjectStatusSection({
   return (
     <section aria-label="项目状态" data-testid="overview-status" className="flex shrink-0 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <h2 className="tw-section-title flex items-center gap-1.5">
+        <h2 className="saker-section-title flex items-center gap-1.5">
           <Activity className="h-4 w-4 shrink-0 text-ink-3" aria-hidden="true" /> 项目状态
         </h2>
         <Badge size="sm" variant={status.paused ? 'warning' : 'success'}>
@@ -613,12 +613,12 @@ function ProjectStatusSection({
             data-testid="overview-failed-runs"
           >
             <CircleAlert className="h-3 w-3" aria-hidden="true" />
-            失败运行 <span className="font-mono tw-nums">{fmtInt(board.runs.failed)}</span>
+            失败运行 <span className="font-mono saker-nums">{fmtInt(board.runs.failed)}</span>
           </button>
         )}
         <span className="ml-auto flex items-center gap-2 text-[11px] text-ink-3">
           目标进度
-          <span className="font-mono tw-nums text-[12px] font-semibold text-ink-2">
+          <span className="font-mono saker-nums text-[12px] font-semibold text-ink-2">
             {status.goalsMet}/{status.goalsTotal}
           </span>
           <Meter
@@ -699,7 +699,7 @@ function PendingSection({
       {inbox.error && (
         <Callout tone="warning" icon={<CircleAlert className="h-4 w-4" />}>
           <span className="text-[12px] leading-relaxed" data-testid="overview-pending-error">
-            待办读取失败：<span className="tw-break">{inbox.error}</span>
+            待办读取失败：<span className="saker-break">{inbox.error}</span>
             {data ? '；下面是上次读到的结果，可能已经过期。' : '；还没有成功读到过待办，这不等于没有待办。'}
           </span>
         </Callout>
@@ -733,7 +733,7 @@ function PendingSection({
 
 // ---- role panels ---------------------------------------------------------
 
-/** A panel-header title: 13px/600 (via .tw-section-title), quiet glyph. */
+/** A panel-header title: 13px/600 (via .saker-section-title), quiet glyph. */
 function PanelTitle({ icon: Icon, children, glyphClass }: { icon: typeof Bot; children: React.ReactNode; glyphClass?: string }) {
   return (
     <span className="flex items-center gap-1.5">
@@ -776,9 +776,9 @@ function CommanderStrip({ board, onNavigate }: { board: BoardResponse; onNavigat
       ) : (
         <span className="min-w-0 flex-1 truncate text-[12px] text-ink-2" title={detail}>{detail}</span>
       )}
-      {active && since > 0 && <span className="shrink-0 font-mono text-[11px] tw-nums text-ink-3">{elapsed}s</span>}
+      {active && since > 0 && <span className="shrink-0 font-mono text-[11px] saker-nums text-ink-3">{elapsed}s</span>}
       {dec?.enabled && (
-        <span className="shrink-0 font-mono text-[11px] tw-nums text-ink-3">{fmtInt(dec.rounds)} 轮</span>
+        <span className="shrink-0 font-mono text-[11px] saker-nums text-ink-3">{fmtInt(dec.rounds)} 轮</span>
       )}
       {dec?.last_error && (
         <span className="w-full min-w-0 truncate text-[11px] text-destructive" title={dec.last_error}>
@@ -894,8 +894,8 @@ function ExecutorPanel({
               </thead>
               <tbody className="divide-y divide-hairline/70">
                 {recent.map((r) => (
-                  <tr key={r.id} className="tw-hover-row">
-                    <th scope="row" className="py-1.5 pr-2 text-left font-mono tw-nums font-normal text-ink-3" title={r.id}>
+                  <tr key={r.id} className="saker-hover-row">
+                    <th scope="row" className="py-1.5 pr-2 text-left font-mono saker-nums font-normal text-ink-3" title={r.id}>
                       {r.id.slice(-6)}
                       <span className="ml-1 text-ink-3/70">
                         {r.purpose === 'verifier' ? '复' : r.purpose === 'report' ? '报' : ''}
@@ -905,7 +905,7 @@ function ExecutorPanel({
                       <StatusIndicator compact status={statusKind(r.status)} label={runStatusLabel(r)} />
                     </td>
                     <td className="hidden py-1.5 pr-2 font-mono text-ink-3 @sm:table-cell">{r.node || '—'}</td>
-                    <td className="py-1.5 text-right font-mono tw-nums text-ink-2">{r.tokens ? fmtInt(r.tokens) : '—'}</td>
+                    <td className="py-1.5 text-right font-mono saker-nums text-ink-2">{r.tokens ? fmtInt(r.tokens) : '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -915,13 +915,13 @@ function ExecutorPanel({
       </SubSection>
 
       <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-hairline pt-3">
-        <Badge size="sm" variant="success" className="font-mono tw-nums">
+        <Badge size="sm" variant="success" className="font-mono saker-nums">
           完成 {fmtInt(board.runs.done)}
         </Badge>
-        <Badge size="sm" variant="danger" className="font-mono tw-nums">
+        <Badge size="sm" variant="danger" className="font-mono saker-nums">
           失败 {fmtInt(board.runs.failed)}
         </Badge>
-        <Badge size="sm" variant="muted" className="font-mono tw-nums">
+        <Badge size="sm" variant="muted" className="font-mono saker-nums">
           取消 {fmtInt(board.runs.canceled)}
         </Badge>
       </div>
@@ -962,17 +962,17 @@ function RunningRow({ item }: { item: BoardItem }) {
   const hot = idle >= QUIET_SECONDS
   const pressure = win > 0 ? ctx / win : 0
   return (
-    <div className="tw-inset rounded-lg px-2.5 py-2">
+    <div className="saker-inset rounded-lg px-2.5 py-2">
       <div className="flex items-center gap-2">
         <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', hot ? 'bg-warning' : 'bg-success')} />
         <span className="min-w-0 flex-1 truncate text-[12px] text-ink" title={item.title}>
           {item.title}
         </span>
-        <span className={cn('shrink-0 font-mono text-[11px] tw-nums', hot ? 'text-warning' : 'text-ink-3')}>
+        <span className={cn('shrink-0 font-mono text-[11px] saker-nums', hot ? 'text-warning' : 'text-ink-3')}>
           {fmtIdle(idle)} · {fmtInt(events)} ev
         </span>
         {(item.pulse?.tool_failures ?? 0) > 0 && (
-          <Badge size="sm" variant="warning" className="font-mono tw-nums" title="本轮结构化失败工具结果的累计数；不代表运行失败">
+          <Badge size="sm" variant="warning" className="font-mono saker-nums" title="本轮结构化失败工具结果的累计数；不代表运行失败">
             工具失败 {fmtInt(item.pulse?.tool_failures)}
           </Badge>
         )}
@@ -986,7 +986,7 @@ function RunningRow({ item }: { item: BoardItem }) {
             className="h-1"
             aria-label="这一轮的上下文压力"
           />
-          <span className="shrink-0 font-mono text-[11px] tw-nums text-ink-3">{Math.round(pressure * 100)}%</span>
+          <span className="shrink-0 font-mono text-[11px] saker-nums text-ink-3">{Math.round(pressure * 100)}%</span>
         </div>
       )}
     </div>
@@ -1045,7 +1045,7 @@ function GuardPanel({
       className={'flex min-h-0 flex-col ' + (className ?? '')}
       bodyClassName="min-h-0 flex-1 overflow-y-auto p-3"
     >
-      <div className="tw-eyebrow">指挥循环</div>
+      <div className="saker-eyebrow">指挥循环</div>
       <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2.5 sm:grid-cols-3">
         <Row label="循环" value={loopLabel} />
         <Row label="心跳" value={dec?.heartbeat_seconds ? fmtSeconds(dec.heartbeat_seconds) : '—'} />
@@ -1056,7 +1056,7 @@ function GuardPanel({
       </div>
 
       <div className="mt-3 border-t border-hairline pt-3">
-        <div className="tw-eyebrow">巡检 · 重派</div>
+        <div className="saker-eyebrow">巡检 · 重派</div>
         <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2.5 sm:grid-cols-3">
           <Row label="巡检周期" value={`${interval}s`} />
           <Row label="静默阈值" value={guard?.idle_timeout_seconds ? fmtSeconds(guard.idle_timeout_seconds) : '关闭'} />
@@ -1085,7 +1085,7 @@ function GuardPanel({
           <div className="divide-y divide-hairline/70">
             {recovered.map((r) => (
               <div key={r.id} className="flex items-center gap-2 py-1.5 text-[11px]">
-                <span className="shrink-0 font-mono tw-nums text-ink-3">{r.id.slice(-6)}</span>
+                <span className="shrink-0 font-mono saker-nums text-ink-3">{r.id.slice(-6)}</span>
                 <span className="min-w-0 flex-1 truncate text-ink-2" title={r.exit_reason}>
                   {r.exit_reason || '运行守卫超时'}
                 </span>
@@ -1157,7 +1157,7 @@ function GoalsPanel({
       ) : (
         <ul className="divide-y divide-hairline/70">
           {goals.map((g) => (
-            <li key={g.id} className="tw-hover-row px-3 py-3">
+            <li key={g.id} className="saker-hover-row px-3 py-3">
               <Button size="xs" variant="ghost" className="float-right" onClick={()=>onEdit(g)}>管理</Button>
               {g.closed && <p className="text-xs text-ink-3">关闭原因：{g.closed_reason}</p>}
               <div className="flex items-start gap-2.5">
@@ -1175,7 +1175,7 @@ function GoalsPanel({
                   )}
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     <StatusIndicator compact status={!g.closed && g.met ? 'success' : 'idle'} label={g.closed ? '已关闭' : g.met ? '已达成' : '未达成'} />
-                    <span className="tw-break font-mono text-[11px] text-ink-3">{g.id}</span>
+                    <span className="saker-break font-mono text-[11px] text-ink-3">{g.id}</span>
                   </div>
                   {/* A sealed goal carries its own argument: why, on which facts,
                       and when. Old seals predate those fields, say so instead of
@@ -1225,7 +1225,7 @@ function GoalsPanel({
                       </div>
                       {g.completed_at && (
                         <div className="text-[11px] text-ink-3">
-                          达成于 <span className="font-mono tw-nums">{fmtTime(g.completed_at)}</span>
+                          达成于 <span className="font-mono saker-nums">{fmtTime(g.completed_at)}</span>
                         </div>
                       )}
                       {/* F9 follow-through: the seal is historical and is not
@@ -1346,7 +1346,7 @@ function FrontierPanel({
     >
       {waiting.length > 0 && (
         <div className="border-b border-hairline px-3 py-2.5" data-testid="overview-waiting-intents">
-          <div className="tw-eyebrow">等待中（不是卡住：已让出槽位）</div>
+          <div className="saker-eyebrow">等待中（不是卡住：已让出槽位）</div>
           <ul className="mt-1.5 space-y-1">
             {waiting.map((item) => {
               const label = (
@@ -1527,13 +1527,13 @@ function FactsDisclosure({
 }) {
   return (
     <details
-      className="tw-panel col-span-full shrink-0 rounded-xl [&[open]>summary>svg]:rotate-180"
+      className="saker-panel col-span-full shrink-0 rounded-xl [&[open]>summary>svg]:rotate-180"
       data-testid="overview-facts"
     >
       <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
         <Network className="h-4 w-4 shrink-0 text-ink-3" aria-hidden="true" />
-        <span className="tw-section-title">最近事实</span>
-        <span className="tw-nums font-mono text-[11px] text-ink-3">{items.length}</span>
+        <span className="saker-section-title">最近事实</span>
+        <span className="saker-nums font-mono text-[11px] text-ink-3">{items.length}</span>
         <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-ink-3 transition-transform" />
       </summary>
       <div className="max-h-[320px] overflow-y-auto border-t border-hairline">
@@ -1556,7 +1556,7 @@ function FactsDisclosure({
                 <div className="min-w-0">
                   <div className="truncate text-[12.5px] text-ink">{f.title}</div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-3">
-                    <span className="tw-break font-mono">{f.id}</span>
+                    <span className="saker-break font-mono">{f.id}</span>
                     <span>证据 {f.evidence ?? 0}</span>
                     {f.origin && (
                       <Badge variant={originVariant(f.origin)} size="sm">
@@ -1657,7 +1657,7 @@ function BriefingBar({ board }: { board: BoardResponse }) {
         : '有变化：下一次唤醒会跑一轮'
 
   return (
-    <div className="tw-inset shrink-0 rounded-lg">
+    <div className="saker-inset shrink-0 rounded-lg">
       <div className="flex flex-wrap items-center gap-2 px-3 py-2">
         <span className="flex items-center gap-1.5 text-[12px] font-medium text-ink">
           <ScrollText className="h-3.5 w-3.5 text-ink-3" /> 作战简报
@@ -1677,7 +1677,7 @@ function BriefingBar({ board }: { board: BoardResponse }) {
         </Button>
       </div>
 
-      <div className="tw-break px-3 pb-2.5 text-[12px] leading-relaxed text-ink-2">{parts.join(' · ')}</div>
+      <div className="saker-break px-3 pb-2.5 text-[12px] leading-relaxed text-ink-2">{parts.join(' · ')}</div>
 
       {open && (
         <div className="grid gap-x-5 gap-y-3 border-t border-hairline px-3 py-3 text-[11px] xl:grid-cols-2">
@@ -1691,7 +1691,7 @@ function BriefingBar({ board }: { board: BoardResponse }) {
           </BriefGroup>
           <BriefGroup label="端口观测" empty="还没有 service 事实">
             {ports.map((p) => (
-              <div key={p.port} className="truncate font-mono tw-nums">
+              <div key={p.port} className="truncate font-mono saker-nums">
                 {p.port} × {p.hosts.length}
               </div>
             ))}
@@ -1726,7 +1726,7 @@ function BriefGroup({
   const items = (Array.isArray(children) ? children.flat(1) : [children]).filter(Boolean)
   return (
     <div className="min-w-0">
-      <div className="tw-eyebrow mb-1">{label}</div>
+      <div className="saker-eyebrow mb-1">{label}</div>
       {items.length === 0 ? <div className="text-ink-3">{empty}</div> : items}
     </div>
   )
@@ -1762,13 +1762,13 @@ function Onboarding({
       <div className="grid gap-6 md:grid-cols-3">
         <div className="min-w-0 space-y-2.5">
           <div className="flex items-center gap-2 text-[13px] font-semibold text-ink">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/12 font-mono text-[11px] tw-nums text-primary">1</span>
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/12 font-mono text-[11px] saker-nums text-primary">1</span>
             写项目简报
           </div>
           <p className="text-[12px] leading-relaxed text-ink-2">
             目标与起点、已知资产、时间窗口与禁止动作。简报和内置约束会原样进入每次派发和决策：测试中新增或移除的资产，直接用「通信」页补充，不必回来改这里。
           </p>
-          <div className="tw-inset tw-break rounded-lg px-2.5 py-2 font-mono text-[11px] leading-relaxed text-ink-3">
+          <div className="saker-inset saker-break rounded-lg px-2.5 py-2 font-mono text-[11px] leading-relaxed text-ink-3">
             {scope || '未指定'}
           </div>
           <Button size="xs" variant="ghost" onClick={() => window.location.assign('/g/?view=projects')}>
@@ -1777,7 +1777,7 @@ function Onboarding({
         </div>
         <div className="min-w-0 space-y-2.5">
           <div className="flex items-center gap-2 text-[13px] font-semibold text-ink">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/12 font-mono text-[11px] tw-nums text-primary">2</span>
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/12 font-mono text-[11px] saker-nums text-primary">2</span>
             目标（可先不定）
           </div>
           <p className="text-[12px] leading-relaxed text-ink-2">
@@ -1789,7 +1789,7 @@ function Onboarding({
         </div>
         <div className="min-w-0 space-y-2.5">
           <div className="flex items-center gap-2 text-[13px] font-semibold text-ink">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/12 font-mono text-[11px] tw-nums text-primary">3</span>
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/12 font-mono text-[11px] saker-nums text-primary">3</span>
             执行节点
           </div>
           <p className="text-[12px] leading-relaxed text-ink-2">
@@ -1839,7 +1839,7 @@ function Onboarding({
         </Button>
       </div>
       <div className="mt-2 text-[11px] text-ink-3">
-        项目：{project?.name ?? '—'} · ID <span className="tw-break font-mono">{project?.id ?? '—'}</span>
+        项目：{project?.name ?? '—'} · ID <span className="saker-break font-mono">{project?.id ?? '—'}</span>
       </div>
     </Panel>
   )
@@ -1864,7 +1864,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
     <div className="min-w-0">
       <div className="text-[11px] leading-4 text-ink-3">{label}</div>
       <div
-        className="truncate font-mono text-[12px] leading-5 tw-nums text-ink-2"
+        className="truncate font-mono text-[12px] leading-5 saker-nums text-ink-2"
         title={typeof value === 'string' ? value : undefined}
       >
         {value}

@@ -330,7 +330,7 @@ export function NewProjectDialog({
                   onChange={(e) => setConstraints(e.target.value)}
                 />
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-ink-3">
-                  <span className="tw-nums">
+                  <span className="saker-nums">
                     {constraintsEdited ? '已修改内置默认文本' : '内置默认文本'} · {constraints.trim().length} 字符
                   </span>
                   {constraintsEdited && (

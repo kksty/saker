@@ -13,7 +13,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 func TestIdenticalActionResolutionIsANoOpSuccess(t *testing.T) {

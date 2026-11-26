@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/project"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/project"
 )
 
 // The admission mode is a constant, so this route is read-only. A write would

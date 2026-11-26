@@ -1,14 +1,14 @@
 # Vendored AOP 生成代码
 
 本目录（以及 `pty/`、`traffic/`、`tool/`、`command/`、`operation/`、`guardrail/`）
-下的 `*.pb.go` 是 cyber-harness 生成文件的副本。天吴不重新生成也不修改 AOP
+下的 `*.pb.go` 是 cyber-harness 生成文件的副本。Saker不重新生成也不修改 AOP
 wire 协议：只把 import 指到 `internal/aop` 并给 `command` 改 package 名，其余
-字节保持上游生成结果。手改这些文件会让天吴的 wire 格式与 harness 静默分叉，
+字节保持上游生成结果。手改这些文件会让Saker的 wire 格式与 harness 静默分叉，
 因此不要手工编辑；升级时用仓库根的同步脚本从 harness 源重新复制。
 
 ## 映射
 
-| vendored（tianwu） | 源（cyber-harness） | 复制时的改写 |
+| vendored（Saker） | 源（cyber-harness） | 复制时的改写 |
 | --- | --- | --- |
 | `internal/aop/pb/chat.pb.go` | `aop/chat.pb.go` | 无（仅版本头可能不同） |
 | `internal/aop/pb/content.pb.go` | `aop/content.pb.go` | 无 |
@@ -30,16 +30,16 @@ wire 协议：只把 import 指到 `internal/aop` 并给 `command` 改 package �
 ## 检查
 
 gate 的“AOP 生成代码漂移检查”步骤和下面两个模式使用同一实现
-（`cmd/tw-gate`，`scripts/gate.*` 与 `scripts/sync-aop-protos.*` 只是薄入口）：
+（`cmd/saker-gate`，`scripts/gate.*` 与 `scripts/sync-aop-protos.*` 只是薄入口）：
 
 ```text
-go run ./cmd/tw-gate -check-aop-protos        # 只比较，不写盘
+go run ./cmd/saker-gate -check-aop-protos        # 只比较，不写盘
 pwsh -File scripts/sync-aop-protos.ps1        # 从 harness 源复制，然后比较
 bash scripts/sync-aop-protos.sh               # Linux/macOS 同上
 ```
 
 比较不是逐字节 diff：先去掉注释与空行（含 `// Code generated` 下的
-protoc-gen-go / protoc 版本行、proto 文档注释、天吴本地说明），把 package 行
+protoc-gen-go / protoc 版本行、proto 文档注释、Saker本地说明），把 package 行
 按名字无关比较，把 `internal/aop` 的 import 折回 harness 路径，把 CRLF 归一为
 LF，再做规范化 SHA-256。消息号、descriptor 字节与 enum 值都会参与比较，所以
 协议语义的分叉一定失败；只有生成工具版本、本地注释、换行与上述路径改写不算

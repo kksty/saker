@@ -16,7 +16,7 @@ import { createServer, type InlineConfig, type Plugin, type ViteDevServer } from
 type OptimizeDepsHost = { optimizeDeps?: { include?: string[] } }
 
 const disableDependencyOptimizer: Plugin = {
-  name: 'tw-test:no-dependency-optimizer',
+  name: 'saker-test:no-dependency-optimizer',
   enforce: 'post',
   configResolved(config) {
     const clear = (target: OptimizeDepsHost | undefined) => {

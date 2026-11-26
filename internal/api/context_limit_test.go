@@ -1,6 +1,6 @@
 package api
 
-// D152 (revised): Tianwu no longer predicts the model window. The harness owns
+// D152 (revised): Saker no longer predicts the model window. The harness owns
 // feasibility/compaction; when it reports a context limit, dispatch retries once
 // with a degraded brief (hard constraints and handoff contract kept, optional
 // summaries replaced by ids/pointers), and never loops.
@@ -16,9 +16,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 func TestContextLimitFailureDetection(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/store"
 )
 
 const fixture = `{"ip":"10.0.0.5","port":"80","protocol":"http","status":"200","uri":"/","host":"www.example.local","title":"Example","midware":"nginx","frameworks":[{"name":"nginx","attributes":{"version":"1.18.0"}}]}

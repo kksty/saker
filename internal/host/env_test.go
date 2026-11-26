@@ -66,20 +66,20 @@ func TestChildEnvLeavesGoodPathAlone(t *testing.T) {
 // Settings arrive as "K=V"; they override the inherited environment instead of
 // being appended twice.
 func TestChildEnvAppliesOverrides(t *testing.T) {
-	t.Setenv("TW_HOST_TEST", "old")
+	t.Setenv("SAKER_HOST_TEST", "old")
 	h := &Host{cfg: Config{Logf: func(string, ...any) {}}}
-	env := h.childEnv([]string{"TW_HOST_TEST=new"})
-	if got := envValue(env, "TW_HOST_TEST"); got != "new" {
+	env := h.childEnv([]string{"SAKER_HOST_TEST=new"})
+	if got := envValue(env, "SAKER_HOST_TEST"); got != "new" {
 		t.Fatalf("override = %q", got)
 	}
 	n := 0
 	for _, kv := range env {
-		if strings.HasPrefix(kv, "TW_HOST_TEST=") {
+		if strings.HasPrefix(kv, "SAKER_HOST_TEST=") {
 			n++
 		}
 	}
 	if n != 1 {
-		t.Fatalf("TW_HOST_TEST appears %d times", n)
+		t.Fatalf("SAKER_HOST_TEST appears %d times", n)
 	}
 }
 

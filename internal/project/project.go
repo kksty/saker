@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/store"
 )
 
 // ManifestFile is the identity of a project on disk. The directory name is the
@@ -33,7 +33,7 @@ const ManifestFile = "project.json"
 // PauseKind values are persisted next to the paused flag so a restart can still
 // say who stopped the project. They are machine codes: the console and the
 // resume contract switch on them, never on the human-readable reason prose.
-// api.pauseKind* and cmd/tw's boot reason derive from these constants, so the
+// api.pauseKind* and cmd/saker's boot reason derive from these constants, so the
 // runtime and the manifest cannot drift apart.
 const (
 	PauseKindManualPause       = "manual_pause"
@@ -521,7 +521,7 @@ func Open(root string) (*Manager, error) { return openManager(root, false) }
 // one idle connection (store.OpenSQLitePooled), which removes the per-commit
 // handle cost from every write. The price is one open OS handle per project, so
 // a caller that deletes a project directory must Close its store first —
-// cmd/tw/hub.go deleteProject does. Nothing may rely on the garbage collector.
+// cmd/saker/hub.go deleteProject does. Nothing may rely on the garbage collector.
 func OpenPooled(root string) (*Manager, error) { return openManager(root, true) }
 
 func openManager(root string, pooled bool) (*Manager, error) {

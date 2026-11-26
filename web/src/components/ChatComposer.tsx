@@ -249,7 +249,7 @@ function Composer({ onSent, paused, runningExecutors, autoFocus = false, compact
             <span className="text-[10px] text-ink-3">对象</span>
             {targetPicker}
           </div>
-          <span className="tw-nums ml-auto font-mono text-[10px] text-ink-3">{text.trim().length}/4000</span>
+          <span className="saker-nums ml-auto font-mono text-[10px] text-ink-3">{text.trim().length}/4000</span>
         </div>
         {directionPicker}
         {hintLine}
@@ -283,7 +283,7 @@ function Composer({ onSent, paused, runningExecutors, autoFocus = false, compact
         aria-label="下发内容"
       />
       <div className="flex items-center gap-2">
-        <span className="tw-nums font-mono text-[11px] text-ink-3">
+        <span className="saker-nums font-mono text-[11px] text-ink-3">
           {text.trim().length}/4000 · Enter 发送，Shift+Enter 换行
         </span>
         <Button

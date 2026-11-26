@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 	"sync/atomic"
 	"testing"
 	"time"

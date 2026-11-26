@@ -266,7 +266,7 @@ export function GraphFilters({
   const rowID = (index: number) => `${listID}-${index}`
 
   return (
-    <div className="tw-graph-overlay-scroll min-h-0 flex-1 overflow-y-auto p-2">
+    <div className="saker-graph-overlay-scroll min-h-0 flex-1 overflow-y-auto p-2">
       <div className="flex items-center gap-1">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-ink-3" />
@@ -344,11 +344,11 @@ export function GraphFilters({
         <div className="mt-1.5 flex min-w-0 items-center gap-1 text-[11px] text-ink-3">
           {hits.length > 0 ? (
             <span className="truncate">
-              命中 <span className="tw-nums font-mono font-semibold text-ink-2">{hits.length}</span> 个节点
+              命中 <span className="saker-nums font-mono font-semibold text-ink-2">{hits.length}</span> 个节点
               {active >= 0 && (
                 <>
                   {' · '}
-                  <span className="tw-nums font-mono text-ink-2">
+                  <span className="saker-nums font-mono text-ink-2">
                     {active + 1}/{hits.length}
                   </span>
                 </>
@@ -414,7 +414,7 @@ export function GraphFilters({
           <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-ink-3">
             <span className="truncate">↑↓ 选择 · Enter 定位 · ⇧Enter 上一个</span>
             {hits.length > VISIBLE_HITS && (
-              <span className="tw-nums shrink-0 font-mono">
+              <span className="saker-nums shrink-0 font-mono">
                 {start + 1}–{start + visible.length}/{hits.length}
               </span>
             )}
@@ -476,7 +476,7 @@ export function GraphFilters({
               title={filters.hiddenKinds.has(k) ? `显示 ${k}` : `隐藏 ${k}`}
             >
               {k}
-              <span className="tw-nums font-mono text-[11px] opacity-60">{counts[k] ?? 0}</span>
+              <span className="saker-nums font-mono text-[11px] opacity-60">{counts[k] ?? 0}</span>
             </Chip>
           ))}
         </div>

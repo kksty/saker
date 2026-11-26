@@ -25,7 +25,7 @@ export function MiniMarkdown({ text }: { text: string }) {
       ordered ? (
         <ol key={key} className={`${cls} list-decimal`}>
           {items.map((li, i) => (
-            <li key={i} className="tw-break pl-0.5">
+            <li key={i} className="saker-break pl-0.5">
               {li}
             </li>
           ))}
@@ -33,7 +33,7 @@ export function MiniMarkdown({ text }: { text: string }) {
       ) : (
         <ul key={key} className={`${cls} list-disc`}>
           {items.map((li, i) => (
-            <li key={i} className="tw-break pl-0.5">
+            <li key={i} className="saker-break pl-0.5">
               {li}
             </li>
           ))}
@@ -51,7 +51,7 @@ export function MiniMarkdown({ text }: { text: string }) {
         className="my-2 border-l-2 border-hairline pl-3 text-[13px] leading-relaxed text-ink-2"
       >
         {quote.map((line, i) => (
-          <p key={i} className="tw-break">
+          <p key={i} className="saker-break">
             {line}
           </p>
         ))}
@@ -65,7 +65,7 @@ export function MiniMarkdown({ text }: { text: string }) {
     out.push(
       <pre
         key={key}
-        className="tw-mono tw-break tw-inset my-3 overflow-x-auto overscroll-contain whitespace-pre-wrap rounded-lg p-3 text-[12px] leading-relaxed text-ink-2 [scrollbar-width:thin]"
+        className="saker-mono saker-break saker-inset my-3 overflow-x-auto overscroll-contain whitespace-pre-wrap rounded-lg p-3 text-[12px] leading-relaxed text-ink-2 [scrollbar-width:thin]"
       >
         {code.join('\n')}
       </pre>,
@@ -157,7 +157,7 @@ export function MiniMarkdown({ text }: { text: string }) {
 
     flushAll(idx)
     out.push(
-      <p key={`p${idx}`} className="tw-break my-2 text-[13px] leading-relaxed text-ink-2">
+      <p key={`p${idx}`} className="saker-break my-2 text-[13px] leading-relaxed text-ink-2">
         {line}
       </p>,
     )

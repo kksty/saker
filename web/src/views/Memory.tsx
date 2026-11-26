@@ -99,7 +99,7 @@ export function Memory() {
                   未保存的修改
                 </Badge>
               )}
-              <span className="tw-nums font-mono text-[11px] text-ink-3">{fmtBytes(bytes)}</span>
+              <span className="saker-nums font-mono text-[11px] text-ink-3">{fmtBytes(bytes)}</span>
               <span className="text-[11px] text-ink-3">v{state.data.version} · {state.data.receipt?.writer || '尚无回执'}{state.data.receipt?.round ? ` · 第 ${state.data.receipt.round} 轮` : ''}</span>
             </span>
           }
@@ -113,7 +113,7 @@ export function Memory() {
               setDirty(true)
             }}
             spellCheck={false}
-            className="tw-mono min-h-[420px] text-[13px] leading-relaxed"
+            className="saker-mono min-h-[420px] text-[13px] leading-relaxed"
           />
           <div className="mt-2.5 space-y-1">
             <p className="text-[12px] leading-relaxed text-ink-2">

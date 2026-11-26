@@ -18,13 +18,13 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/kksty/tianwu/internal/aop/guardrail"
-	"github.com/kksty/tianwu/internal/aop/operation"
-	pb "github.com/kksty/tianwu/internal/aop/pb"
-	"github.com/kksty/tianwu/internal/ws"
+	"github.com/kksty/saker/internal/aop/guardrail"
+	"github.com/kksty/saker/internal/aop/operation"
+	pb "github.com/kksty/saker/internal/aop/pb"
+	"github.com/kksty/saker/internal/ws"
 )
 
-// The session workspace is a Tianwu fork extension on OpenSessionRequest: the
+// The session workspace is a harness fork extension on OpenSessionRequest: the
 // upstream schema has no per-session working directory (D110). Pin the wire
 // shape so a refactor cannot silently send sessions back to the agent's
 // process directory.
@@ -325,7 +325,7 @@ func coreMessage(payload *anypb.Any) (*pb.ProtocolMessage, bool) {
 }
 
 // The evaluator goal is a separate extension, not the turn input: the wire must
-// carry tianwu.RunGoal with the short goal and the pacing spec beside the
+// carry saker.RunGoal with the short goal and the pacing spec beside the
 // AgentRunOptions criterion. A host that ignores it falls back to the input.
 func TestRunTurnCarriesRunGoalExtensionBesideAgentRunOptions(t *testing.T) {
 	var mu sync.Mutex

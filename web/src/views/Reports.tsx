@@ -274,20 +274,20 @@ export function Reports({
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]">
               <span className="inline-flex items-baseline gap-1.5">
                 <span className="text-ink-3">可入报告</span>
-                <b className="tw-nums font-mono font-semibold text-ink">{fmtInt(verdict.precheck.reportable)}</b>
+                <b className="saker-nums font-mono font-semibold text-ink">{fmtInt(verdict.precheck.reportable)}</b>
               </span>
               <span className="inline-flex items-baseline gap-1.5">
                 <span className="text-ink-3">{progress.data?.reviews_disabled ? '未复核（复核关闭）' : '未复核'}</span>
-                <b className="tw-nums font-mono font-semibold text-ink">{fmtInt(verdict.precheck.unverified)}</b>
+                <b className="saker-nums font-mono font-semibold text-ink">{fmtInt(verdict.precheck.unverified)}</b>
               </span>
               <span className="inline-flex items-baseline gap-1.5">
                 <span className="text-ink-3">已否决</span>
-                <b className="tw-nums font-mono font-semibold text-ink">{fmtInt(verdict.precheck.rejected)}</b>
+                <b className="saker-nums font-mono font-semibold text-ink">{fmtInt(verdict.precheck.rejected)}</b>
               </span>
               {(verdict.precheck.withdrawn ?? 0) > 0 && (
                 <span className="inline-flex items-baseline gap-1.5">
                   <span className="text-ink-3">已撤回</span>
-                  <b className="tw-nums font-mono font-semibold text-ink">{fmtInt(verdict.precheck.withdrawn ?? 0)}</b>
+                  <b className="saker-nums font-mono font-semibold text-ink">{fmtInt(verdict.precheck.withdrawn ?? 0)}</b>
                 </span>
               )}
             </div>
@@ -304,7 +304,7 @@ export function Reports({
               <details className="group rounded-lg border border-hairline" data-testid="unreported-list">
                 <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-3 py-2 text-[12px] text-ink-2 transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
                   <span className="font-medium">未进过报告的事实</span>
-                  <span className="tw-nums font-mono text-[11px] text-ink-3">{fmtInt(unreported.total)} 条</span>
+                  <span className="saker-nums font-mono text-[11px] text-ink-3">{fmtInt(unreported.total)} 条</span>
                   <span className="ml-auto text-[11px] text-ink-3 group-open:hidden">展开清单</span>
                   <span className="ml-auto hidden text-[11px] text-ink-3 group-open:inline">收起清单</span>
                 </summary>
@@ -313,7 +313,7 @@ export function Reports({
                     {unreported.items.map((item) => (
                       <li key={item.fact} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[12px] leading-5">
                         <FactRef id={item.fact} onOpenFact={onOpenFact} />
-                        <span className="tw-break min-w-0 flex-1 text-ink-2">{item.title || '（没有标题）'}</span>
+                        <span className="saker-break min-w-0 flex-1 text-ink-2">{item.title || '（没有标题）'}</span>
                       </li>
                     ))}
                   </ul>
@@ -346,7 +346,7 @@ export function Reports({
       <Panel
         title="报告列表"
         extra={
-          <span role="status" aria-live="polite" className="tw-nums font-mono text-[11px] text-ink-3">{rows.length} 份</span>
+          <span role="status" aria-live="polite" className="saker-nums font-mono text-[11px] text-ink-3">{rows.length} 份</span>
         }
         bodyClassName="p-0"
       >
@@ -384,12 +384,12 @@ export function Reports({
                       onClick={() => showReport(r.id)}
                       title="打开报告预览"
                       aria-expanded={openedID === r.id}
-                      className="tw-break rounded font-mono text-[13px] font-medium leading-5 text-ink hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                      className="saker-break rounded font-mono text-[13px] font-medium leading-5 text-ink hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                     >
                       {r.id}
                     </button>
                     <Badge size="sm" variant="secondary">
-                      <span className="tw-nums font-mono">{r.findings}</span> 条结论
+                      <span className="saker-nums font-mono">{r.findings}</span> 条结论
                     </Badge>
                     {r.status === 'stale' && (
                       <Badge size="sm" variant="warning">账本变更后过期</Badge>
@@ -412,7 +412,7 @@ export function Reports({
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
                   <StatusIndicator compact status={statusKind(r.status)} label={statusLabel(r.status)} />
-                  <span className="tw-nums whitespace-nowrap font-mono text-[11px] leading-4 text-ink-3">
+                  <span className="saker-nums whitespace-nowrap font-mono text-[11px] leading-4 text-ink-3">
                     {fmtTime(r.created_at)}
                     {r.finished_at ? ` → ${fmtTime(r.finished_at)}` : ''}
                   </span>
@@ -557,7 +557,7 @@ function UnverifiedDialog({
               {facts.data.map((fact) => (
                 <li key={fact.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-3 py-2 text-[12px] leading-5">
                   <Badge size="sm" variant="muted">{fact.kind}</Badge>
-                  <span className="tw-break min-w-0 flex-1 text-ink">{fact.title || fact.summary || '（没有标题）'}</span>
+                  <span className="saker-break min-w-0 flex-1 text-ink">{fact.title || fact.summary || '（没有标题）'}</span>
                   <FactRef id={fact.id} onOpenFact={onOpenFact} />
                 </li>
               ))}
@@ -612,19 +612,19 @@ function ReportSheet({
     <Sheet open={!!report} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-2xl">
         <SheetHeader className="shrink-0 space-y-2 border-b border-hairline px-5 py-4 pr-12 text-left">
-          <div className="tw-eyebrow">报告预览</div>
-          <SheetTitle className="tw-break font-mono text-[15px] leading-6">{report?.id}</SheetTitle>
+          <div className="saker-eyebrow">报告预览</div>
+          <SheetTitle className="saker-break font-mono text-[15px] leading-6">{report?.id}</SheetTitle>
           {report && (
             <>
               <div className="flex flex-wrap items-center gap-2">
                 <StatusIndicator compact status={statusKind(report.status)} label={statusLabel(report.status)} />
                 <Badge size="sm" variant="secondary">
-                  <span className="tw-nums font-mono">{report.findings}</span> 条结论
+                  <span className="saker-nums font-mono">{report.findings}</span> 条结论
                 </Badge>
               </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] leading-4 text-ink-3">
-                <span className="tw-nums">生成 {fmtTime(report.created_at)}</span>
-                {report.finished_at && <span className="tw-nums">完成 {fmtTime(report.finished_at)}</span>}
+                <span className="saker-nums">生成 {fmtTime(report.created_at)}</span>
+                {report.finished_at && <span className="saker-nums">完成 {fmtTime(report.finished_at)}</span>}
                 {report.status === 'ready' ? (
                   <a
                     className="inline-flex items-center gap-1 text-ink-2 hover:text-primary"
@@ -707,7 +707,7 @@ function ReportSheetBody({ report, onOpenFact }: { report: ReportMeta; onOpenFac
             </Callout>
             {failedChecks.length > 0 && (
               <div>
-                <div className="tw-eyebrow mb-1.5">未通过的校验</div>
+                <div className="saker-eyebrow mb-1.5">未通过的校验</div>
                 <ul className="space-y-1">
                   {failedChecks.map((c, i) => (
                     <li key={i} className="flex items-start gap-1.5 text-[12px] leading-5">
@@ -736,11 +736,11 @@ function ReportSheetBody({ report, onOpenFact }: { report: ReportMeta; onOpenFac
             {report.status === 'ready' && (findings.data?.length ?? 0) > 0 && (
               <section className="space-y-2" aria-label="报告分级">
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <h3 className="tw-section-title">分级</h3>
+                  <h3 className="saker-section-title">分级</h3>
                   {tally.map((t) => (
                     <span key={t.tier} className="inline-flex items-baseline gap-1 text-[12px]">
                       <span className="text-ink-3">{t.label}</span>
-                      <span className="tw-nums font-mono font-medium text-ink">{t.count}</span>
+                      <span className="saker-nums font-mono font-medium text-ink">{t.count}</span>
                     </span>
                   ))}
                 </div>
@@ -750,7 +750,7 @@ function ReportSheetBody({ report, onOpenFact }: { report: ReportMeta; onOpenFac
                       <Badge size="sm" variant={severityVariant(f.severity)}>
                         {f.severity ? severityLabel(f.severity) : '未标注'}
                       </Badge>
-                      <span className="tw-break min-w-0 flex-1 text-ink">{f.title || f.fact}</span>
+                      <span className="saker-break min-w-0 flex-1 text-ink">{f.title || f.fact}</span>
                       {/* The conclusion's own fact id: without it a finding is a
                           title with no ledger row behind it (the trace's ①). */}
                       {f.fact && <FactRef id={f.fact} onOpenFact={onOpenFact} />}

@@ -7,12 +7,20 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-// WorkDirExtensionURL is the Tianwu fork's per-session workspace extension on
+// WorkDirExtensionURL is the harness fork's per-session workspace extension on
 // OpenSessionRequest. Upstream AOP has no session working directory, and one
 // agent process serves every run, so without this a session resolves relative
-// paths against the agent's process directory (tianwu's <data>). The fork reads
-// the value (tianwu.WorkDir, JSON with work_dir and single_task) and binds the
-// workspace plus the native mailbox scheduling policy (D110, D129).
+// paths against the agent's process directory (saker's <data>). The fork reads
+// the value (JSON with work_dir and single_task) and binds the workspace plus
+// the native mailbox scheduling policy (D110, D129).
+//
+// The type name is a wire contract with another process, not a product name, so
+// it keeps the spelling that process matches literally: cyber-harness
+// agent/session/protocol.go, workDirExtensionURL. A different value is not
+// rejected either: the fork skips an unknown extension without an error or a
+// log line, the session quietly keeps the agent's process directory, and every
+// relative path a run writes lands there instead of the case directory. Change
+// both sides together, or neither.
 const WorkDirExtensionURL = "type.googleapis.com/tianwu.WorkDir"
 
 type workDirPayload struct {

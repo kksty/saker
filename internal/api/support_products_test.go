@@ -7,11 +7,11 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/aop/tool"
-	native "github.com/kksty/tianwu/internal/aop/traffic"
-	"github.com/kksty/tianwu/internal/artifact"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/traffic"
+	"github.com/kksty/saker/internal/aop/tool"
+	native "github.com/kksty/saker/internal/aop/traffic"
+	"github.com/kksty/saker/internal/artifact"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/traffic"
 )
 
 // Native artifacts and HTTP captures are persisted per run, so a report or

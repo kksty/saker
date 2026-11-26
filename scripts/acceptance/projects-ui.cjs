@@ -1,14 +1,14 @@
 // Offline project-list and deletion regression. All requests use synthetic fixtures;
-// no Tianwu service, real projects, tools or credentials are touched.
+// no Saker service, real projects, tools or credentials are touched.
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '../..');
-const webRoot = path.resolve(process.env.TW_PROJECTS_WEB || path.join(root, 'internal/web/static'));
+const webRoot = path.resolve(process.env.SAKER_PROJECTS_WEB || path.join(root, 'internal/web/static'));
 const out = path.join(root, '.build/ui-qa'); fs.mkdirSync(out, { recursive: true });
 const profile = fs.mkdtempSync(path.join(out, 'projects-chrome-'));
-const chrome = spawn(process.env.TW_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe', ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--user-data-dir=' + profile, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
+const chrome = spawn(process.env.SAKER_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe', ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--user-data-dir=' + profile, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const projects = ['第一个项目', '第二个项目'].map((name, i) => ({ id: 'p' + i, name, scope: i ? 'portal.example.test' : undefined, running: 0, intents: 0, facts: 0, evidence: 0, created: '2026-11-12', max_runs_effective: 4 }));
 let holdReads = false, reads = [], deletes = [], failures = false;
@@ -71,7 +71,7 @@ async function api(url, request) {
     const shot = async name => { const s = await call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }); fs.writeFileSync(path.join(out, name + '.png'), Buffer.from(s.data, 'base64')); };
     const rowExists = id => `!![...document.querySelectorAll('[aria-label="项目列表"] li')].find(r=>r.textContent.includes('${id}'))`;
     await call('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
-    await call('Page.navigate', { url: 'http://tianwu.test/g/?view=projects' }); await text('第一个项目');
+    await call('Page.navigate', { url: 'http://saker.test/g/?view=projects' }); await text('第一个项目');
     const searchBox = `document.querySelector('input[aria-label="搜索项目"]')`;
     for (const [field, query] of [['name', '第二个'], ['ID', ' P1 '], ['scope', 'PORTAL.EXAMPLE.TEST']]) {
       await evaluate(`${searchBox}.focus()`);
@@ -105,7 +105,7 @@ async function api(url, request) {
     await evaluate(`(()=>{const b=[...document.querySelectorAll('[role=dialog] button')].find(b=>b.textContent==='确认删除');b.click();b.click()})()`);
     await text('正在删除项目…');
     await pause(100); check('rapid clicks send one mutation', deletes.length === 1, deletes.length);
-    check('pending progress is indeterminate and animated', await evaluate(`(()=>{const p=document.querySelector('[role=progressbar]');return !!p&&!p.hasAttribute('aria-valuenow')&&getComputedStyle(p.firstElementChild).animationName==='tw-progress'})()`));
+    check('pending progress is indeterminate and animated', await evaluate(`(()=>{const p=document.querySelector('[role=progressbar]');return !!p&&!p.hasAttribute('aria-valuenow')&&getComputedStyle(p.firstElementChild).animationName==='saker-progress'})()`));
     await call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
     await call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
     await call('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, x: 10, y: 10 });

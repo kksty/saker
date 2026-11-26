@@ -4,7 +4,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/store"
 	"os"
 )
 

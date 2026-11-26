@@ -25,8 +25,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/evidence"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/evidence"
+	"github.com/kksty/saker/internal/model"
 )
 
 // Version is the bundle format version. Bump only when an old reader would

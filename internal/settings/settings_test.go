@@ -11,7 +11,7 @@ import (
 )
 
 func TestEffectiveFallsBackToEnv(t *testing.T) {
-	t.Setenv("TW_HARNESS_CONFIG", filepath.Join(t.TempDir(), "cyber.yaml"))
+	t.Setenv("SAKER_HARNESS_CONFIG", filepath.Join(t.TempDir(), "cyber.yaml"))
 	t.Setenv("CYBER_BASE_URL", "http://env:8080")
 	t.Setenv("CYBER_API_KEY", "k")
 	t.Setenv("CYBER_MODEL", "m")
@@ -338,7 +338,7 @@ func TestSavePreservesRuntime(t *testing.T) {
 }
 
 func TestHarnessConfigPath(t *testing.T) {
-	t.Setenv("TW_HARNESS_CONFIG", "")
+	t.Setenv("SAKER_HARNESS_CONFIG", "")
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Skip("no home directory in this environment")
@@ -346,8 +346,8 @@ func TestHarnessConfigPath(t *testing.T) {
 	if got, want := HarnessConfigPath(), filepath.Join(home, ".cyber", "cyber.yaml"); got != want {
 		t.Fatalf("path = %q, want %q", got, want)
 	}
-	t.Setenv("TW_HARNESS_CONFIG", filepath.Join(t.TempDir(), "custom.yaml"))
-	if got := HarnessConfigPath(); got != os.Getenv("TW_HARNESS_CONFIG") {
+	t.Setenv("SAKER_HARNESS_CONFIG", filepath.Join(t.TempDir(), "custom.yaml"))
+	if got := HarnessConfigPath(); got != os.Getenv("SAKER_HARNESS_CONFIG") {
 		t.Fatalf("override = %q", got)
 	}
 }

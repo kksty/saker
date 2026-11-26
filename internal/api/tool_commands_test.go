@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/executor"
+	"github.com/kksty/saker/internal/executor"
 )
 
 func TestShellObservationCountsExecutablesNotQuotedArguments(t *testing.T) {

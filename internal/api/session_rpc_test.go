@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"github.com/kksty/tianwu/internal/testutil"
+	"github.com/kksty/saker/internal/testutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/aopexec"
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/aopexec"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 // sessionExec records dispatched requests without doing any work. The native
@@ -135,10 +135,10 @@ func (h *nativeSessionRPC) handler(t *testing.T) http.Handler {
 			accepted := h.resetAccepted
 			h.mu.Unlock()
 			if !accepted {
-				_, _ = w.Write([]byte(`{"requestId":"tw","rejected":{"code":"NOT_FOUND","message":"session not found"}}`))
+				_, _ = w.Write([]byte(`{"requestId":"saker","rejected":{"code":"NOT_FOUND","message":"session not found"}}`))
 				return
 			}
-			_, _ = w.Write([]byte(`{"requestId":"tw","accepted":{"previous":{"id":"sess-gone"},"current":{"session":{"id":"sess-new"}}}}`))
+			_, _ = w.Write([]byte(`{"requestId":"saker","accepted":{"previous":{"id":"sess-gone"},"current":{"session":{"id":"sess-new"}}}}`))
 		default:
 			http.NotFound(w, r)
 		}

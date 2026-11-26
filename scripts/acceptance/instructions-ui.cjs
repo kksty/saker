@@ -5,10 +5,10 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '../..');
-const webRoot = path.resolve(process.env.TW_INSTRUCTIONS_WEB || path.join(root, 'internal/web/static'));
+const webRoot = path.resolve(process.env.SAKER_INSTRUCTIONS_WEB || path.join(root, 'internal/web/static'));
 const out = path.join(root, '.build/ui-qa'); fs.mkdirSync(out, { recursive: true });
 const profile = fs.mkdtempSync(path.join(out, 'instructions-chrome-'));
-const chrome = spawn(process.env.TW_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe', ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--user-data-dir=' + profile, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
+const chrome = spawn(process.env.SAKER_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe', ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', '--user-data-dir=' + profile, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const at = '2026-11-12T10:00:00+08:00';
 const rows = [{ id: 'instruction_old', text: '初始范围约束', version: 1, state: 'active', created_by: 'operator', created_at: at, updated_at: at }];
@@ -115,7 +115,7 @@ async function api(url, req) {
     const check = (name, passed) => { checks.push({ name, passed }); assert.ok(passed, name); };
     const shot = async name => { const result = await call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }); fs.writeFileSync(path.join(out, name + '.png'), Buffer.from(result.data, 'base64')); };
     await call('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
-    await call('Page.navigate', { url: 'http://tianwu.test/p/fixture/?view=messages' });
+    await call('Page.navigate', { url: 'http://saker.test/p/fixture/?view=messages' });
     await text('持久指令'); await text('一条普通对话');
     await text('1 次持久指令变更已折叠');
     check('instruction-change notices fold out of the conversation stream',

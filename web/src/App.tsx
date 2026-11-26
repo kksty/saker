@@ -27,7 +27,7 @@ function Boot() {
     <div className="flex h-full w-full flex-col overflow-hidden lg:flex-row" aria-busy="true" aria-label="正在加载控制台">
       <span className="sr-only" role="status">正在加载控制台…</span>
       <div className="flex h-14 shrink-0 items-center border-b border-hairline bg-surface-1 px-4 lg:hidden"><Skeleton className="h-6 w-24" /></div>
-      <aside className="tw-rail hidden w-[236px] shrink-0 flex-col border-r border-hairline lg:flex">
+      <aside className="saker-rail hidden w-[236px] shrink-0 flex-col border-r border-hairline lg:flex">
         <div className="flex h-14 shrink-0 items-center border-b border-hairline px-5">
           <Skeleton className="h-6 w-28" />
         </div>
@@ -36,7 +36,7 @@ function Boot() {
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="tw-page-header flex shrink-0 items-start gap-3 border-b border-hairline px-5 py-4 sm:px-6 lg:px-8">
+        <div className="saker-page-header flex shrink-0 items-start gap-3 border-b border-hairline px-5 py-4 sm:px-6 lg:px-8">
           <div className="space-y-2">
             <Skeleton className="h-2.5 w-24" />
             <Skeleton className="h-5 w-32" />

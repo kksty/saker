@@ -40,7 +40,7 @@ export function DeliveryEvidence({ message, records, maps, fresh }: { message: M
         >
           <Link2 className="h-3 w-3 shrink-0" />
           <span className="shrink-0 font-medium text-ink-2">原始投递</span>
-          <span className="tw-nums min-w-0 truncate font-mono text-ink-2">{label}</span>
+          <span className="saker-nums min-w-0 truncate font-mono text-ink-2">{label}</span>
           <span className="ml-auto shrink-0 text-primary">{open ? '收起' : '展开'}</span>
         </button>
       ) : (
@@ -96,7 +96,7 @@ export function ObservedDelivery({ record, maps, fresh }: { record: IOARecord; m
         <span className="text-ink-3/70">（{view.fromDetail} → {view.toDetail}）</span>
       </div>
       {record.error && <p className="mt-0.5 text-destructive">{record.error}</p>}
-      <p className="tw-break mt-1 whitespace-pre-wrap rounded bg-surface-2/40 px-1.5 py-1 text-[11px] leading-relaxed text-ink-2">
+      <p className="saker-break mt-1 whitespace-pre-wrap rounded bg-surface-2/40 px-1.5 py-1 text-[11px] leading-relaxed text-ink-2">
         {view.body || '（无正文）'}
       </p>
     </div>

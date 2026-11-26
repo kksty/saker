@@ -17,7 +17,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 func TestReviewPromptTreatsDeclarerTextAsMaterial(t *testing.T) {

@@ -35,7 +35,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // OperatorScopeFile is the bypass file's name inside a project directory.

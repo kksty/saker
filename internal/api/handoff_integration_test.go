@@ -12,7 +12,7 @@ package api
 // handoff receipt, and the following pressure round must not repeat the handoff.
 // The gateway is scripted so the run is deterministic; the harness, the tool
 // execution path and the note API are the real ones. Opt in with
-// TW_HARNESS_BIN (and TW_SCAN_BIN); otherwise the test skips, like the other
+// SAKER_HARNESS_BIN (and SAKER_SCAN_BIN); otherwise the test skips, like the other
 // real-harness integration tests.
 
 import (
@@ -30,12 +30,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/aopexec"
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/decider"
-	"github.com/kksty/tianwu/internal/host"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/skills"
+	"github.com/kksty/saker/internal/aopexec"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/decider"
+	"github.com/kksty/saker/internal/host"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/skills"
 )
 
 // handoffHarnessCall is one provider request seen by the scripted gateway.
@@ -215,7 +215,7 @@ func handoffHarnessClip(s string, n int) string {
 }
 
 // handoffHarnessConsoleGate is the minimal project-mux gate for this test: the
-// production gate (cmd/tw) resolves the bearer token to a collab identity and
+// production gate (cmd/saker) resolves the bearer token to a collab identity and
 // mounts it only on the note path for the commander. The same resolution and
 // the same rule are used here; the operator has no token and stays operator.
 func handoffHarnessConsoleGate(t *testing.T, s *Server, mux *http.ServeMux) http.Handler {
@@ -261,13 +261,13 @@ func handoffHarnessConsoleGate(t *testing.T, s *Server, mux *http.ServeMux) http
 }
 
 func TestHarnessCommanderNoteReceiptRoundTrip(t *testing.T) {
-	bin := os.Getenv("TW_HARNESS_BIN")
+	bin := os.Getenv("SAKER_HARNESS_BIN")
 	if bin == "" {
-		bin = os.Getenv("TW_AISCAN_BIN")
+		bin = os.Getenv("SAKER_AISCAN_BIN")
 	}
-	scan := os.Getenv("TW_SCAN_BIN")
+	scan := os.Getenv("SAKER_SCAN_BIN")
 	if bin == "" || scan == "" {
-		t.Skip("set TW_HARNESS_BIN and TW_SCAN_BIN to run the real harness handoff round-trip")
+		t.Skip("set SAKER_HARNESS_BIN and SAKER_SCAN_BIN to run the real harness handoff round-trip")
 	}
 
 	s, _, st := newCommanderServer(t)

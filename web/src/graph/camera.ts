@@ -34,7 +34,7 @@ export interface Bounds {
  * another panel and a reload tears it down, so the camera has to outlive both.
  */
 export function cameraStorageKey(projectID: string): string {
-  return `tw.graph.camera:${projectID}`
+  return `saker.graph.camera:${projectID}`
 }
 
 /**

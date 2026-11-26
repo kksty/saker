@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/decider"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/project"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/decider"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/project"
 )
 
 // The commander's stop request is a real project pause that only the operator can

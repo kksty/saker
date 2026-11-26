@@ -58,7 +58,7 @@ export function Nodes() {
           <Panel title="接入 scan 节点">
             <p className="mb-2 text-xs text-ink-3">连接同一个 Hub 后自动发现。执行者通过共享项目目录交接文件；跨机器时共享路径和平台 API 都需要可达。</p>
             <Button size="sm" variant="outline" onClick={()=>void setup()}>生成原生接入命令</Button>
-            {join&&<div className="mt-3 space-y-2 text-xs"><p>{join.note}</p><p className="font-mono tw-break">项目目录：{join.workspace}</p><pre className="tw-break whitespace-pre-wrap rounded bg-surface-2 p-2">cyber-scan {join.args.map(a=>`'${a.replace(/'/g,"'\"'\"'")}'`).join(' ')}</pre><Button size="xs" variant="ghost" onClick={()=>setJoin(null)}>隐藏接入凭据</Button></div>}
+            {join&&<div className="mt-3 space-y-2 text-xs"><p>{join.note}</p><p className="font-mono saker-break">项目目录：{join.workspace}</p><pre className="saker-break whitespace-pre-wrap rounded bg-surface-2 p-2">cyber-scan {join.args.map(a=>`'${a.replace(/'/g,"'\"'\"'")}'`).join(' ')}</pre><Button size="xs" variant="ghost" onClick={()=>setJoin(null)}>隐藏接入凭据</Button></div>}
           </Panel>
           {list.error && (
             <Callout tone="destructive">
@@ -89,7 +89,7 @@ export function Nodes() {
             <Panel
               title="执行节点"
               extra={
-                <span className="tw-nums font-mono text-[11px] text-ink-3">{nodes.length} 个</span>
+                <span className="saker-nums font-mono text-[11px] text-ink-3">{nodes.length} 个</span>
               }
               bodyClassName="p-0"
             >
@@ -125,12 +125,12 @@ export function Nodes() {
                                 disabled={aop && !runtime.terminal}
                                 aria-expanded={active}
                                 title="在下方面板打开终端"
-                                className="tw-break rounded text-left font-mono text-[13px] font-medium leading-5 text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-40"
+                                className="saker-break rounded text-left font-mono text-[13px] font-medium leading-5 text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-40"
                               >
                                 {n.id}
                               </button>
                             ) : (
-                              <span className="tw-break font-mono text-[13px] font-medium leading-5 text-ink">{n.id}</span>
+                              <span className="saker-break font-mono text-[13px] font-medium leading-5 text-ink">{n.id}</span>
                             )}
                             {n.name && <span className="text-xs text-ink-2">{n.name}</span>}
                             {n.agent && <Badge size="sm" variant="info">scan</Badge>}
@@ -147,24 +147,24 @@ export function Nodes() {
                             {n.bound&&!n.project_default&&<Button size="xs" variant="ghost" disabled={saving} onClick={()=>void bind(n.id,true,true)}>设为默认</Button>}
                             {n.model&&<span className="text-xs text-ink-3">{n.model}</span>}
                           </div>
-                          {n.working_dir&&<p className="mt-1 tw-break font-mono text-xs text-ink-3">{n.working_dir}</p>}
+                          {n.working_dir&&<p className="mt-1 saker-break font-mono text-xs text-ink-3">{n.working_dir}</p>}
                           {n.note && (
-                            <div className="tw-break mt-1 text-[12px] leading-relaxed text-ink-2">{n.note}</div>
+                            <div className="saker-break mt-1 text-[12px] leading-relaxed text-ink-2">{n.note}</div>
                           )}
                           {where && (
-                            <div className="tw-break mt-1 font-mono text-[11px] leading-4 text-ink-3">{where}</div>
+                            <div className="saker-break mt-1 font-mono text-[11px] leading-4 text-ink-3">{where}</div>
                           )}
                           {n.host && (
                             <div className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] leading-4 text-ink-3">
                               {n.host.pid > 0 && (
-                                <span className="tw-nums font-mono">PID {n.host.pid}</span>
+                                <span className="saker-nums font-mono">PID {n.host.pid}</span>
                               )}
-                              <span>重启 <span className="tw-nums font-mono">{n.host.restarts}</span> 次</span>
+                              <span>重启 <span className="saker-nums font-mono">{n.host.restarts}</span> 次</span>
                             </div>
                           )}
                           {n.host && !n.host.ready && (
                             <Callout tone="destructive" className="mt-2">
-                              <div className="tw-break whitespace-pre-wrap text-[12px]">{n.host.last_error || '宿主正在启动，等待模型就绪。'}</div>
+                              <div className="saker-break whitespace-pre-wrap text-[12px]">{n.host.last_error || '宿主正在启动，等待模型就绪。'}</div>
                               <div className="mt-1 text-[12px]">
                                 默认模型暂不能派发。检查模型账户、连接与配置后，<a href="/g/?view=settings" className="underline underline-offset-2">到设置 → 模型保存重试</a>；无需绑定节点。
                               </div>
@@ -210,7 +210,7 @@ export function Nodes() {
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl">
               <Suspense
                 fallback={
-                  <div className="tw-panel flex h-full min-h-[200px] flex-col gap-3 rounded-xl p-4">
+                  <div className="saker-panel flex h-full min-h-[200px] flex-col gap-3 rounded-xl p-4">
                     <span className="text-[12px] text-ink-2">终端内核加载中…</span>
                     <SkeletonList count={4} />
                   </div>
@@ -219,7 +219,7 @@ export function Nodes() {
                 <NodeTerminal node={terminal} onClose={() => setTerminal(null)} />
               </Suspense>
             </div>
-            <p className="tw-break px-1 font-mono text-[11px] leading-4 text-ink-3">
+            <p className="saker-break px-1 font-mono text-[11px] leading-4 text-ink-3">
               终端运行在所选 scan 节点；关闭面板不会停止节点。
             </p>
           </div>

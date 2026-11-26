@@ -12,9 +12,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/evidence"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/evidence"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 // TestServeEvidenceDistinguishesEscapeFromMissing pins the two refusals the API

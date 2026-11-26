@@ -10,10 +10,10 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// A Windows child does not die with its parent: if `tw` is killed (even with
+// A Windows child does not die with its parent: if `saker` is killed (even with
 // taskkill /F, which is exactly how an exe swap stops it), the Hub and scan node
 // keep running and keep listening. The user's requirement is the opposite — when
-// tw goes away, its own children go with it.
+// saker goes away, its own children go with it.
 //
 // The only mechanism that survives a forced kill of the parent is a Job Object
 // with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE: the job handle is owned by this

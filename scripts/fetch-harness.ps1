@@ -1,4 +1,4 @@
-# Download a matched rc10 Hub + scan pair. Tianwu needs its fork's session
+# Download a matched rc10 Hub + scan pair. Saker needs its fork's session
 # workspace and scheduling extensions; use artifacts built from tianwu/fixes.
 param(
     [Parameter(Mandatory = $true)][string]$Url,

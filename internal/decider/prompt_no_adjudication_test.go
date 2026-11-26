@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/board"
+	"github.com/kksty/saker/internal/board"
 )
 
 // TestCommanderDocsAreNotAdjudicated is the third bad-input class: start and

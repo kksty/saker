@@ -98,7 +98,7 @@ export function Knowledge() {
     <div role="alert">
       <Callout tone="destructive" icon={<TriangleAlert className="h-4 w-4" />}>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="min-w-0 tw-break">{list.error || drafts.error}</span>
+          <span className="min-w-0 saker-break">{list.error || drafts.error}</span>
           <Button size="xs" variant="outline" disabled={busy} onClick={refresh}>重试</Button>
         </div>
       </Callout>
@@ -132,10 +132,10 @@ export function Knowledge() {
             <Tabs value={tab} onValueChange={(value) => { setTab(value as 'published' | 'candidates'); setSelected(''); setEditing(null) }}>
               <TabsList className="h-8">
                 <TabsTrigger value="published" className="h-6 gap-1.5 px-2.5 text-[12px]" disabled={busy}>
-                  已发布知识 <span className="tw-nums font-mono text-[11px] text-ink-3">{entries.length}</span>
+                  已发布知识 <span className="saker-nums font-mono text-[11px] text-ink-3">{entries.length}</span>
                 </TabsTrigger>
                 <TabsTrigger value="candidates" className="h-6 gap-1.5 px-2.5 text-[12px]" disabled={busy}>
-                  晋升候选 <span className="tw-nums font-mono text-[11px] text-ink-3">{pendingCandidates}</span>
+                  晋升候选 <span className="saker-nums font-mono text-[11px] text-ink-3">{pendingCandidates}</span>
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -148,7 +148,7 @@ export function Knowledge() {
                     onClick={() => { setLayer(value); setSelected(''); setEditing(null) }}
                     className="h-7 px-2 text-[11px]"
                   >
-                    {label} <span className="tw-nums font-mono text-[10px] text-ink-3">{count}</span>
+                    {label} <span className="saker-nums font-mono text-[10px] text-ink-3">{count}</span>
                   </Chip>
                 ))}
               </div>
@@ -163,7 +163,7 @@ export function Knowledge() {
                 className="h-8 pl-8 text-[12px]"
               />
             </div>
-            <span className="tw-nums shrink-0 font-mono text-[11px] text-ink-3">
+            <span className="saker-nums shrink-0 font-mono text-[11px] text-ink-3">
               显示 {filtered.length} / {rows.length}
             </span>
             <Button size="sm" variant="ghost" disabled={busy} onClick={refresh}>刷新列表</Button>
@@ -221,14 +221,14 @@ export function Knowledge() {
                   title={rows.length === 0 ? (tab === 'published' ? (layer === 'all' ? '还没有已发布知识' : `没有${layer === 'builtin' ? '内置' : '实例'}条目`) : '还没有晋升候选') : '没有匹配的条目'}
                   description={rows.length === 0
                     ? (tab === 'published'
-                      ? (layer === 'all' ? '内置条目随 tw 发布；实例条目在本页发布后只属于当前实例。' : '切回「全部」查看其他来源的条目。')
+                      ? (layer === 'all' ? '内置条目随 saker 发布；实例条目在本页发布后只属于当前实例。' : '切回「全部」查看其他来源的条目。')
                       : '晋升候选由运行沉淀，也可以在右上角「新建候选」手动补充事实与来源后发布。')
                     : '换个关键词，或清掉标签筛选。'}
                 />
               )}
             </div>
             <div className="flex shrink-0 items-center gap-2 border-t border-hairline px-3 py-2 text-[11px] text-ink-3">
-              <span role="status" aria-live="polite" className="tw-nums font-mono">显示 {filtered.length} / {rows.length}</span>
+              <span role="status" aria-live="polite" className="saker-nums font-mono">显示 {filtered.length} / {rows.length}</span>
               <Button size="xs" variant="ghost" disabled={busy} onClick={refresh} className="ml-auto">刷新列表</Button>
             </div>
           </aside>
@@ -241,7 +241,7 @@ export function Knowledge() {
                 <div role="alert">
                   <Callout tone="destructive" icon={<TriangleAlert className="h-4 w-4" />}>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                      <span className="min-w-0 tw-break">来源战场知识读取失败：{source.error}</span>
+                      <span className="min-w-0 saker-break">来源战场知识读取失败：{source.error}</span>
                       <Button size="xs" variant="outline" onClick={source.reload}>重试</Button>
                     </div>
                   </Callout>
@@ -356,7 +356,7 @@ export function Knowledge() {
                     <p className="flex flex-wrap items-center gap-2 text-[12px] leading-6 text-ink-3">
                       <Badge variant={layerBadge(current.entry).variant} size="sm">{layerBadge(current.entry).label}</Badge>
                       {current.entry.origin === 'builtin'
-                        ? '随 tw 二进制发布，由仓库作者维护；本页的编辑与删除只作用于当前实例。'
+                        ? '随 saker 二进制发布，由仓库作者维护；本页的编辑与删除只作用于当前实例。'
                         : current.entry.covers_builtin
                           ? '当前实例对内置条目的覆盖，只在本实例生效；内置文本与仓库资产不变。'
                           : '只属于当前实例，不会进入仓库内置知识。'}
@@ -365,13 +365,13 @@ export function Knowledge() {
                   <p className="text-[13px] leading-6 text-ink-2">{current.entry.description}</p>
                   {current.entry.applicability && (
                     <div className="rounded-lg border border-primary/20 bg-primary/[0.05] p-4">
-                      <h3 className="tw-eyebrow mb-2 normal-case tracking-normal">适用范围与前提条件</h3>
+                      <h3 className="saker-eyebrow mb-2 normal-case tracking-normal">适用范围与前提条件</h3>
                       <p className="whitespace-pre-wrap break-words text-[13px] leading-6 text-ink-2">{current.entry.applicability}</p>
                     </div>
                   )}
                   <p className="whitespace-pre-wrap break-words text-[13px] leading-7 text-ink-2">{current.entry.detail}</p>
                   {current.entry.commands?.map((cmd, i) => (
-                    <pre key={i} className="tw-break overflow-auto rounded-lg border border-hairline bg-surface-2/50 p-3 font-mono text-[12px] text-ink-2">{cmd}</pre>
+                    <pre key={i} className="saker-break overflow-auto rounded-lg border border-hairline bg-surface-2/50 p-3 font-mono text-[12px] text-ink-2">{cmd}</pre>
                   ))}
                   {current.candidate && (
                     <div className="rounded-lg border border-hairline bg-surface-2/40 p-4 text-[12px] leading-6">
@@ -388,18 +388,18 @@ export function Knowledge() {
                   </footer>
                 </Panel>
               ) : (
-                <div className="tw-panel rounded-xl">
+                <div className="saker-panel rounded-xl">
                   <EmptyState
                     icon={BookOpen}
                     title="尚无知识"
-                    description="从左侧选择条目，或点右上角「新建候选」补充事实与来源后发布。内置条目随 tw 二进制发布，实例条目只属于当前实例。"
+                    description="从左侧选择条目，或点右上角「新建候选」补充事实与来源后发布。内置条目随 saker 二进制发布，实例条目只属于当前实例。"
                     action={<Button size="sm" variant="outline" disabled={busy} onClick={() => edit(blank())}><FilePlus2 className="h-3.5 w-3.5" />新建候选</Button>}
                   />
                 </div>
               )}
 
               <p className="rounded-lg border border-hairline bg-surface-2/40 p-3 text-[12px] leading-6 text-ink-3">
-                内置条目随 tw 二进制发布，只有仓库作者维护 <code className="font-mono text-[11px] text-ink-2">internal/kb/assets/entries</code>；本页的发布和删除只写当前实例的 <code className="font-mono text-[11px] text-ink-2">&lt;data&gt;/kb</code>，不会进入仓库，也没有导入脚本。
+                内置条目随 saker 二进制发布，只有仓库作者维护 <code className="font-mono text-[11px] text-ink-2">internal/kb/assets/entries</code>；本页的发布和删除只写当前实例的 <code className="font-mono text-[11px] text-ink-2">&lt;data&gt;/kb</code>，不会进入仓库，也没有导入脚本。
               </p>
             </div>
           </section>

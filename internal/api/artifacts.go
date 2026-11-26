@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/kksty/tianwu/internal/artifact"
-	"github.com/kksty/tianwu/internal/executor"
+	"github.com/kksty/saker/internal/artifact"
+	"github.com/kksty/saker/internal/executor"
 )
 
 // supportProductHidden reports whether this request must not see a native
@@ -73,7 +73,7 @@ func (s *Server) artifactData(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", `attachment; filename="native-result.bin"`)
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("X-Tianwu-Source-Type", record.MediaType)
+	w.Header().Set("X-Saker-Source-Type", record.MediaType)
 	_, _ = w.Write(raw)
 }
 

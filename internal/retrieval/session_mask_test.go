@@ -3,7 +3,7 @@ package retrieval
 import (
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // A session read re-checks the live row on every call, so an assertion that

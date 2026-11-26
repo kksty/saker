@@ -1,14 +1,14 @@
 #!/usr/bin/env pwsh
 # watchdog.ps1 — optional external caretaker for a long unattended run.
 #
-# It is NOT part of the engine. tw does not know it exists; it only reads
+# It is NOT part of the engine. saker does not know it exists; it only reads
 # project files and the console API, and (when explicitly told to) performs two
 # narrow actions. Default mode is observe.
 #
 #   pwsh -File scripts/watchdog.ps1 -Project p-00000000                  # observe
 #   pwsh -File scripts/watchdog.ps1 -Project p-1 -Mode resume             # + undo restart_pause
 #   pwsh -File scripts/watchdog.ps1 -Project p-1 -Mode restart `
-#        -StartCommand 'C:\tw\tw.exe --addr 127.0.0.1:18200 ...'
+#        -StartCommand 'C:\saker\saker.exe --addr 127.0.0.1:18200 ...'
 #
 # Why it exists: an 8-hour unattended run needs something outside the process to
 # notice that the process is gone. It is deliberately NOT a supervisor that
@@ -19,7 +19,7 @@
 #     decisions by a person or by the commander; undoing them is not this
 #     script's job. real projects must not be resumed behind the operator.
 #   * "start" only when the console port is free, i.e. the process is gone. A
-#     live but silent control plane is logged for a human; force-killing tw can
+#     live but silent control plane is logged for a human; force-killing saker can
 #     lose an in-flight run's settlement, so the script does not do it.
 #   * "stalled" requires both: no new event for -StallMinutes AND zero running
 #     runs. If the running count cannot be read (no token, API down), the state

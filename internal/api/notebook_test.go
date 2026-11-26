@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/decider"
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/decider"
+	"github.com/kksty/saker/internal/model"
 )
 
 func TestNotebookAuthenticatesWriterAndFencesOldRound(t *testing.T) {

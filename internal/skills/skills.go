@@ -1,7 +1,7 @@
-// Package skills ships the harness Skills that Tianwu hands to every executor.
+// Package skills ships the harness Skills that Saker hands to every executor.
 //
 // cyber-harness loads a Skill by name or by file path (`-s`), and resolves
-// `.cyber/skills/<name>/SKILL.md` relative to the working directory. Tianwu
+// `.cyber/skills/<name>/SKILL.md` relative to the working directory. Saker
 // embeds its own skills in the binary, writes them to the data dir at startup,
 // and passes absolute paths — so the contract travels with the version instead
 // of being re-pasted into every prompt (docs/06, D23).
@@ -24,7 +24,7 @@ var assets embed.FS
 // skill: their handoff contract lives in the dispatch prompt, where it cannot
 // fail to load (D32). Collaborate is different: it is discoverable content
 // installed under .cyber/skills and read only when the executor needs it.
-const Report = "tianwu-report"
+const Report = "saker-report"
 
 // Collaborate documents the per-run participant API. Harness lists it in the
 // system prompt by name/description; the body is read on demand, not pasted into
@@ -32,7 +32,7 @@ const Report = "tianwu-report"
 const Collaborate = "collaborate"
 
 // Commander is the skill the commander session receives (D78). It documents the
-// control-plane API the commander calls with its own tools; tianwu drops the
+// control-plane API the commander calls with its own tools; saker drops the
 // file into the data dir and lets harness expand `/skill:commander` inside the
 // session instead of pasting the body into every prompt.
 const Commander = "commander"
@@ -76,7 +76,7 @@ func Ensure(dir string) ([]string, error) {
 // Install exposes one embedded skill in a harness discovery directory
 // (<dir>/<name>/SKILL.md). Harness loads `.cyber/skills` relative to its
 // working directory, so a host started in <data> finds a skill dropped under
-// <data>/.cyber/skills and a session can expand `/skill:<name>` itself — tianwu
+// <data>/.cyber/skills and a session can expand `/skill:<name>` itself — saker
 // does not paste the body into the prompt (D78). Rewrites only on change.
 func Install(name, dir string) (string, error) {
 	name = strings.TrimSpace(name)

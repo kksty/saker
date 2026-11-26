@@ -174,11 +174,11 @@ export function GraphListView({
       data-testid="graph-list-view"
     >
       <div className="flex items-center gap-2 border-b border-hairline bg-card/95 px-3 py-2.5">
-        <span className="tw-section-title shrink-0">节点列表</span>
+        <span className="saker-section-title shrink-0">节点列表</span>
         <span className="min-w-0 truncate text-[12px] text-ink-3">
-          <span className="tw-nums font-mono font-semibold text-ink-2">{ordered.length}</span> 个节点 · 画布的键盘等价入口
+          <span className="saker-nums font-mono font-semibold text-ink-2">{ordered.length}</span> 个节点 · 画布的键盘等价入口
         </span>
-        <span className="tw-graph-list-hint ml-auto shrink-0 text-[11px] text-ink-3">
+        <span className="saker-graph-list-hint ml-auto shrink-0 text-[11px] text-ink-3">
           ↑↓ 选择 · Enter 打开 · Esc 返回画布
         </span>
         <Button
@@ -205,7 +205,7 @@ export function GraphListView({
         <span className="min-w-0 flex-1">节点</span>
         <span className="w-[76px] shrink-0 text-right">状态</span>
         <span className="w-[104px] shrink-0 truncate">发起者</span>
-        <span className="tw-graph-list-id w-[136px] shrink-0">ID</span>
+        <span className="saker-graph-list-id w-[136px] shrink-0">ID</span>
       </div>
       <div
         ref={containerRef}
@@ -214,7 +214,7 @@ export function GraphListView({
         aria-activedescendant={ordered.length > 0 ? rowID(active) : undefined}
         tabIndex={0}
         onKeyDown={onKeyDown}
-        className="tw-scroll min-h-0 flex-1 overflow-y-auto px-2 py-1.5 outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="saker-scroll min-h-0 flex-1 overflow-y-auto px-2 py-1.5 outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
         {ordered.length === 0 ? (
           <EmptyState
@@ -270,7 +270,7 @@ export function GraphListView({
                   {originText(node)}
                 </span>
                 <span
-                  className="tw-graph-list-id w-[136px] shrink-0 truncate font-mono text-[11px] text-ink-3/80"
+                  className="saker-graph-list-id w-[136px] shrink-0 truncate font-mono text-[11px] text-ink-3/80"
                   title={node.id}
                 >
                   {node.id}

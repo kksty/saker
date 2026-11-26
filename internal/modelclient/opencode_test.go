@@ -22,7 +22,7 @@ func TestOpenCodeConversationHeaderSurvivesTurnsAndKeyChange(t *testing.T) {
 		if r.URL.Path != "/inference/go/openai/v1/chat/completions" {
 			t.Fatalf("path = %s", r.URL.Path)
 		}
-		if r.UserAgent() != "tianwu/0.x" {
+		if r.UserAgent() != "saker/0.x" {
 			t.Fatalf("user agent = %q", r.UserAgent())
 		}
 		ids = append(ids, r.Header.Get("x-opencode-session"))

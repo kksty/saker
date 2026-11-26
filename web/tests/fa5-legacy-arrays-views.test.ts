@@ -366,7 +366,7 @@ test('a canceled run says its category once and gives the operator words the ful
   assert.doesNotMatch(text, /止损：/, 'the category is not repeated inside the reason')
   const body = renderer!.root.findAll((node: any) =>
     typeof node.type === 'string' &&
-    String(node.props?.className ?? '').includes('tw-break') &&
+    String(node.props?.className ?? '').includes('saker-break') &&
     String(node.props?.title ?? '').includes('止损')).at(-1)
   assert.ok(body, 'the cancel reason body is rendered')
   assert.doesNotMatch(String(body.props.className), /flex-1/, 'the reason must not share its row with the label')

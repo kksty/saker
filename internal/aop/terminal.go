@@ -12,10 +12,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	pb "github.com/kksty/tianwu/internal/aop/pb"
-	"github.com/kksty/tianwu/internal/aop/pty"
-	"github.com/kksty/tianwu/internal/connectretry"
-	"github.com/kksty/tianwu/internal/ws"
+	pb "github.com/kksty/saker/internal/aop/pb"
+	"github.com/kksty/saker/internal/aop/pty"
+	"github.com/kksty/saker/internal/connectretry"
+	"github.com/kksty/saker/internal/ws"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -156,7 +156,7 @@ func openTerminalOnce(ctx context.Context, url string, header http.Header, nodeI
 	}
 	t := &Terminal{
 		sock:   sock,
-		stream: "tw-term-" + newID(),
+		stream: "saker-term-" + newID(),
 		shared: singleton,
 		out:    make(chan []byte, 128),
 		errs:   make(chan error, 1),

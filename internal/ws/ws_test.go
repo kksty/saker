@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/testutil"
+	"github.com/kksty/saker/internal/testutil"
 )
 
 func TestEchoRoundTrip(t *testing.T) {

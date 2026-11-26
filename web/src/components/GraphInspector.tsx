@@ -114,8 +114,8 @@ function Meta({
     <div className={`flex items-baseline gap-2 py-0.5 ${className ?? ''}`} title={title}>
       <span className="w-14 shrink-0 text-[11px] leading-4 text-ink-3">{label}</span>
       <span
-        className={`tw-break min-w-0 flex-1 text-[13px] leading-5 text-ink-2 ${
-          mono ? 'font-mono tw-nums' : ''
+        className={`saker-break min-w-0 flex-1 text-[13px] leading-5 text-ink-2 ${
+          mono ? 'font-mono saker-nums' : ''
         }`}
       >
         {value}
@@ -128,7 +128,7 @@ function Meta({
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="border-t border-hairline pt-2 first:border-t-0 first:pt-0">
-      <div className="tw-eyebrow mb-1">{title}</div>
+      <div className="saker-eyebrow mb-1">{title}</div>
       <div className="space-y-0.5">{children}</div>
     </div>
   )
@@ -204,7 +204,7 @@ export function GraphInspector({
     <div
       data-testid="graph-inspector"
       data-relation-kind={!node ? edge?.kind : undefined}
-      className="pointer-events-none tw-graph-dock tw-graph-dock-right tw-graph-under-toolbar absolute flex flex-col overflow-hidden rounded-xl border border-hairline bg-card/95 shadow-elevated backdrop-blur"
+      className="pointer-events-none saker-graph-dock saker-graph-dock-right saker-graph-under-toolbar absolute flex flex-col overflow-hidden rounded-xl border border-hairline bg-card/95 shadow-elevated backdrop-blur"
       style={{ width }}
     >
       <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-hairline bg-surface-1/60 px-3 py-2">
@@ -263,23 +263,23 @@ export function GraphInspector({
       </div>
 
       <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-2.5">
-        <div className="tw-break text-[13px] font-semibold leading-5 text-ink">{title || '（无标题）'}</div>
+        <div className="saker-break text-[13px] font-semibold leading-5 text-ink">{title || '（无标题）'}</div>
         {summary && (
           /* Hovering is a request to read the node: up to eight lines of summary
              instead of a three-line tease. Clamped so the card height stays
              bounded (the card is pointer-transparent and cannot be scrolled). */
-          <div className="tw-break line-clamp-[8] text-[12.5px] leading-relaxed text-ink-2" title={summary}>
+          <div className="saker-break line-clamp-[8] text-[12.5px] leading-relaxed text-ink-2" title={summary}>
             {summary}
           </div>
         )}
         {isBoundary && (
           <>
-            <div className="tw-break rounded-lg border border-hairline bg-surface-2/60 px-2.5 py-2 text-[12px] leading-relaxed text-ink-2">
+            <div className="saker-break rounded-lg border border-hairline bg-surface-2/60 px-2.5 py-2 text-[12px] leading-relaxed text-ink-2">
               {boundaryText(node?.boundaryState)}
             </div>
             <div className="flex items-baseline gap-2">
               <span className="w-14 shrink-0 text-[11px] leading-4 text-ink-3">引用 id</span>
-              <span className="tw-break min-w-0 flex-1 font-mono text-[13px] leading-5 text-ink-2">
+              <span className="saker-break min-w-0 flex-1 font-mono text-[13px] leading-5 text-ink-2">
                 {node?.boundary}
               </span>
             </div>
@@ -400,7 +400,7 @@ export function GraphInspector({
             {warnings.slice(0, 3).map((w, i) => {
               const native = /subagent/i.test(w)
               return (
-                <div key={i} className="tw-break text-[12px] leading-relaxed text-ink-2">
+                <div key={i} className="saker-break text-[12px] leading-relaxed text-ink-2">
                   {native && (
                     <Badge size="sm" variant="warning" className="mr-1">
                       原生 subagent

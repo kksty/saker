@@ -134,7 +134,7 @@ export function OperatorInboxCard({
 
   const timeChip = (at: string) =>
     at ? (
-      <span className="ml-auto shrink-0 font-mono tw-nums text-[10.5px] text-ink-3" title="待处理行按这个时间倒序混排">
+      <span className="ml-auto shrink-0 font-mono saker-nums text-[10.5px] text-ink-3" title="待处理行按这个时间倒序混排">
         {fmtTime(at)}
       </span>
     ) : null
@@ -147,7 +147,7 @@ export function OperatorInboxCard({
           <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
-              className="tw-break text-left text-[12.5px] font-medium text-ink transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="saker-break text-left text-[12.5px] font-medium text-ink transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               onClick={() => onOpenAuthorization?.(req.id)}
               disabled={!onOpenAuthorization}
               title={onOpenAuthorization ? `在授权页打开请求 ${req.id}` : undefined}
@@ -160,14 +160,14 @@ export function OperatorInboxCard({
             {timeChip(row.at)}
           </div>
           {(req.asset || req.impact) && (
-            <div className="tw-break mt-0.5 text-[11.5px] leading-relaxed text-ink-2">
+            <div className="saker-break mt-0.5 text-[11.5px] leading-relaxed text-ink-2">
               {req.asset && <span>资产：{req.asset}</span>}
               {req.asset && req.impact && <span className="px-1 text-ink-3">·</span>}
               {req.impact && <span>影响：{req.impact}</span>}
             </div>
           )}
           {req.authorization && (
-            <div className="tw-break mt-0.5 text-[11.5px] leading-relaxed text-ink-2">
+            <div className="saker-break mt-0.5 text-[11.5px] leading-relaxed text-ink-2">
               需要授权：{req.authorization}
             </div>
           )}
@@ -286,7 +286,7 @@ export function OperatorInboxCard({
                 category answered; otherwise the rows below are a lower bound. */}
             {actionable && (
               <span
-                className="font-mono tw-nums text-[11px] text-ink-3"
+                className="font-mono saker-nums text-[11px] text-ink-3"
                 title={inbox.summary && !inbox.summary.countable ? '有类别没读到：这是已知的下限，不是精确总数' : undefined}
               >
                 {inbox.summary && !inbox.summary.countable ? `${inbox.summary.total}+` : inbox.total}
@@ -334,7 +334,7 @@ export function OperatorInboxCard({
           {hiddenRows > 0 && (
             <div className="mt-2.5">
               <Button size="xs" variant="outline" onClick={() => setShowAll(true)}>
-                还有 <span className="font-mono tw-nums">{hiddenRows}</span> 条待处理 · 展开全部
+                还有 <span className="font-mono saker-nums">{hiddenRows}</span> 条待处理 · 展开全部
               </Button>
             </div>
           )}

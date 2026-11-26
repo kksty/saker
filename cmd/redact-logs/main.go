@@ -94,7 +94,7 @@ func main() {
 		extra         repeatedFlag
 	)
 	flag.StringVar(&dataDir, "data", "./data", "实例数据目录（只扫描 <data>/runs 与 <data>/projects/*/runs）")
-	flag.StringVar(&harness, "harness-config", defaultHarnessPath(), "harness 配置（默认 $TW_HARNESS_CONFIG 或 ~/.cyber/cyber.yaml）")
+	flag.StringVar(&harness, "harness-config", defaultHarnessPath(), "harness 配置（默认 $SAKER_HARNESS_CONFIG 或 ~/.cyber/cyber.yaml）")
 	flag.Var(&extra, "secret", "额外要清理的 secret 值（可重复）")
 	flag.BoolVar(&apply, "apply", false, "真正写回文件（默认只做 dry-run，不写任何东西）")
 	flag.BoolVar(&backup, "backup", false, "写回前把原文件保存为 <file>.bak（已存在则不覆盖）")
@@ -123,10 +123,10 @@ func (f *repeatedFlag) Set(v string) error {
 	return nil
 }
 
-// defaultHarnessPath mirrors the control plane's default: TW_HARNESS_CONFIG,
+// defaultHarnessPath mirrors the control plane's default: SAKER_HARNESS_CONFIG,
 // then the harness's own user configuration.
 func defaultHarnessPath() string {
-	if p := strings.TrimSpace(os.Getenv("TW_HARNESS_CONFIG")); p != "" {
+	if p := strings.TrimSpace(os.Getenv("SAKER_HARNESS_CONFIG")); p != "" {
 		return p
 	}
 	home, err := os.UserHomeDir()

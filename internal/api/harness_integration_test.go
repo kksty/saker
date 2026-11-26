@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/kksty/tianwu/internal/testutil"
+	"github.com/kksty/saker/internal/testutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,28 +16,28 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/access"
-	"github.com/kksty/tianwu/internal/aop"
-	"github.com/kksty/tianwu/internal/aopexec"
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/decider"
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/host"
-	"github.com/kksty/tianwu/internal/ioa"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/node"
-	"github.com/kksty/tianwu/internal/skills"
-	"github.com/kksty/tianwu/internal/ws"
+	"github.com/kksty/saker/internal/access"
+	"github.com/kksty/saker/internal/aop"
+	"github.com/kksty/saker/internal/aopexec"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/decider"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/host"
+	"github.com/kksty/saker/internal/ioa"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/node"
+	"github.com/kksty/saker/internal/skills"
+	"github.com/kksty/saker/internal/ws"
 )
 
 func TestHarnessProjectPauseCancelsModelAndPreventsFurtherRequests(t *testing.T) {
-	bin := os.Getenv("TW_HARNESS_BIN")
+	bin := os.Getenv("SAKER_HARNESS_BIN")
 	if bin == "" {
-		bin = os.Getenv("TW_AISCAN_BIN")
+		bin = os.Getenv("SAKER_AISCAN_BIN")
 	}
-	scan := os.Getenv("TW_SCAN_BIN")
+	scan := os.Getenv("SAKER_SCAN_BIN")
 	if bin == "" || scan == "" {
-		t.Skip("set TW_HARNESS_BIN and TW_SCAN_BIN for real pause/model cancellation check")
+		t.Skip("set SAKER_HARNESS_BIN and SAKER_SCAN_BIN for real pause/model cancellation check")
 	}
 	var calls atomic.Int32
 	started, disconnected := make(chan struct{}), make(chan struct{})
@@ -70,7 +70,7 @@ func TestHarnessProjectPauseCancelsModelAndPreventsFurtherRequests(t *testing.T)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	h, err := host.Start(ctx, host.Config{Bin: bin, NodeBin: scan, Dir: dir, Args: []string{"--config", config}, DropEnvPrefixes: []string{"CYBER_", "TW_CONSOLE_TOKEN", "TW_AGENT_TOKEN"}, RequireProvider: true, ReadyTimeout: 10 * time.Second})
+	h, err := host.Start(ctx, host.Config{Bin: bin, NodeBin: scan, Dir: dir, Args: []string{"--config", config}, DropEnvPrefixes: []string{"CYBER_", "SAKER_CONSOLE_TOKEN", "SAKER_AGENT_TOKEN"}, RequireProvider: true, ReadyTimeout: 10 * time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,13 +125,13 @@ func TestHarnessProjectPauseCancelsModelAndPreventsFurtherRequests(t *testing.T)
 }
 
 func TestHarnessModelFailureKeepsConsoleTerminalAndRecovers(t *testing.T) {
-	bin := os.Getenv("TW_HARNESS_BIN")
+	bin := os.Getenv("SAKER_HARNESS_BIN")
 	if bin == "" {
-		bin = os.Getenv("TW_AISCAN_BIN")
+		bin = os.Getenv("SAKER_AISCAN_BIN")
 	}
-	scan := os.Getenv("TW_SCAN_BIN")
+	scan := os.Getenv("SAKER_SCAN_BIN")
 	if bin == "" || scan == "" {
-		t.Skip("set TW_HARNESS_BIN and TW_SCAN_BIN for the real host/PTY contract check")
+		t.Skip("set SAKER_HARNESS_BIN and SAKER_SCAN_BIN for the real host/PTY contract check")
 	}
 	var paid atomic.Bool
 	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -152,7 +152,7 @@ func TestHarnessModelFailureKeepsConsoleTerminalAndRecovers(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	args := []string{"--config", config}
-	h, err := host.Start(ctx, host.Config{Bin: bin, NodeBin: scan, Dir: dir, Args: args, DropEnvPrefixes: []string{"CYBER_", "TW_CONSOLE_TOKEN", "TW_AGENT_TOKEN"}, RequireProvider: true, AllowNotReady: true, ReadyTimeout: 10 * time.Second, Logf: t.Logf})
+	h, err := host.Start(ctx, host.Config{Bin: bin, NodeBin: scan, Dir: dir, Args: args, DropEnvPrefixes: []string{"CYBER_", "SAKER_CONSOLE_TOKEN", "SAKER_AGENT_TOKEN"}, RequireProvider: true, AllowNotReady: true, ReadyTimeout: 10 * time.Second, Logf: t.Logf})
 	if h == nil || !errors.Is(err, host.ErrNotReady) {
 		t.Fatalf("failed model Start = %v, host=%v", err, h)
 	}
@@ -211,15 +211,15 @@ func TestHarnessModelFailureKeepsConsoleTerminalAndRecovers(t *testing.T) {
 
 // This checks the composed API -> AOP -> real harness -> provider boundary.
 // A fake AOP host cannot detect a syntactically valid but unexpanded /skill.
-// No external model or target is used. Opt in with TW_HARNESS_BIN (+ TW_SCAN_BIN).
+// No external model or target is used. Opt in with SAKER_HARNESS_BIN (+ SAKER_SCAN_BIN).
 func TestHarnessExpandsCommanderSkillBeforeCallingModel(t *testing.T) {
-	bin := os.Getenv("TW_HARNESS_BIN")
+	bin := os.Getenv("SAKER_HARNESS_BIN")
 	if bin == "" {
-		bin = os.Getenv("TW_AISCAN_BIN")
+		bin = os.Getenv("SAKER_AISCAN_BIN")
 	}
-	scan := os.Getenv("TW_SCAN_BIN")
+	scan := os.Getenv("SAKER_SCAN_BIN")
 	if bin == "" || scan == "" {
-		t.Skip("set TW_HARNESS_BIN and TW_SCAN_BIN to run the real harness contract check")
+		t.Skip("set SAKER_HARNESS_BIN and SAKER_SCAN_BIN to run the real harness contract check")
 	}
 	parallelStarted := make(chan struct{}, 2)
 	parallelRelease := make(chan struct{})
@@ -436,7 +436,7 @@ func TestHarnessExpandsCommanderSkillBeforeCallingModel(t *testing.T) {
 	if err != nil || !strings.Contains(output, "NATIVE-PROFILE-HTTP-FIXTURE") {
 		t.Fatalf("native profile command = %q, %v", output, err)
 	}
-	if os.Getenv("TW_BROWSER_INTEGRATION") == "1" {
+	if os.Getenv("SAKER_BROWSER_INTEGRATION") == "1" {
 		t.Run("registered browser ownership", func(t *testing.T) {
 			operatorLease := leaseID(t, leaseCall(t, s, entry, nil, map[string]any{"action": "acquire"}))
 			if _, err := s.runBrowserCommand(ctx, entry, "!playwright open "+quoteNative(target.URL)+" --session "+quoteNative(entry.Session)); err != nil {

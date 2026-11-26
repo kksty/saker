@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/kksty/tianwu/internal/retrieval"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/retrieval"
+	"github.com/kksty/saker/internal/store"
 )
 
 // The focus index written into the run's case. It is a bounded, frozen index of

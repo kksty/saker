@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/collab"
+	"github.com/kksty/saker/internal/collab"
 )
 
 // The three project documents are operator-owned (agent.md L41). The route lives

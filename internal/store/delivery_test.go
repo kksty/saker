@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // An unacknowledged delivery is a global demand only when its retry backoff has

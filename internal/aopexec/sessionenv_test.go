@@ -5,32 +5,32 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/aop"
+	"github.com/kksty/saker/internal/aop"
 )
 
 func TestSessionToolEnvMatchesCaseState(t *testing.T) {
 	dir := t.TempDir()
-	tw := filepath.Join(dir, ".tw")
-	if err := os.MkdirAll(tw, 0o700); err != nil {
+	saker := filepath.Join(dir, ".tw")
+	if err := os.MkdirAll(saker, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(tw, "identity.json"), []byte(
+	if err := os.WriteFile(filepath.Join(saker, "identity.json"), []byte(
 		`{"api_base":"http://127.0.0.1:8080/","project_id":"p-1","intent_id":"in-9"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(tw, "auth"),
+	if err := os.WriteFile(filepath.Join(saker, "auth"),
 		[]byte("Authorization: Bearer tok-xyz\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
 	env := sessionToolEnv(dir)
 	want := map[string]string{
-		"TW_API":                    "http://127.0.0.1:8080",
-		"TW_PROJECT":                "p-1",
-		"TW_SELF":                   "in-9",
-		"TW_AGENT":                  "http://127.0.0.1:8080/agent/p-1/api",
-		"TW_BATTLE":                 "http://127.0.0.1:8080/p/p-1/api",
-		"TW_AUTH":                   "Authorization: Bearer tok-xyz",
+		"SAKER_API":                    "http://127.0.0.1:8080",
+		"SAKER_PROJECT":                "p-1",
+		"SAKER_SELF":                   "in-9",
+		"SAKER_AGENT":                  "http://127.0.0.1:8080/agent/p-1/api",
+		"SAKER_BATTLE":                 "http://127.0.0.1:8080/p/p-1/api",
+		"SAKER_AUTH":                   "Authorization: Bearer tok-xyz",
 		aop.DisableNativeIOASendEnv: "1",
 	}
 	for key, value := range want {
@@ -38,8 +38,8 @@ func TestSessionToolEnvMatchesCaseState(t *testing.T) {
 			t.Fatalf("%s = %q, want %q", key, env[key], value)
 		}
 	}
-	if env["TW_BIN"] == "" {
-		t.Fatal("TW_BIN is empty; the shell cannot call the native read verbs")
+	if env["SAKER_BIN"] == "" {
+		t.Fatal("SAKER_BIN is empty; the shell cannot call the native read verbs")
 	}
 }
 

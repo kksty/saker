@@ -62,7 +62,7 @@ export function Page({ title, status, subtitle, meta, actions, children, scroll 
     // targets it by id. `tabIndex={-1}` lets the skip link move focus here
     // without adding a tab stop of its own.
     <main
-      id="tw-main"
+      id="saker-main"
       tabIndex={-1}
       aria-labelledby={headingID}
       className="flex h-full min-h-0 min-w-0 flex-col focus:outline-none"
@@ -72,14 +72,14 @@ export function Page({ title, status, subtitle, meta, actions, children, scroll 
           never moves), then reference (snapshot / layout / tokens) and finally
           the actions. A subtitle still gets its own line, because it is prose,
           not a counter. */}
-      <header className={cn('tw-page-header flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2 border-b border-hairline py-3.5', pageGutter, headerClassName)}>
+      <header className={cn('saker-page-header flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2 border-b border-hairline py-3.5', pageGutter, headerClassName)}>
         {/* A floor on the name column: without it the right-hand counters and
             actions (533px wide) keep their place and squeeze this column to 35px
             at 640, which printed the project name as 「应用…」. With the floor the
             header wraps instead: 640 → two rows, 768 and up → still one row. */}
         <div className="min-w-[9rem] flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
-            <span className="tw-eyebrow min-w-0 max-w-[16rem] truncate text-ink-3">
+            <span className="saker-eyebrow min-w-0 max-w-[16rem] truncate text-ink-3">
               {chrome ? (chrome.projectName || '项目工作区') : '全局控制台'}
             </span>
             {/* The separator belongs to the page name, not to the row: bound
@@ -92,7 +92,7 @@ export function Page({ title, status, subtitle, meta, actions, children, scroll 
             {status}
           </div>
           {subtitle && (
-            <div className="tw-subtitle mt-1 max-w-[760px]">{subtitle}</div>
+            <div className="saker-subtitle mt-1 max-w-[760px]">{subtitle}</div>
           )}
         </div>
         {(hasTopRow || hasMetaRow) && (
@@ -142,7 +142,7 @@ export function Page({ title, status, subtitle, meta, actions, children, scroll 
  *
  * Extra `<section>` attributes (`data-testid`, `aria-*`, `id`) pass through, so
  * a page that needs a stable test hook for its card can use the real card
- * component instead of hand-rolling a `tw-panel` section.
+ * component instead of hand-rolling a `saker-panel` section.
  */
 export function Panel({
   title,
@@ -159,10 +159,10 @@ export function Panel({
   bodyClassName?: string
 } & Omit<React.HTMLAttributes<HTMLElement>, 'title' | 'children'>) {
   return (
-    <section {...rest} className={cn('tw-panel min-w-0 rounded-xl', className)}>
+    <section {...rest} className={cn('saker-panel min-w-0 rounded-xl', className)}>
       {(title || extra) && (
-        <header className="tw-panel-header flex flex-wrap items-center gap-2 border-b border-hairline px-4 py-3">
-          <div className="tw-section-title min-w-0">{title}</div>
+        <header className="saker-panel-header flex flex-wrap items-center gap-2 border-b border-hairline px-4 py-3">
+          <div className="saker-section-title min-w-0">{title}</div>
           <div className="ml-auto flex items-center gap-2">{extra}</div>
         </header>
       )}

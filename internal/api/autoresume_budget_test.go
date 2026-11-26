@@ -3,7 +3,7 @@ package api
 import (
 	"testing"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // The resume budget exists to bound a retry storm, not to count refusals. A

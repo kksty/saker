@@ -15,7 +15,7 @@ import (
 // Defaults for the harness's shared `traffic` section, written into the host
 // runtime configuration below. The harness default for body_storage is "none"
 // (bounded previews only, see cyber-harness pkg/config/traffic.go), which keeps
-// the console from showing the exchange's original bytes; Tianwu switches the
+// the console from showing the exchange's original bytes; Saker switches the
 // local scanner's store to disk and keeps the limits bounded.
 const (
 	defaultTrafficBodyStorage        = "disk"
@@ -114,7 +114,7 @@ func (s *Store) ValidateTrafficBodyRetention(bytes int64) error {
 // through RuntimeConfig: this setting is read by the scan at process start.
 func (s *Store) SetTrafficBodyRetention(bytes int64) error {
 	if s.harness == "" {
-		return fmt.Errorf("没有 harness 配置路径：设置 TW_HARNESS_CONFIG")
+		return fmt.Errorf("没有 harness 配置路径：设置 SAKER_HARNESS_CONFIG")
 	}
 	if err := s.ValidateTrafficBodyRetention(bytes); err != nil {
 		return err
@@ -259,7 +259,7 @@ func (s *Store) ValidateRuntimeConfig() error {
 }
 
 // RuntimeConfig materialises the default host/audit configuration. The saved
-// document also carries Tianwu admission and scheduling metadata, which the
+// document also carries Saker admission and scheduling metadata, which the
 // harness's strict parser must never see, even on an inactive profile.
 // A content-addressed path makes Host.Update notice changes to file-only
 // settings while a no-op save or admission toggle leaves live sessions alone.
@@ -320,7 +320,7 @@ func (s *Store) SecretValues() []string {
 	return values
 }
 
-// ensureTraffic fills the shared harness traffic section with Tianwu's bounded
+// ensureTraffic fills the shared harness traffic section with Saker's bounded
 // on-disk defaults. Only absent keys are added: the operator's cyber.yaml is the
 // authority, and a partially specified section (for example body_storage only)
 // must keep every explicit value while the rest falls back to the limits here.

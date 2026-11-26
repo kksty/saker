@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	native "github.com/kksty/tianwu/internal/aop/traffic"
+	native "github.com/kksty/saker/internal/aop/traffic"
 	"google.golang.org/protobuf/proto"
 )
 

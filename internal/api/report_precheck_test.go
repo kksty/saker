@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/report"
+	"github.com/kksty/saker/internal/report"
 )
 
 // writeReportFixture puts one report directory under the case root: report.json

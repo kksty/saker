@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/state"
+	"github.com/kksty/saker/internal/state"
 )
 
 // A restart recovery wake is the boot watchdog asking for one round without an

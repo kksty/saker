@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/board"
+	"github.com/kksty/saker/internal/board"
 )
 
 // The bounded-list label ("these rows are a top-N, the totals are the ledger")

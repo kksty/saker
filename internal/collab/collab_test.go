@@ -122,7 +122,7 @@ func TestCommanderIdentityNeedsNoIntent(t *testing.T) {
 }
 
 // The commander keeps one token per session but its run binding follows the
-// live round; otherwise $TW_AGENT calls would be attributed to the finished
+// live round; otherwise $SAKER_AGENT calls would be attributed to the finished
 // round that first received the token. Revoking the current run must still drop
 // it, and the old run id must not linger in the registry.
 func TestAdoptMovesAReusedTokenToTheCurrentRun(t *testing.T) {

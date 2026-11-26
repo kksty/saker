@@ -7,11 +7,11 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/contract"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/retrieval"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/contract"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/retrieval"
+	"github.com/kksty/saker/internal/store"
 )
 
 // Prompt budgets (docs/06, D17). Big enough to carry the reasoning that led to
@@ -510,9 +510,9 @@ func writeOwnHistory(b *strings.Builder, db store.DB, in model.Intent) {
 			r.ID, span, r.Status, prefix, clipRunes(runHistoryReason(r), 120), r.DeclaredFacts)
 	}
 	if hidden > 0 {
-		fmt.Fprintf(b, "- …（更早 %d 次未列出；按 `GET $TW_BATTLE/runs` 续读）\n", hidden)
+		fmt.Fprintf(b, "- …（更早 %d 次未列出；按 `GET $SAKER_BATTLE/runs` 续读）\n", hidden)
 	}
-	b.WriteString("要看某一轮跑过什么命令：`GET $TW_BATTLE/runs/<run_id>/events`（同意图可读；不读不会自动带进来）。\n")
+	b.WriteString("要看某一轮跑过什么命令：`GET $SAKER_BATTLE/runs/<run_id>/events`（同意图可读；不读不会自动带进来）。\n")
 	b.WriteString("- 以上只是历史记录，不代表本轮必须怎么做。\n")
 }
 
@@ -683,7 +683,7 @@ func writeInputPointers(b *strings.Builder, graph, focus, optional bool) {
 	// instead of re-deriving it. It is a read view, not authorization. The
 	// detailed read commands belong to the collaborate skill; the prompt names
 	// only the entry points, so a solo dispatch does not carry a tool manual.
-	b.WriteString("战场态势（只读）：`\"$TW_BIN\"` 的 board/wake/facts/changes/inbox/focus/readiness 输出已格式化；或读 `$TW_BATTLE`（board、intents、goals、playbooks、runs，`-H \"$TW_AUTH\"`）；写操作走 `$TW_AGENT`。分页标记不是全集，截断时换小页重试；命令细节见 `collaborate` skill。\n")
+	b.WriteString("战场态势（只读）：`\"$SAKER_BIN\"` 的 board/wake/facts/changes/inbox/focus/readiness 输出已格式化；或读 `$SAKER_BATTLE`（board、intents、goals、playbooks、runs，`-H \"$SAKER_AUTH\"`）；写操作走 `$SAKER_AGENT`。分页标记不是全集，截断时换小页重试；命令细节见 `collaborate` skill。\n")
 }
 
 // singleLine collapses a field that has to stay on one line. A newline in a

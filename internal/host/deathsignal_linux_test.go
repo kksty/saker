@@ -12,7 +12,7 @@ import (
 // forking thread and cannot be set by guardChild after cmd.Start. This test
 // pins both halves of the Linux stand-in for the Windows job object — the
 // process group (one signal takes the tree) and the parent-death signal (a
-// killed tw still takes the host down).
+// killed saker still takes the host down).
 func TestSetProcAttrArmsTheParentDeathSignal(t *testing.T) {
 	cmd := exec.Command("true")
 	setProcAttr(cmd)
@@ -28,12 +28,12 @@ func TestSetProcAttrArmsTheParentDeathSignal(t *testing.T) {
 }
 
 // The variant is only about the parent-death policy; the group must survive it,
-// because killGroup sends one signal to -pgid and would otherwise hit tw itself.
+// because killGroup sends one signal to -pgid and would otherwise hit saker itself.
 func TestSetProcAttrKeepsOnlyTheGroupAndTheDeathSignal(t *testing.T) {
 	cmd := exec.Command("true")
 	setProcAttr(cmd)
 	if cmd.SysProcAttr.Setsid {
-		t.Fatal("Setsid must stay false: the child would leave tw's terminal and the group")
+		t.Fatal("Setsid must stay false: the child would leave saker's terminal and the group")
 	}
 	if cmd.SysProcAttr.Credential != nil {
 		t.Fatalf("Credential = %+v, want nil (no account switch)", cmd.SysProcAttr.Credential)

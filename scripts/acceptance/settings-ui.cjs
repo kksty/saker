@@ -1,5 +1,5 @@
 // Offline settings acceptance for the single model gateway console.
-// All page HTTP responses are synthetic; no Tianwu service, model provider,
+// All page HTTP responses are synthetic; no Saker service, model provider,
 // project data or saved credential is used. The sibling console-gallery.cjs
 // renders screenshots (not committed); this script is the behavioral regression
 // for 设置.
@@ -8,10 +8,10 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '../..');
-const webRoot = path.resolve(process.env.TW_SETTINGS_WEB || path.join(root, 'internal/web/static'));
+const webRoot = path.resolve(process.env.SAKER_SETTINGS_WEB || path.join(root, 'internal/web/static'));
 const out = path.join(root, '.build/ui-qa'); fs.mkdirSync(out, { recursive: true });
 const profile = fs.mkdtempSync(path.join(out, 'settings-chrome-'));
-const chrome = spawn(process.env.TW_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe', [
+const chrome = spawn(process.env.SAKER_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe', [
   '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
   '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1',
   '--user-data-dir=' + profile, 'about:blank',
@@ -114,13 +114,13 @@ function api(url, request) {
     const wait = async expression => { for (let i = 0; i < 100; i++) { if (await evaluate('Boolean(' + expression + ')')) return; await pause(75); } throw new Error('Timed out: ' + expression + '\n' + await evaluate('document.body.innerText')); };
     const text = value => wait('document.body.innerText.includes(' + JSON.stringify(value) + ')');
     const click = async label => evaluate(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.getClientRects().length&&(b.textContent.trim()===${JSON.stringify(label)}||b.getAttribute('aria-label')===${JSON.stringify(label)}));if(!b)throw Error('Missing button '+${JSON.stringify(label)});b.click()})()`);
-    const clickIn = async (cardText, label) => evaluate(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.getClientRects().length&&b.textContent.trim()===${JSON.stringify(label)}&&((b.closest('.tw-panel')||{}).textContent||'').includes(${JSON.stringify(cardText)}));if(!b)throw Error('Missing button '+${JSON.stringify(label)}+' in '+${JSON.stringify(cardText)});b.click()})()`);
+    const clickIn = async (cardText, label) => evaluate(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.getClientRects().length&&b.textContent.trim()===${JSON.stringify(label)}&&((b.closest('.saker-panel')||{}).textContent||'').includes(${JSON.stringify(cardText)}));if(!b)throw Error('Missing button '+${JSON.stringify(label)}+' in '+${JSON.stringify(cardText)});b.click()})()`);
     const fill = async (label, value) => evaluate(`(()=>{const e=[...document.querySelectorAll('input')].find(e=>e.getAttribute('aria-label')===${JSON.stringify(label)});if(!e)throw Error('Missing input '+${JSON.stringify(label)});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}))})()`);
     const check = (name, passed, actual) => { checks.push({ name, passed }); assert.ok(passed, name + (actual === undefined ? '' : ': ' + JSON.stringify(actual))); };
     const shot = async name => { const s = await call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }); fs.writeFileSync(path.join(out, name + '.png'), Buffer.from(s.data, 'base64')); };
 
     await call('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1050, deviceScaleFactor: 1, mobile: false });
-    await call('Page.navigate', { url: 'http://tianwu.test/g/?view=settings' });
+    await call('Page.navigate', { url: 'http://saker.test/g/?view=settings' });
     await text('统一模型连接');
     await text('复核与报告并发');
     check('page explains the one shared gateway', await evaluate("document.body.innerText.includes('指挥官、执行者和复核共用此入口')"));

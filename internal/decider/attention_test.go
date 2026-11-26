@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/retrieval"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/retrieval"
 )
 
 func TestFailedGlobalCallRetainsEventsAndBacksOffAutomaticCalls(t *testing.T) {

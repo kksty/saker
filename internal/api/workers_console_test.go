@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -10,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 func consoleCall(t *testing.T, s *Server, method, path, actor string, body any) *httptest.ResponseRecorder {
@@ -104,10 +105,17 @@ func TestConsoleWorkersAndKill(t *testing.T) {
 	if run.Status != model.RunCanceled || run.CancelCause != model.CancelCauseWorkerKill {
 		t.Fatalf("run = %s/%s", run.Status, run.CancelCause)
 	}
-	got, _ := f.p.Store.GetIntent(owned.ID)
-	if got.Status != model.StatusFailed || !got.Hold {
-		t.Fatalf("killed worker = %s hold=%v", got.Status, got.Hold)
-	}
+	// finish writes the run's terminal state first and settles the intent right
+	// after, so "the run is no longer running" is not yet "the intent is
+	// settled": wait for the intent, not for the run.
+	waitFor(t, 5*time.Second, func() bool {
+		got, ok := f.p.Store.GetIntent(owned.ID)
+		return ok && got.Status == model.StatusFailed && got.Hold
+	}, func() string {
+		got, _ := f.p.Store.GetIntent(owned.ID)
+		run, _ := f.p.Store.GetRun(byID[owned.ID].RunID)
+		return fmt.Sprintf("killed worker = %s hold=%v (run %s/%s)", got.Status, got.Hold, run.Status, run.CancelCause)
+	})
 
 	// A finished worker is a conflict, not a silent kill.
 	rec = consoleCall(t, f.srv, http.MethodPost, "/api/workers/"+finished.ID+"/kill", "", nil)

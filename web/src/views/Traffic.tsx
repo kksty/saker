@@ -117,7 +117,7 @@ export function Traffic() {
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-mono text-[11px] font-semibold leading-4 text-ink">{row.method}</span>
                           <Badge variant={row.status >= 500 || row.error ? 'warning' : 'muted'} size="sm">
-                            <span className="tw-nums font-mono">{row.status || '无响应'}</span>
+                            <span className="saker-nums font-mono">{row.status || '无响应'}</span>
                           </Badge>
                           {/* Body completeness is a content fact, not a status:
                               a small dot keeps the row scannable and the title
@@ -134,11 +134,11 @@ export function Traffic() {
                               {capturePreviewBadge(flags)}
                             </span>
                           )}
-                          <time className="tw-nums ml-auto whitespace-nowrap font-mono text-[11px] leading-4 text-ink-3">{fmtTime(row.at)}</time>
+                          <time className="saker-nums ml-auto whitespace-nowrap font-mono text-[11px] leading-4 text-ink-3">{fmtTime(row.at)}</time>
                         </div>
-                        <p className="tw-break mt-1 font-mono text-[12px] leading-5 text-ink">{row.url}</p>
-                        <p className="tw-break mt-0.5 font-mono text-[11px] leading-4 text-ink-3">
-                          {row.run_id} · 响应 <span className="tw-nums">{bytes}</span> B{!row.complete ? ' · 记录不完整' : ''}
+                        <p className="saker-break mt-1 font-mono text-[12px] leading-5 text-ink">{row.url}</p>
+                        <p className="saker-break mt-0.5 font-mono text-[11px] leading-4 text-ink-3">
+                          {row.run_id} · 响应 <span className="saker-nums">{bytes}</span> B{!row.complete ? ' · 记录不完整' : ''}
                         </p>
                       </button>
                       </li>
@@ -155,7 +155,7 @@ export function Traffic() {
               )}
             </div>
             <div className="flex items-center gap-2 border-t border-hairline p-2.5 text-[11px] text-ink-3" role="group" aria-label="流量分页">
-              <span role="status" aria-live="polite" className="tw-nums font-mono">共 {page?.total ?? 0} 条 · 第 {pageIndex} 页</span>
+              <span role="status" aria-live="polite" className="saker-nums font-mono">共 {page?.total ?? 0} 条 · 第 {pageIndex} 页</span>
               <Button size="xs" variant="ghost" className="ml-auto" disabled={offset === 0} onClick={() => { setSelected(''); setOffset(Math.max(0, offset - 100)) }}>
                 上一页
               </Button>
@@ -184,7 +184,7 @@ export function Traffic() {
                   <Callout>当前选中记录已移出本页列表，详情保持不变。</Callout>
                 )}
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="tw-section-title">请求与响应</h2>
+                  <h2 className="saker-section-title">请求与响应</h2>
                   {currentFlags?.partial && (
                     <Badge size="sm" variant="warning">{capturePreviewBadge(currentFlags)}</Badge>
                   )}
@@ -195,15 +195,15 @@ export function Traffic() {
                     <Download className="h-3.5 w-3.5" /> 下载原始记录
                   </a>
                 </div>
-                <dl className="tw-inset grid grid-cols-1 gap-x-4 gap-y-1.5 rounded-lg p-3 font-mono text-[11px] leading-5 text-ink-3 sm:grid-cols-2">
-                  <div className="flex min-w-0 items-baseline gap-1.5"><dt>运行</dt><dd className="tw-break min-w-0 text-ink-2">{current.record.run_id}</dd></div>
-                  <div className="flex min-w-0 items-baseline gap-1.5"><dt>意图</dt><dd className="tw-break min-w-0 text-ink-2">{current.record.intent_id || '—'}</dd></div>
-                  <div className="flex min-w-0 items-baseline gap-1.5"><dt>会话</dt><dd className="tw-break min-w-0 text-ink-2">{current.record.session_id || '未提供'}</dd></div>
-                  <div className="flex min-w-0 items-baseline gap-1.5"><dt>流量</dt><dd className="tw-break min-w-0 text-ink-2">{current.record.flow_id}</dd></div>
-                  <div className="flex min-w-0 items-baseline gap-1.5"><dt>操作</dt><dd className="tw-break min-w-0 text-ink-2">{current.record.operation?.operation_id || '未提供'}</dd></div>
-                  <div className="flex min-w-0 items-baseline gap-1.5"><dt>调用</dt><dd className="tw-break min-w-0 text-ink-2">{current.record.operation?.call_id || '未提供'}</dd></div>
-                  <div className="flex min-w-0 items-baseline gap-1.5"><dt>字节</dt><dd className="tw-break min-w-0 text-ink-2">请求 {typeof current.record.request_bytes === 'number' ? `${current.record.request_bytes.toLocaleString()} B` : '未记录'} · 响应 {typeof current.record.response_bytes === 'number' ? `${current.record.response_bytes.toLocaleString()} B` : '未记录'}</dd></div>
-                  <div className="flex min-w-0 items-baseline gap-1.5"><dt>正文</dt><dd className={`tw-break min-w-0 ${currentFlags?.partial ? 'text-warning' : 'text-ink-2'}`}>{currentFlags?.partial ? capturePreviewBadge(currentFlags) : '已保存完整正文'}</dd></div>
+                <dl className="saker-inset grid grid-cols-1 gap-x-4 gap-y-1.5 rounded-lg p-3 font-mono text-[11px] leading-5 text-ink-3 sm:grid-cols-2">
+                  <div className="flex min-w-0 items-baseline gap-1.5"><dt>运行</dt><dd className="saker-break min-w-0 text-ink-2">{current.record.run_id}</dd></div>
+                  <div className="flex min-w-0 items-baseline gap-1.5"><dt>意图</dt><dd className="saker-break min-w-0 text-ink-2">{current.record.intent_id || '—'}</dd></div>
+                  <div className="flex min-w-0 items-baseline gap-1.5"><dt>会话</dt><dd className="saker-break min-w-0 text-ink-2">{current.record.session_id || '未提供'}</dd></div>
+                  <div className="flex min-w-0 items-baseline gap-1.5"><dt>流量</dt><dd className="saker-break min-w-0 text-ink-2">{current.record.flow_id}</dd></div>
+                  <div className="flex min-w-0 items-baseline gap-1.5"><dt>操作</dt><dd className="saker-break min-w-0 text-ink-2">{current.record.operation?.operation_id || '未提供'}</dd></div>
+                  <div className="flex min-w-0 items-baseline gap-1.5"><dt>调用</dt><dd className="saker-break min-w-0 text-ink-2">{current.record.operation?.call_id || '未提供'}</dd></div>
+                  <div className="flex min-w-0 items-baseline gap-1.5"><dt>字节</dt><dd className="saker-break min-w-0 text-ink-2">请求 {typeof current.record.request_bytes === 'number' ? `${current.record.request_bytes.toLocaleString()} B` : '未记录'} · 响应 {typeof current.record.response_bytes === 'number' ? `${current.record.response_bytes.toLocaleString()} B` : '未记录'}</dd></div>
+                  <div className="flex min-w-0 items-baseline gap-1.5"><dt>正文</dt><dd className={`saker-break min-w-0 ${currentFlags?.partial ? 'text-warning' : 'text-ink-2'}`}>{currentFlags?.partial ? capturePreviewBadge(currentFlags) : '已保存完整正文'}</dd></div>
                 </dl>
                 {current.record.error && <Callout tone="warning">{current.record.error}</Callout>}
                 {!current.record.complete && <Callout tone="warning">原生记录标记为不完整，正文可能缺失。</Callout>}
@@ -239,13 +239,13 @@ function Exchange({title, start, headers = [], body = ''}: {title: string; start
     <Panel title={title} bodyClassName="space-y-2">
       {/* 正文块自己滚（max-h + overflow-auto），但不拦截滚动链：指针停在报文上时，
           块内到底后滚轮必须继续带动外层详情面板，否则整页看起来「滑不动」。 */}
-      <pre className="tw-inset tw-break overflow-auto whitespace-pre-wrap rounded-lg p-3 font-mono text-[11px] leading-5 text-ink-2 [scrollbar-width:thin]">
+      <pre className="saker-inset saker-break overflow-auto whitespace-pre-wrap rounded-lg p-3 font-mono text-[11px] leading-5 text-ink-2 [scrollbar-width:thin]">
         {start}{'\n'}{headers.map(h => `${h.name}: ${h.value}`).join('\n')}
       </pre>
-      <pre className="tw-inset tw-break max-h-[420px] overflow-auto whitespace-pre-wrap rounded-lg p-3 font-mono text-[11px] leading-5 text-ink-2 [scrollbar-width:thin]">
+      <pre className="saker-inset saker-break max-h-[420px] overflow-auto whitespace-pre-wrap rounded-lg p-3 font-mono text-[11px] leading-5 text-ink-2 [scrollbar-width:thin]">
         {preview.text || '（空正文）'}
       </pre>
-      <p className="tw-nums text-[11px] leading-4 text-ink-3">
+      <p className="saker-nums text-[11px] leading-4 text-ink-3">
         {preview.size.toLocaleString()} B
         {preview.binary ? ' · 二进制，十六进制预览' : ''}
         {preview.truncated ? ' · 界面只解码前 64 KiB；这不是服务端的截断标记，下载原始记录查看全部已保存字节' : ''}

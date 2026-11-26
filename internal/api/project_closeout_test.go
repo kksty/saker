@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/decider"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/project"
+	"github.com/kksty/saker/internal/decider"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/project"
 )
 
 func closeoutServer(t *testing.T) (*Server, *commanderExec) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 # Thin entry: sync the vendored AOP generated code from the cyber-harness source.
 #
-# All copy/rewrite/check logic lives in cmd/tw-gate (-sync-aop-protos), the same
+# All copy/rewrite/check logic lives in cmd/saker-gate (-sync-aop-protos), the same
 # single implementation scripts/gate.ps1 and scripts/gate.sh run; this script
 # only locates the repository root, runs that mode and forwards arguments and
 # exit code.
@@ -10,7 +10,7 @@
 #   pwsh -File scripts/sync-aop-protos.ps1 -aop-dry-run
 #   pwsh -File scripts/sync-aop-protos.ps1 -harness-dir ../cyber-harness
 #
-# Only generated files are copied; tianwu never edits the wire semantics. The
+# Only generated files are copied; saker never edits the wire semantics. The
 # harness source is resolved like the gate: -harness-dir, $HARNESS_DIR,
 # .build/harness-src, then a sibling ../cyber-harness. The command runs the same
 # drift check the gate runs after copying, so a sync that still differs fails.
@@ -26,7 +26,7 @@ if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
 
 Push-Location $root
 try {
-    & go run ./cmd/tw-gate -sync-aop-protos @args
+    & go run ./cmd/saker-gate -sync-aop-protos @args
     exit $LASTEXITCODE
 }
 finally {

@@ -1,7 +1,7 @@
 package buildinfo
 
-// The vendored AOP drift check is the safety net for the one place tianwu copies
-// generated code across repositories. These tests build a throwaway tianwu root
+// The vendored AOP drift check is the safety net for the one place saker copies
+// generated code across repositories. These tests build a throwaway saker root
 // and a throwaway harness checkout, so they can prove the three states the gate
 // must distinguish (consistent, different, absent) without either real checkout.
 
@@ -54,7 +54,7 @@ func writeAOPProtoHarnessFixture(t *testing.T, harnessDir string) {
 	}
 }
 
-// writeAOPProtoVendoredFixture writes only the tianwu side of the pair set, in
+// writeAOPProtoVendoredFixture writes only the saker side of the pair set, in
 // the exact form a sync from the fixture harness produces.
 func writeAOPProtoVendoredFixture(t *testing.T, root string) {
 	t.Helper()
@@ -126,7 +126,7 @@ func TestCheckAOPProtoConsistent(t *testing.T) {
 }
 
 // TestCheckAOPProtoIgnoresVendoringNoise proves the documented normalization:
-// generator toolchain versions, tianwu's local comment and CRLF checked-out
+// generator toolchain versions, saker's local comment and CRLF checked-out
 // files must not read as protocol drift, while a code change must.
 func TestCheckAOPProtoIgnoresVendoringNoise(t *testing.T) {
 	root, harnessDir := t.TempDir(), t.TempDir()
@@ -190,7 +190,7 @@ func TestCheckAOPProtoMismatch(t *testing.T) {
 	if mismatch.Path != target || mismatch.HarnessPath != "aop/tool/protocol.pb.go" {
 		t.Fatalf("mismatch paths = %+v", mismatch)
 	}
-	if mismatch.TianwuLine == 0 {
+	if mismatch.SakerLine == 0 {
 		t.Fatalf("extra line not located: %+v", mismatch)
 	}
 	if info.SHA256 == before.SHA256 {

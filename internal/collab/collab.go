@@ -97,7 +97,7 @@ func NewRegistry(ttl time.Duration) *Registry {
 
 // IssueReadOnly mints a credential bound to one project and one run. The run is
 // part of the binding so RevokeRun ends it with the run that was given it; the
-// gate decides what it may reach (cmd/tw/auth.go verifierReadAllowed), this
+// gate decides what it may reach (cmd/saker/auth.go verifierReadAllowed), this
 // registry only says which project and whether it is still alive.
 func (r *Registry) IssueReadOnly(projectID, runID string) (string, error) {
 	if r == nil {
@@ -193,7 +193,7 @@ func (r *Registry) Resolve(token string) (Identity, bool) {
 
 // Adopt points an already-issued token at the run now using it. The commander's
 // credential is per session, not per run: rotating the token every round would
-// invalidate the $TW_AUTH a long-lived shell exported once. Its identity must
+// invalidate the $SAKER_AUTH a long-lived shell exported once. Its identity must
 // still follow the live round, or participant messages and audit events would be
 // attributed to the finished run that first received the token. The token hash
 // is unchanged, so the shell's value keeps working; only the bookkeeping moves.

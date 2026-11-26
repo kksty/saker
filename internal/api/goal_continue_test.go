@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/decider"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/project"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/decider"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/project"
+	"github.com/kksty/saker/internal/store"
 )
 
 // appendGoalCommander is the decider's model call in these tests: it only counts
@@ -281,7 +281,7 @@ func TestAppendGoalAndContinueResumesRestartPause(t *testing.T) {
 	s, p := newBindingServer(t)
 	dec, commander := startAppendGoalDecider(t, s.Store)
 	s.Decider = dec
-	// The shape a failed boot recovery leaves behind (cmd/tw: persist the cause,
+	// The shape a failed boot recovery leaves behind (cmd/saker: persist the cause,
 	// restore it into the runtime, park the decider).
 	if err := p.SetPausedWithKind(true, project.PauseKindRestart); err != nil {
 		t.Fatal(err)

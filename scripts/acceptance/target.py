@@ -3,7 +3,7 @@
 
 Runs in the Kali WSL VM (10.0.0.10) so the control plane (10.0.0.20)
 reaches it across network segments — or on a VPS as a 127.0.0.1-only target
-(`TW_TARGET_HOST=127.0.0.1`). Weaknesses are the kind a scanner finds without
+(`SAKER_TARGET_HOST=127.0.0.1`). Weaknesses are the kind a scanner finds without
 exploit code: default credentials, an unauthenticated admin API, an exposed
 backup archive and a directory listing.
 """
@@ -14,9 +14,9 @@ import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
 
-HOST = os.environ.get("TW_TARGET_HOST", "0.0.0.0")
-PORT = int(os.environ.get("TW_TARGET_PORT", "18099"))
-SID = "sid=tw-acceptance-admin"
+HOST = os.environ.get("SAKER_TARGET_HOST", "0.0.0.0")
+PORT = int(os.environ.get("SAKER_TARGET_PORT", "18099"))
+SID = "sid=saker-acceptance-admin"
 
 LOGIN = """<!doctype html><html><head><title>运维平台登录</title></head><body>
 <h2>运维平台</h2>
@@ -102,12 +102,12 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, BACKUP, "application/zip",
                       {"Content-Disposition": 'attachment; filename="backup.zip"'})
         elif path in ("/files", "/files/"):
-            names = sorted(os.listdir("/tmp/tw-target/files"))
+            names = sorted(os.listdir("/tmp/saker-target/files"))
             rows = "".join('<li><a href="/files/%s">%s</a></li>' % (n, n) for n in names)
             self.send(200, "<h2>Index of /files/</h2><ul>%s</ul>" % rows)
         elif path.startswith("/files/"):
             name = os.path.basename(path)
-            full = os.path.join("/tmp/tw-target/files", name)
+            full = os.path.join("/tmp/saker-target/files", name)
             if os.path.isfile(full):
                 with open(full, "rb") as fh:
                     self.send(200, fh.read(), "text/plain; charset=utf-8")
@@ -131,8 +131,8 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    os.makedirs("/tmp/tw-target/files", exist_ok=True)
-    with open("/tmp/tw-target/files/notes.txt", "w") as fh:
+    os.makedirs("/tmp/saker-target/files", exist_ok=True)
+    with open("/tmp/saker-target/files/notes.txt", "w") as fh:
         fh.write(NOTES)
     print("acceptance target on %s:%d" % (HOST, PORT), flush=True)
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()

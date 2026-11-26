@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/testutil"
-	"github.com/kksty/tianwu/internal/ws"
+	"github.com/kksty/saker/internal/testutil"
+	"github.com/kksty/saker/internal/ws"
 )
 
 // TestMain installs the in-process host transport, the narrow dial-level retry

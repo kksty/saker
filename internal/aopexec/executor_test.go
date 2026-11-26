@@ -17,10 +17,10 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/kksty/tianwu/internal/aop"
-	pb "github.com/kksty/tianwu/internal/aop/pb"
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/ws"
+	"github.com/kksty/saker/internal/aop"
+	pb "github.com/kksty/saker/internal/aop/pb"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/ws"
 )
 
 // fakeHost is the smallest AOP host that behaves like the real one on the wire:
@@ -36,7 +36,7 @@ type fakeHost struct {
 	cancels  int
 	closes   int
 	// workDirs records the working directory each OpenSessionRequest carried
-	// (the Tianwu fork's session workspace extension, D110).
+	// (the harness fork's session workspace extension, D110).
 	workDirs []string
 	// watchCursors records the after_cursor of each WatchEvents request; the
 	// second run must not replay from zero.
@@ -47,7 +47,7 @@ type fakeHost struct {
 	watchIDs []string
 	// cancelOps records CancelOperation requests (subscription/PTY release).
 	cancelOps []*pb.CancelOperation
-	// runGoals records the decoded tianwu.RunGoal extension of each RunTurn
+	// runGoals records the decoded saker.RunGoal extension of each RunTurn
 	// request, and runCriteria the AgentRunOptions eval criterion if present.
 	runGoals    []runGoalFixture
 	runCriteria []string
@@ -63,7 +63,7 @@ type fakeHost struct {
 	replay bool
 }
 
-// runGoalFixture is one decoded tianwu.RunGoal extension as the fake host read
+// runGoalFixture is one decoded saker.RunGoal extension as the fake host read
 // it off the wire, plus whether the request carried it at all.
 type runGoalFixture struct {
 	Goal       string `json:"goal"`
@@ -337,7 +337,7 @@ func TestRunStreamsTurnEvents(t *testing.T) {
 	if !CanResume(work) {
 		t.Fatal("the marker was not written, so steer could not work")
 	}
-	if h.opened != 1 || h.titles[0] != "tianwu: i1" {
+	if h.opened != 1 || h.titles[0] != "saker: i1" {
 		t.Fatalf("opened=%d titles=%v", h.opened, h.titles)
 	}
 }
@@ -370,7 +370,7 @@ func TestEvaluatedRunSendsGoalExtensionAndFullBrief(t *testing.T) {
 		t.Fatalf("turn input is not the full executor brief: %q", p)
 	}
 	if len(h.runGoals) != 1 || !h.runGoals[0].Present {
-		t.Fatalf("RunTurn carried no tianwu.RunGoal extension: %+v", h.runGoals)
+		t.Fatalf("RunTurn carried no saker.RunGoal extension: %+v", h.runGoals)
 	}
 	if h.runGoals[0].Goal != "枚举攻击面" || h.runGoals[0].EvalRounds != "3" {
 		t.Fatalf("RunGoal = %+v", h.runGoals[0])
@@ -437,7 +437,7 @@ func TestTurnEndCancelsTheWatchSubscription(t *testing.T) {
 
 func TestRunReferencesSkillFileAndKeepsItsBaseDirectory(t *testing.T) {
 	work := t.TempDir()
-	dir := filepath.Join(t.TempDir(), "tianwu-report")
+	dir := filepath.Join(t.TempDir(), "saker-report")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}

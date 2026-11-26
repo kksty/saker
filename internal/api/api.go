@@ -22,29 +22,29 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/kksty/tianwu/internal/aopexec"
-	"github.com/kksty/tianwu/internal/assets"
-	"github.com/kksty/tianwu/internal/board"
-	"github.com/kksty/tianwu/internal/bundle"
-	"github.com/kksty/tianwu/internal/collab"
-	"github.com/kksty/tianwu/internal/decider"
-	"github.com/kksty/tianwu/internal/evidence"
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/host"
-	"github.com/kksty/tianwu/internal/kb"
-	"github.com/kksty/tianwu/internal/ledger"
-	"github.com/kksty/tianwu/internal/lifecycle"
-	"github.com/kksty/tianwu/internal/metrics"
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/pocs"
-	"github.com/kksty/tianwu/internal/project"
-	"github.com/kksty/tianwu/internal/report"
-	"github.com/kksty/tianwu/internal/retrieval"
-	"github.com/kksty/tianwu/internal/skills"
-	"github.com/kksty/tianwu/internal/state"
-	"github.com/kksty/tianwu/internal/store"
-	"github.com/kksty/tianwu/internal/traffic"
-	"github.com/kksty/tianwu/internal/verifier"
+	"github.com/kksty/saker/internal/aopexec"
+	"github.com/kksty/saker/internal/assets"
+	"github.com/kksty/saker/internal/board"
+	"github.com/kksty/saker/internal/bundle"
+	"github.com/kksty/saker/internal/collab"
+	"github.com/kksty/saker/internal/decider"
+	"github.com/kksty/saker/internal/evidence"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/host"
+	"github.com/kksty/saker/internal/kb"
+	"github.com/kksty/saker/internal/ledger"
+	"github.com/kksty/saker/internal/lifecycle"
+	"github.com/kksty/saker/internal/metrics"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/pocs"
+	"github.com/kksty/saker/internal/project"
+	"github.com/kksty/saker/internal/report"
+	"github.com/kksty/saker/internal/retrieval"
+	"github.com/kksty/saker/internal/skills"
+	"github.com/kksty/saker/internal/state"
+	"github.com/kksty/saker/internal/store"
+	"github.com/kksty/saker/internal/traffic"
+	"github.com/kksty/saker/internal/verifier"
 )
 
 type Server struct {
@@ -246,7 +246,7 @@ type Server struct {
 	identityMu sync.Mutex
 	// commanderMu guards commanderIdent, the commander session's credential. It
 	// is reused across rounds (per session, not per round) so a long-lived shell
-	// holding the exported TW_AUTH does not go stale between rounds.
+	// holding the exported SAKER_AUTH does not go stale between rounds.
 	commanderMu    sync.Mutex
 	commanderIdent *collab.Identity
 	// browserActive is guarded by accessMu. Native network I/O does not hold
@@ -354,7 +354,7 @@ const defaultModelStallLimit = 3
 // "0" disables the detector, a positive integer changes the cycle count.
 // The Server field wins when it was set explicitly (tests do that); New() only
 // consults the environment for its default.
-const modelStallEnv = "TW_MODEL_STALL_LIMIT"
+const modelStallEnv = "SAKER_MODEL_STALL_LIMIT"
 
 func configuredModelStallLimit() int {
 	raw := strings.TrimSpace(os.Getenv(modelStallEnv))
@@ -507,7 +507,7 @@ func New(st *store.Store, ex executor.Executor, dataDir, caseRoot string) *Serve
 		toolCache: map[string]toolFile{},
 
 		// Liveness default: three consecutive empty replies is a stall, not a
-		// slow model (TW_MODEL_STALL_LIMIT overrides; 0 disables). A bare
+		// slow model (SAKER_MODEL_STALL_LIMIT overrides; 0 disables). A bare
 		// Server literal keeps 0 (disabled) unless the field is set, so tests
 		// construct exactly the behaviour they assert.
 		ModelStallLimit: configuredModelStallLimit(),
@@ -736,7 +736,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/project/pause", s.projectPause)
 	mux.HandleFunc("POST /api/project/resume", s.projectResume)
 	// The commander's own global stop request. It is the one /api/project/ route
-	// the harness surface may reach (cmd/tw auth.agentRouteHidden): a round that
+	// the harness surface may reach (cmd/saker auth.agentRouteHidden): a round that
 	// judged the engagement should stop must be able to say so globally, instead
 	// of parking a direction and letting the wake loop spend another round on the
 	// parked result. Resume and append-goal stay operator-only.
@@ -744,7 +744,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/project/closeout", s.projectCloseout)
 	// Append a new independent goal and, if the project was parked in a resumable
 	// stand-by, re-arm it. It sits under /api/project/ on purpose: that segment is
-	// operator-only on the harness surface (cmd/tw auth.agentRouteHidden), so an
+	// operator-only on the harness surface (cmd/saker auth.agentRouteHidden), so an
 	// agent token cannot append goals or resume the project; the participant mux
 	// never registers it either.
 	mux.HandleFunc("POST /api/project/append-goal", s.appendGoalAndContinue)
@@ -2382,7 +2382,7 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 		return p
 	}
 	prompt = appendDispatchSections(prompt)
-	// Tianwu does not predict the window: the harness owns feasibility,
+	// Saker does not predict the window: the harness owns feasibility,
 	// compaction and overflow recovery. If it reports a context limit, the
 	// post-run path retries once with the degraded brief (context_limit.go).
 	if waitSection != "" {
@@ -2402,7 +2402,7 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 	// prompt: queued is a promise that the next run carries it, not a mailbox
 	// nobody opens. The section marks what it shows as accepted, so a message is
 	// injected exactly once (D86). Its own caps (row count, byte budget) bound
-	// it; Tianwu does not shrink it against a window it cannot predict.
+	// it; Saker does not shrink it against a window it cannot predict.
 	if section := s.inboxSection(collab.ParticipantID(in.ID), "prompt:"+runID, runID, "", 0); section != "" {
 		prompt += section
 		// The prompt is not part of the ledger, so the injection itself is:
@@ -2978,7 +2978,7 @@ func (s *Server) serveEvidence(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.Header().Set("Content-Disposition", "inline")
 		// The console's preview sheet frames PDFs. The instance-wide
-		// X-Frame-Options: DENY (cmd/tw withSecurityHeaders) would block that
+		// X-Frame-Options: DENY (cmd/saker withSecurityHeaders) would block that
 		// same-origin frame; this handler writes into the same response header
 		// map, so this endpoint — and only this one — relaxes it to SAMEORIGIN.
 		// Console pages keep DENY, and document types are CSP-sandboxed below.
@@ -4186,7 +4186,7 @@ func (s *Server) createGoal(w http.ResponseWriter, r *http.Request) {
 // no citation requirement beyond verified_only's admission. It is deliberately
 // operator-only — a session closes its goal through completeGoal, which enforces
 // the ledger's citation rules — so a guessed intent id cannot hand-stamp the
-// operator's endpoint (cmd/tw auth also 404s /met for the harness credential).
+// operator's endpoint (cmd/saker auth also 404s /met for the harness credential).
 func (s *Server) pinGoal(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if harnessSession(r) {
@@ -5348,7 +5348,7 @@ func readRunEventTail(dataDir, runID string, lines int) ([]json.RawMessage, int,
 }
 
 // Keep the submitted input visible even after it falls outside the recent tail.
-// The operator can inspect exactly what Tianwu submitted, without rebuilding a
+// The operator can inspect exactly what Saker submitted, without rebuilding a
 // prompt from current project state or pretending to expose host-only history.
 //
 // The file is streamed, not slurped: a long engagement's journal can reach

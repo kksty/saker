@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/platform"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/platform"
 )
 
 // ToolStat is one row of the tool-call leaderboard. Calls are counted from the
@@ -377,7 +377,7 @@ func instanceDataDir(projectDir string) string {
 //
 //	scan workdir/.cyber, then <scan executable dir>/.cyber, then ~/.cyber
 //
-// tianwu launches the scan with its working directory set to the instance data
+// saker launches the scan with its working directory set to the instance data
 // directory (internal/host/host.go execLaunch), so the first candidate is
 // <instance>/.cyber and the last is the user directory. The scan executable
 // directory is not observable from the AOP runtime, so it is not guessed; the

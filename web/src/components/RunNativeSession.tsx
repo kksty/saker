@@ -63,7 +63,7 @@ export function RunCommandsPanel({ runID, sessionID }: { runID: string; sessionI
       )}
       {failure && (
         <Callout tone={failure.tone}>
-          <span className="tw-break">{failure.text}</span>
+          <span className="saker-break">{failure.text}</span>
           <Button size="xs" variant="outline" className="ml-2" onClick={() => void load()}>重试</Button>
         </Callout>
       )}
@@ -85,7 +85,7 @@ export function RunCommandsPanel({ runID, sessionID }: { runID: string; sessionI
                 spellCheck={false}
               />
             </div>
-            <span className="tw-nums font-mono text-[11px] text-ink-3">
+            <span className="saker-nums font-mono text-[11px] text-ink-3">
               {catalog ? `${commands.length}/${catalog.length} 条` : '命令数未读全'} · {data.source}
             </span>
           </div>
@@ -107,9 +107,9 @@ export function RunCommandsPanel({ runID, sessionID }: { runID: string; sessionI
                   <li key={command.name} className="rounded border border-hairline bg-card/50 px-2.5 py-1.5">
                     <div className="flex flex-wrap items-baseline gap-x-2">
                       <code className="font-mono text-[12px] text-ink">/{command.name}</code>
-                      {command.description && <span className="tw-break text-[11px] text-ink-2">{command.description}</span>}
+                      {command.description && <span className="saker-break text-[11px] text-ink-2">{command.description}</span>}
                     </div>
-                    {detail && <div className="tw-break font-mono text-[11px] text-ink-3">{detail}</div>}
+                    {detail && <div className="saker-break font-mono text-[11px] text-ink-3">{detail}</div>}
                   </li>
                 )
               })}
@@ -175,12 +175,12 @@ export function RunHistoryPanel({ runID, sessionID }: { runID: string; sessionID
       </div>
       {!page && !error && !loading && (
         <p className="text-[11px] leading-relaxed text-ink-3">
-          按需读取宿主侧的 canonical 事件历史（ListEvents）。它与账本事件流是两份记录：账本记录天吴的判断，这里记录会话实际发生的事。
+          按需读取宿主侧的 canonical 事件历史（ListEvents）。它与账本事件流是两份记录：账本记录Saker的判断，这里记录会话实际发生的事。
         </p>
       )}
       {failure && (
         <Callout tone={failure.tone}>
-          <span className="tw-break">{failure.text}</span>
+          <span className="saker-break">{failure.text}</span>
           <Button
             size="xs"
             variant="outline"
@@ -206,16 +206,16 @@ export function RunHistoryPanel({ runID, sessionID }: { runID: string; sessionID
                   <div className="flex flex-wrap items-baseline gap-x-2">
                     <Badge size="sm" variant="muted">{summary.kind}</Badge>
                     {summary.state && <span className="font-mono text-[11px] text-info">{summary.state}</span>}
-                    <span className="tw-nums ml-auto font-mono text-[10px] text-ink-3" title="宿主游标">{item.cursor}</span>
+                    <span className="saker-nums ml-auto font-mono text-[10px] text-ink-3" title="宿主游标">{item.cursor}</span>
                   </div>
-                  <p className="tw-break mt-0.5 font-mono text-[11px] leading-relaxed text-ink-2">{summary.text}</p>
+                  <p className="saker-break mt-0.5 font-mono text-[11px] leading-relaxed text-ink-2">{summary.text}</p>
                   {summary.at && <p className="font-mono text-[10px] text-ink-3">{summary.at}</p>}
                 </li>
               )
             })}
           </ul>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="tw-nums font-mono text-[11px] text-ink-3" role="status" aria-live="polite">
+            <span className="saker-nums font-mono text-[11px] text-ink-3" role="status" aria-live="polite">
               已加载 {events.length} 条{canLoadMore ? '，还有更多' : '，已到末尾'}
             </span>
             {canLoadMore ? (

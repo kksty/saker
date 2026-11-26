@@ -34,9 +34,9 @@ export function BrowserOccupancy({ entry, busy, onChange }: {
         : 'secondary'
 
   return (
-    <div className="tw-inset mb-3 rounded-lg p-3">
+    <div className="saker-inset mb-3 rounded-lg p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="tw-eyebrow">现场占用</span>
+        <span className="saker-eyebrow">现场占用</span>
         <Badge variant={variant} size="sm">
           {lease ? <LockKeyhole className="mr-1 h-3 w-3" /> : <UnlockKeyhole className="mr-1 h-3 w-3" />}
           {browserOccupancyLabel(entry)}
@@ -65,15 +65,15 @@ export function BrowserOccupancy({ entry, busy, onChange }: {
         <dl className="mt-2.5 grid grid-cols-1 gap-x-4 gap-y-1 text-[12px] leading-relaxed sm:grid-cols-2">
           <div className="flex min-w-0 items-baseline gap-1.5">
             <dt className="shrink-0 text-[11px] text-ink-3">持有者</dt>
-            <dd className="tw-break min-w-0 font-mono text-[11px] text-ink-2">
+            <dd className="saker-break min-w-0 font-mono text-[11px] text-ink-2">
               {lease.owner}
               {lease.generation ? ` · 第 ${lease.generation} 代` : ''}
             </dd>
           </div>
           <div className="flex min-w-0 items-baseline gap-1.5">
             <dt className="shrink-0 text-[11px] text-ink-3">领取于</dt>
-            <dd className="tw-break min-w-0 font-mono text-[11px] text-ink-2">
-              <span className="tw-nums">{fmtTime(lease.acquired_at)}</span>
+            <dd className="saker-break min-w-0 font-mono text-[11px] text-ink-2">
+              <span className="saker-nums">{fmtTime(lease.acquired_at)}</span>
               {lease.run_id && (
                 <>
                   {' · '}
@@ -90,7 +90,7 @@ export function BrowserOccupancy({ entry, busy, onChange }: {
           {lease.note && (
             <div className="flex min-w-0 items-baseline gap-1.5 sm:col-span-2">
               <dt className="shrink-0 text-[11px] text-ink-3">说明</dt>
-              <dd className="tw-break min-w-0 whitespace-pre-wrap text-[12px] text-ink-2">{lease.note}</dd>
+              <dd className="saker-break min-w-0 whitespace-pre-wrap text-[12px] text-ink-2">{lease.note}</dd>
             </div>
           )}
         </dl>

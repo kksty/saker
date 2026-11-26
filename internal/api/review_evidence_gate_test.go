@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
+	"github.com/kksty/saker/internal/model"
 )
 
 // 用例①（手动单条复核接口）：零证据的 vuln 结论必须在启动复核之前被拒绝，理由说清缺什么。

@@ -1,7 +1,7 @@
 // Package ioa sends a message into a live harness session through the IOA
 // server that aiscan web mounts beside AOP.
 //
-// Tianwu does not need a harness fork for "say": aiscan web already embeds the
+// Saker does not need a harness fork for "say": aiscan web already embeds the
 // IOA server at <host>/ioa, and the harness IOA extension turns a targeted
 // message into Runtime.Deliver -> session inbox -> the same run. This package
 // is only the HTTP client for that already-existing path.
@@ -147,7 +147,7 @@ func (c *Client) Read(ctx context.Context, after string, limit int) ([]Message, 
 // The space/sender/target ids are cached per host. A host restart can change
 // them, so a "gone" response clears the cache and the request is retried once
 // after re-resolving; without that, every later say kept POSTing to an id that
-// no longer existed until tw itself was restarted.
+// no longer existed until saker itself was restarted.
 func (c *Client) Send(ctx context.Context, sessionID, text string, interrupt bool) (string, error) {
 	return c.SendEvent(ctx, sessionID, text, interrupt, "")
 }

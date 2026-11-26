@@ -14,7 +14,7 @@ const NodeTerminal = lazy(() =>
 
 function TerminalFallback() {
   return (
-    <div className="tw-panel flex h-full min-h-[160px] flex-col gap-3 rounded-xl p-4" aria-busy="true">
+    <div className="saker-panel flex h-full min-h-[160px] flex-col gap-3 rounded-xl p-4" aria-busy="true">
       <span className="text-[12px] text-ink-2">终端内核加载中…</span>
       <SkeletonList count={4} />
     </div>
@@ -70,7 +70,7 @@ function TerminalPage({ mode }: { mode: 'shell' | 'repl' }) {
             </SelectContent>
           </Select>
         ) : node ? (
-          <span className="tw-break font-mono text-[12px] text-ink-3">{node}</span>
+          <span className="saker-break font-mono text-[12px] text-ink-3">{node}</span>
         ) : undefined
       }
     >
@@ -85,13 +85,13 @@ function TerminalPage({ mode }: { mode: 'shell' | 'repl' }) {
         )}
 
         {list.loading && (
-          <div className="tw-panel rounded-xl p-4">
+          <div className="saker-panel rounded-xl p-4">
             <SkeletonList count={3} />
           </div>
         )}
 
         {!list.loading && !node && (
-          <div className="tw-panel rounded-xl">
+          <div className="saker-panel rounded-xl">
             <EmptyState
               icon={SquareTerminal}
               title="没有可开终端的节点"
@@ -115,7 +115,7 @@ function TerminalPage({ mode }: { mode: 'shell' | 'repl' }) {
               </Suspense>
             </div>
             {current && (
-              <p className="tw-break px-1 font-mono text-[11px] leading-4 text-ink-3">
+              <p className="saker-break px-1 font-mono text-[11px] leading-4 text-ink-3">
                 {`AOP 宿主 ${current.endpoint ?? ''} 上的 ${repl ? 'scan REPL' : 'shell'}`}
               </p>
             )}

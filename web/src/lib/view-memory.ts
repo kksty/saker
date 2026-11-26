@@ -21,7 +21,7 @@
 
 import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
 
-const STORAGE_KEY = 'tw.viewMemory.v1'
+const STORAGE_KEY = 'saker.viewMemory.v1'
 /** Scroll positions are namespaced under this scope; views use `project:<id>`. */
 const SCROLL_SCOPE = 'scroll'
 /**

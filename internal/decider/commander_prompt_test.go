@@ -4,14 +4,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/board"
+	"github.com/kksty/saker/internal/board"
 )
 
 // The role has to be in every round prompt, not only in the first turn: a long
 // session can be compacted or resumed without the skill turn still in context.
 func TestCommanderRoundPromptStatesTheRoleFirst(t *testing.T) {
 	p := CommanderRoundPrompt(board.View{}, "笔记", "10.0.0.0/24", ContextStatus{}, RoundContext{})
-	role := strings.Index(p, "你是天吴项目的指挥官")
+	role := strings.Index(p, "你是Saker项目的指挥官")
 	if role < 0 {
 		t.Fatalf("round prompt does not name the role:\n%s", p)
 	}
@@ -21,7 +21,7 @@ func TestCommanderRoundPromptStatesTheRoleFirst(t *testing.T) {
 	// A handoff round swaps the decision contract for the handoff one, but it is
 	// still the commander reading it.
 	h := CommanderRoundPrompt(board.View{}, "笔记", "", ContextStatus{Used: 110000, Window: 128000}, RoundContext{Resume: true})
-	if !strings.Contains(h, "你是天吴项目的指挥官") {
+	if !strings.Contains(h, "你是Saker项目的指挥官") {
 		t.Fatalf("handoff round lost the role:\n%s", h)
 	}
 	// The intent definition must survive a compacted or resumed session in

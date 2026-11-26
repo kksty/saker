@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/kksty/tianwu/internal/aop"
-	"github.com/kksty/tianwu/internal/executor"
-	"github.com/kksty/tianwu/internal/ws"
+	"github.com/kksty/saker/internal/aop"
+	"github.com/kksty/saker/internal/executor"
+	"github.com/kksty/saker/internal/ws"
 )
 
 // terminalControl is a text frame from the browser. Binary frames are the
@@ -25,7 +25,7 @@ type terminalControl struct {
 // Every execution node is an AOP host, so the endpoint comes from the node
 // registry and the bytes are the host PTY's. An audit node is the one local
 // process with no host to dial, so it has no terminal — the console must not
-// pretend otherwise. The control-plane machine is no exception: tw starts an
+// pretend otherwise. The control-plane machine is no exception: saker starts an
 // `aiscan web` for it and registers it as node `local` (docs/14-nodes.md, D64).
 //
 // mode=repl attaches the host's singleton `main-repl` instead of opening a new

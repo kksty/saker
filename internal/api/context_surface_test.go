@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kksty/tianwu/internal/collab"
+	"github.com/kksty/saker/internal/collab"
 )
 
 // A working-context delivery belongs to a harness session. A console request has

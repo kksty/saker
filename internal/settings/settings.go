@@ -20,7 +20,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/kksty/tianwu/internal/modelclient"
+	"github.com/kksty/saker/internal/modelclient"
 )
 
 // MaxAuxiliaryConcurrency is the upper bound of the operator-tunable gate that

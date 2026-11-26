@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	modelpkg "github.com/kksty/tianwu/internal/model"
+	modelpkg "github.com/kksty/saker/internal/model"
 )
 
 // operatorActionsFile is the append-only record of the operator's own goal

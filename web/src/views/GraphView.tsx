@@ -922,7 +922,7 @@ export function GraphView({ current, projects, board, boardState, onRefresh, loa
         <nav aria-label="项目导航" className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 pb-4">
           {NAV_GROUPS.map((group) => (
             <div key={group.label}>
-              <div className="tw-eyebrow mb-2 px-3">{group.label}</div>
+              <div className="saker-eyebrow mb-2 px-3">{group.label}</div>
               <div className="space-y-0.5">
                 {group.items.map((id) => {
                   const item = NAV.find((entry) => entry.id === id)!

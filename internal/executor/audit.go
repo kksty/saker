@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/model"
-	"github.com/kksty/tianwu/internal/platform"
+	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/platform"
 )
 
 // Audit runs cyber-audit, the source/binary audit harness, for one intent

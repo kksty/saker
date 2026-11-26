@@ -1,4 +1,4 @@
-// Package buildinfo collects the build manifest of one tianwu checkout.
+// Package buildinfo collects the build manifest of one saker checkout.
 //
 // A verification result is only as useful as its answer to "which source and
 // which binaries produced this?". The manifest records exactly that (taskbook
@@ -23,10 +23,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kksty/tianwu/internal/board"
-	"github.com/kksty/tianwu/internal/bundle"
-	"github.com/kksty/tianwu/internal/ioa"
-	"github.com/kksty/tianwu/internal/store"
+	"github.com/kksty/saker/internal/board"
+	"github.com/kksty/saker/internal/bundle"
+	"github.com/kksty/saker/internal/ioa"
+	"github.com/kksty/saker/internal/store"
 )
 
 // ManifestVersion is the JSON layout version. Bump when an old reader would
@@ -55,7 +55,7 @@ type Manifest struct {
 	Gate         *GateInfo     `json:"gate,omitempty"`
 }
 
-// SourceIdentity is the tianwu checkout the checks ran against.
+// SourceIdentity is the saker checkout the checks ran against.
 type SourceIdentity struct {
 	// Root is the absolute checkout path. Paths in this file are slash-separated
 	// so a Windows and a Linux manifest can be compared line by line.
@@ -104,7 +104,7 @@ type HarnessIdentity struct {
 	Binaries      []Binary `json:"binaries"`
 }
 
-// ControlPlane names the tw and tw-repair binaries built by the gate.
+// ControlPlane names the saker and saker-repair binaries built by the gate.
 type ControlPlane struct {
 	BinDir   string   `json:"bin_dir"`
 	Binaries []Binary `json:"binaries"`
@@ -183,7 +183,7 @@ type ProbeInfo struct {
 	Error            *string `json:"error"` // redacted; never contains the API key
 }
 
-// GateInfo is filled by cmd/tw-gate and absent for a plain cmd/tw-manifest run.
+// GateInfo is filled by cmd/saker-gate and absent for a plain cmd/saker-manifest run.
 type GateInfo struct {
 	StartedAt  string             `json:"started_at"`
 	FinishedAt string             `json:"finished_at"`
@@ -224,7 +224,7 @@ type EmbeddedArtifacts struct {
 
 // Options configures one manifest collection.
 type Options struct {
-	// Root is the tianwu checkout root (required).
+	// Root is the saker checkout root (required).
 	Root string
 	// HarnessDir is the resolved cyber-harness source directory, "" when absent
 	// or skipped.
@@ -232,7 +232,7 @@ type Options struct {
 	// BinDir is where the gate built/will build binaries (relative to Root).
 	BinDir string
 	// HarnessConfig overrides the harness config path; "" means
-	// $TW_HARNESS_CONFIG, then ~/.cyber/cyber.yaml.
+	// $SAKER_HARNESS_CONFIG, then ~/.cyber/cyber.yaml.
 	HarnessConfig string
 	// ProbeModel sends the one minimal request that records the real model id.
 	ProbeModel bool
@@ -241,9 +241,9 @@ type Options struct {
 	// AOPProto is the already computed vendored AOP drift result. The gate runs
 	// the check as a step and passes the result here so the manifest and the
 	// check log cannot disagree; when nil Collect runs the check itself
-	// (cmd/tw-manifest and -manifest-only).
+	// (cmd/saker-manifest and -manifest-only).
 	AOPProto *AOPProtoInfo
-	// Gate is set by cmd/tw-gate; nil for cmd/tw-manifest.
+	// Gate is set by cmd/saker-gate; nil for cmd/saker-manifest.
 	Gate *GateInfo
 }
 
@@ -288,8 +288,8 @@ func Collect(ctx context.Context, opts Options) (*Manifest, error) {
 		ControlPlane: ControlPlane{
 			BinDir: manifestPath(root, binDir),
 			Binaries: []Binary{
-				collectBinary(root, "tw", filepath.Join(binDir, "tw"+exe)),
-				collectBinary(root, "tw-repair", filepath.Join(binDir, "tw-repair"+exe)),
+				collectBinary(root, "saker", filepath.Join(binDir, "saker"+exe)),
+				collectBinary(root, "saker-repair", filepath.Join(binDir, "saker-repair"+exe)),
 			},
 		},
 		Versions: Versions{

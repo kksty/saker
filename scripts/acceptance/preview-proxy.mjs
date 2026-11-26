@@ -4,14 +4,14 @@
 // Why not `pnpm dev`: Vite's dev server pre-bundles dependencies with esbuild,
 // and this locked-down Windows host denies esbuild's scratch writes (the same
 // reason web/vite.config.ts disables esbuild for `build`). The production
-// bundle is exactly what `tw` embeds, so serving it here and proxying the API
+// bundle is exactly what `saker` embeds, so serving it here and proxying the API
 // shows the shipped UI without restarting the running console.
 //
 //   node scripts/acceptance/preview-proxy.mjs
-//   TW_PREVIEW_URL=http://127.0.0.1:5173 node scripts/acceptance/messages-ui.cjs
+//   SAKER_PREVIEW_URL=http://127.0.0.1:5173 node scripts/acceptance/messages-ui.cjs
 //
 // It is a proxy, not a console: it never writes data/, never starts a model,
-// and only forwards what the browser asks for. Point TW_CONSOLE_URL somewhere
+// and only forwards what the browser asks for. Point SAKER_CONSOLE_URL somewhere
 // else if the console is not on the default loopback port.
 import { createServer } from 'node:http'
 import { readFile } from 'node:fs/promises'
@@ -20,8 +20,8 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const STATIC = join(ROOT, 'internal/web/static')
-const UPSTREAM = (process.env.TW_CONSOLE_URL || 'http://127.0.0.1:8080').replace(/\/+$/, '')
-const PORT = Number(process.env.TW_PREVIEW_PORT || 5173)
+const UPSTREAM = (process.env.SAKER_CONSOLE_URL || 'http://127.0.0.1:8080').replace(/\/+$/, '')
+const PORT = Number(process.env.SAKER_PREVIEW_PORT || 5173)
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
