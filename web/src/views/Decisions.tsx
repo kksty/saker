@@ -1,7 +1,7 @@
 import { Badge, Button, Callout, EmptyState, SkeletonList, StatusIndicator } from '@cyber/ui'
 import { Page, Panel } from '@/components/Page'
 import { api } from '@/lib/api'
-import { fmtInt, fmtTime } from '@/lib/format'
+import { fmtInt, fmtPercent, fmtTime } from '@/lib/format'
 import { useLoad } from '@/lib/hooks'
 import type { BoardResponse } from '@/lib/types'
 
@@ -137,7 +137,7 @@ export function Decisions({ board }: { board?: BoardResponse }) {
                   </div>
                 )}
                 {(r.context_percent !== undefined || r.handoff !== undefined || r.new_facts !== undefined) && <div className="mt-2 flex flex-wrap gap-3 text-xs text-ink-3">
-                  <span>上下文 {r.context_percent ?? '—'}%</span><span>{r.handoff ? '交接轮' : '普通轮'}</span>
+                  <span>上下文 {fmtPercent(r.context_percent)}</span><span>{r.handoff ? '交接轮' : '普通轮'}</span>
                   {r.compacted&&<span>已压缩</span>}<span>回执 {r.handoff_receipt ? '有效' : r.handoff ? '缺失' : '未要求'}</span>
                   <span>交接未回执 {r.handoff_missing ?? 0}</span>{r.handoff_released&&<span>已释放交接压力</span>}
                   <span>新增事实 {r.new_facts ?? '—'}</span>

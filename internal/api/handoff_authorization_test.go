@@ -205,6 +205,26 @@ func TestRefusedHandoffLeavesTheDirectionRunnable(t *testing.T) {
 	}
 }
 
+// A stale handoff version is a machine-readable conflict, so the console can
+// refresh and keep the typed note instead of showing a generic failure.
+func TestHandoffVersionConflictCarriesCode(t *testing.T) {
+	s, p := newBindingServer(t)
+	in, err := p.Store.CreateIntent(model.Intent{Title: "换人", Description: "d"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := call(t, s, http.MethodPost, "/api/intents/"+in.ID+"/handoff", map[string]any{
+		"note": "换个人继续", "expected_version": 1,
+	})
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "handoff_conflict") {
+		t.Fatalf("stale handoff = %d %s", rec.Code, rec.Body.String())
+	}
+	cur, _ := p.Store.GetIntent(in.ID)
+	if cur.Handoff != nil || cur.HandoffOperation != "" || cur.Hold {
+		t.Fatalf("a refused stale handoff changed the direction: %+v", cur)
+	}
+}
+
 // Nothing was ever shown to a model on a direction that never ran, so there is
 // no paraphrase to guard against and handoff needs no archive.
 func TestHandoffOfANeverRunDirectionIsAllowed(t *testing.T) {

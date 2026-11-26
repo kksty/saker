@@ -1334,6 +1334,20 @@ export interface RunPulse {
   last_text?: string
 }
 
+/** One durable automatic-review attempt as the overview shows it. */
+export interface ReviewAttemptDetail {
+  fact: string
+  title?: string
+  claim_version: number
+  /** run_failed | needs_evidence | rejected */
+  outcome: string
+  reason?: string
+  /** Originals the fact cites: what a needs_evidence verdict is waiting for. */
+  missing_evidence?: string[]
+  retry_at?: string
+  run_id?: string
+}
+
 export interface BoardView {
   generated_at: string
   case?: string
@@ -1454,7 +1468,7 @@ export interface PortGroup {
 export interface DeciderStatus {
   context_tokens?: number
   context_window?: number
-  context_percent?: number
+  context_percent?: number | null
   compacted?: boolean
   handoff_missing?: number
   handoff_released?: boolean
@@ -1506,7 +1520,20 @@ export interface DeciderActivity {
 
 export interface BoardResponse extends BoardView {
   operator_frontier?: OperatorFrontierItem[]
-  reviews?: { automatic: boolean; paused: boolean; disabled?: boolean; pending: number; processing: number; cooling: number }
+  /** Automatic review queue state. Pending is the queued set only; cooling and
+   *  blocked are waiting on their own conditions, and rejected is an independent
+   *  verdict, not a queue failure. */
+  reviews?: {
+    automatic: boolean
+    paused: boolean
+    disabled?: boolean
+    pending: number
+    processing: number
+    cooling: number
+    blocked?: number
+    rejected?: number
+    details?: ReviewAttemptDetail[]
+  }
   usage?: TokenTotals
   decider: DeciderStatus
   project_paused?: boolean
@@ -1605,7 +1632,7 @@ export interface DecisionTool {
 export interface Decision {
   context_tokens?: number
   context_window?: number
-  context_percent?: number
+  context_percent?: number | null
   compacted?: boolean
   handoff?: boolean
   handoff_missing?: number

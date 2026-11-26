@@ -30,6 +30,7 @@ import {
 } from '@/lib/format'
 import { useConsoleLocation, useLoad, usePoll } from '@/lib/hooks'
 import { useSessionState } from '@/lib/session-state'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import { navigate } from '@/lib/navigation'
 import { guardrailCallEventIndex } from '@/lib/guardrail'
 import { createRequestGate } from '@/lib/requests'
@@ -136,7 +137,7 @@ export function Runs({
   const [locateNote, setLocateNote] = useState<{ tone: 'info' | 'warning'; text: string } | null>(null)
   const streamRef = useRef<HTMLDivElement | null>(null)
   const [error, setError] = useState('')
-  const [copied, setCopied] = useState('')
+  const { feedback: copyFeedback, copy: copyText } = useCopyFeedback()
   const [canceling, setCanceling] = useState<string | null>(null)
   const [dismissingWarnings, setDismissingWarnings] = useState('')
   const cancelLock = useRef(false)
@@ -160,16 +161,6 @@ export function Runs({
     }
   }
 
-
-  async function copyBrief(path: string) {
-    try {
-      await navigator.clipboard.writeText(path)
-      setCopied(path)
-      window.setTimeout(() => setCopied(''), 1500)
-    } catch {
-      setError('复制失败：浏览器没有剪贴板权限')
-    }
-  }
 
   function selectRun(id: string) {
     const params = new URLSearchParams(window.location.search)
@@ -764,14 +755,23 @@ export function Runs({
                       <Button
                         size="icon-xs"
                         variant="ghost"
-                        title="复制任务书路径（只读，不发起文件下载）"
-                        onClick={() => copyBrief(current.brief_path!)}
+                        title={copyFeedback?.key === current.brief_path && copyFeedback.status === 'failed'
+                          ? '复制失败：请手动选择路径'
+                          : '复制任务书路径（只读，不发起文件下载）'}
+                        onClick={() => void copyText(current.brief_path!, current.brief_path!)}
                       >
                         <Copy className="h-3.5 w-3.5" />
                       </Button>
                       <span className="shrink-0 text-[11px] text-ink-3">
-                        {copied === current.brief_path ? '已复制' : '只读路径'}
+                        {copyFeedback?.key === current.brief_path
+                          ? copyFeedback.status === 'ok' ? '已复制' : '复制失败'
+                          : '只读路径'}
                       </span>
+                      {copyFeedback?.key === current.brief_path && copyFeedback.status === 'failed' && (
+                        <span role="status" className="saker-break basis-full text-[11px] text-destructive">
+                          剪贴板不可用；上面的路径可以直接选中手工复制。
+                        </span>
+                      )}
                       {current.brief_archive?.sha256 && (
                         <span className="shrink-0 font-mono text-[10px] text-ink-3" title={current.brief_archive.sha256}>
                           sha {current.brief_archive.sha256.slice(0, 12)}

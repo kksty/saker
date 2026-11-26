@@ -26,7 +26,7 @@ type Decision struct {
 	HandoffReceipt     *model.NoteRef          `json:"handoff_receipt,omitempty"`
 	ContextTokens      int                     `json:"context_tokens,omitempty"`
 	ContextWindow      int                     `json:"context_window,omitempty"`
-	ContextPercent     int                     `json:"context_percent,omitempty"`
+	ContextPercent     *int                    `json:"context_percent,omitempty"`
 	Compacted          bool                    `json:"compacted,omitempty"`
 	Handoff            bool                    `json:"handoff,omitempty"`
 	HandoffMissing     int                     `json:"handoff_missing,omitempty"`
@@ -134,6 +134,21 @@ func (c ContextStatus) Percent() int {
 		return 0
 	}
 	return c.Used * 100 / c.Window
+}
+
+// Known reports whether both sides of the ratio were observed. A nil Percent in
+// the wire status is "not reported"; a present 0 is a real observation that
+// rounds below one percent (the console must not render it as unknown).
+func (c ContextStatus) Known() bool { return c.Used > 0 && c.Window > 0 }
+
+// PercentPtr is the transport form: nil when unknown, otherwise the complete
+// percentage including a legitimate zero.
+func (c ContextStatus) PercentPtr() *int {
+	if !c.Known() {
+		return nil
+	}
+	p := c.Percent()
+	return &p
 }
 
 // Handoff reports whether this round is the 85% round. It is true once per

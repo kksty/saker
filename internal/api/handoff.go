@@ -62,17 +62,23 @@ func (s *Server) handoffIntent(w http.ResponseWriter, r *http.Request) {
 	}
 	updated, handoff, runID, err := s.HandoffIntent(r.Context(), id, req.Profile, req.Note, req.ExpectedVersion)
 	if err != nil {
-		status := http.StatusBadRequest
 		switch {
 		case errors.Is(err, store.ErrHandoffConflict):
-			status = http.StatusConflict
+			// The caller's version is stale (another session handed the direction
+			// over). The console refreshes and keeps the typed note; the machine
+			// code is what tells it this is a version conflict, not a refusal.
+			writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "handoff_conflict"})
+			return
 		case errors.Is(err, store.ErrHandoffUnarchived):
-			status = http.StatusConflict
+			writeErr(w, http.StatusConflict, err.Error())
+			return
 		case strings.Contains(err.Error(), "已结束"):
-			status = http.StatusConflict
+			writeErr(w, http.StatusConflict, err.Error())
+			return
+		default:
+			writeErr(w, http.StatusBadRequest, err.Error())
+			return
 		}
-		writeErr(w, status, err.Error())
-		return
 	}
 	writeJSON(w, http.StatusAccepted, map[string]any{
 		"intent": updated, "handoff": handoff, "run_id": runID,

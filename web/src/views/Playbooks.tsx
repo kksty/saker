@@ -19,6 +19,7 @@ import { Page } from '@/components/Page'
 import { api, projectID } from '@/lib/api'
 import { fmtTime } from '@/lib/format'
 import { useDebounced, useLoad } from '@/lib/hooks'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import type { Playbook, PlaybookStatus } from '@/lib/types'
 
 // The API derives the displayed status from the entry and its source facts.
@@ -59,7 +60,7 @@ export function Playbooks() {
   const searchInput = useRef<HTMLInputElement>(null)
   const [sort, setSort] = useState<SortMode>('updated')
   const [selected, setSelected] = useState<string | null>(null)
-  const [copied, setCopied] = useState('')
+  const { feedback: copyFeedback, copy } = useCopyFeedback()
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [archived, setArchived] = useState(false)
@@ -166,16 +167,6 @@ export function Playbooks() {
       if (request === generation.current) setError(e instanceof Error ? e.message : String(e))
     } finally {
       if (request === generation.current) setBusy('')
-    }
-  }
-
-  async function copy(text: string, key: string) {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(key)
-      window.setTimeout(() => setCopied((v) => (v === key ? '' : v)), 1200)
-    } catch {
-      /* clipboard is best-effort; the text is visible anyway */
     }
   }
 
@@ -503,13 +494,20 @@ export function Playbooks() {
                       size="xs"
                       variant="ghost"
                       className="absolute right-1 top-1 h-7 gap-1 text-[11px]"
-                      onClick={() => copy(current.doc ?? '', current.id)}
-                      title="复制战场知识"
+                      onClick={() => void copy(current.doc ?? '', current.id)}
+                      title={copyFeedback?.key === current.id && copyFeedback.status === 'failed' ? '复制失败：请手动选择上面的文本' : '复制战场知识'}
                     >
-                      {copied === current.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                      {copied === current.id ? '已复制' : '复制'}
+                      {copyFeedback?.key === current.id && copyFeedback.status === 'ok' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      {copyFeedback?.key === current.id
+                        ? copyFeedback.status === 'ok' ? '已复制' : '复制失败'
+                        : '复制'}
                     </Button>
                   </div>
+                  {copyFeedback?.key === current.id && copyFeedback.status === 'failed' && (
+                    <span role="status" className="mt-1 block text-[11px] leading-relaxed text-destructive">
+                      剪贴板不可用；上面这段文本可以直接选中手工复制。
+                    </span>
+                  )}
                 </div>
               )}
 

@@ -3,7 +3,7 @@
 // actions do not sit in the GraphView chunk. The logic below is unchanged: this
 // file only owns the panel, the page shell owns selection.
 
-import { useCallback, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import {
   Activity,
   Download,
@@ -209,6 +209,15 @@ function NodeWorkspace({
   )
   const [handoffOpen, setHandoffOpen] = useState(false)
   const [handoffNote, setHandoffNote] = useState('')
+  // The version the next handoff submit will send. A conflict refresh sets it to
+  // the newly read version, so the operator can review and resubmit the same
+  // note without retyping it (or silently retrying against the old version).
+  const [handoffVersion, setHandoffVersion] = useState<number | null>(null)
+  useEffect(() => {
+    setHandoffVersion(null)
+    setHandoffNote('')
+    setHandoffOpen(false)
+  }, [intent?.id])
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
   const [parking, setParking] = useState(false)
@@ -363,17 +372,37 @@ function NodeWorkspace({
     if (!intent) return
     setBusy(true)
     setNote('')
+    const expected = handoffVersion ?? intent.handoff_version ?? 0
     try {
       const r = await api.handoffIntent(
         intent.id,
         handoffNote.trim(),
-        intent.handoff_version ?? 0,
+        expected,
       )
       setNote(`已交给新执行者（新 run ${r.run_id}）。旧执行者的日志保留。`)
       setHandoffOpen(false)
       setHandoffNote('')
+      setHandoffVersion(null)
       onChanged()
     } catch (e) {
+      if (e instanceof ApiError && e.status === 409 && (e.code === 'handoff_conflict' || !e.code)) {
+        // Version conflict: the note is the operator's input and must survive.
+        // Read the current intent while the button stays busy, then keep the form
+        // open against the version we just observed. The operator decides whether
+        // to submit again after checking the latest handoff record.
+        setNote('交接版本已变化：正在读取最新的意图与交接记录…')
+        try {
+          const fresh = await api.intent(intent.id)
+          const latest = fresh.intent.handoff_version ?? 0
+          setHandoffVersion(latest)
+          setHandoffOpen(true)
+          onChanged()
+          setNote(`交接版本已变化（当前 v${latest}）：说明已保留，请核对最新交接记录后再次提交。`)
+        } catch (refreshError) {
+          setNote(`交接未成功（${e.message}）；读取最新记录也失败：${refreshError instanceof Error ? refreshError.message : String(refreshError)}。说明已保留，请稍后重试。`)
+        }
+        return
+      }
       setNote(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
@@ -787,7 +816,7 @@ function NodeWorkspace({
             <div className="rounded-lg border border-hairline bg-surface-2/40 px-2.5 py-2">
               <div className="flex items-center gap-1.5">
                 <span className="saker-eyebrow normal-case tracking-normal text-ink-2">新执行者接班</span>
-                <Badge size="sm" variant="muted">交接 v{intent.handoff_version ?? 0}</Badge>
+                <Badge size="sm" variant="muted">交接 v{handoffVersion ?? intent.handoff_version ?? 0}</Badge>
                 {<Button
                   size="xs"
                   variant="outline"

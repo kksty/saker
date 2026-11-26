@@ -47,6 +47,7 @@ import { usageBreakdownView } from '@/lib/usage-breakdown'
 import { PHASE_LABEL, isPhaseActive, phaseDetail, phaseOf } from '@/lib/decider'
 import {
   fmtInt,
+  fmtPercent,
   fmtTime,
   fmtUptime,
   frontierMarkers,
@@ -54,18 +55,30 @@ import {
   kindVariant,
   originVariant,
   runStatusLabel,
+  secondsSince,
   statusKind,
   statusLabel,
 } from '@/lib/format'
 import { usePoll } from '@/lib/hooks'
 import type { AsyncState } from '@/lib/hooks'
 import { projectStatusSummary } from '@/lib/project-status'
+import { reviewSummaryText, visibleReviewAttempts } from '@/lib/review-summary'
+import { watchdogEvents } from '@/lib/watchdog-events'
 import type { BoardItem, BoardResponse, Goal, OperatorFrontierItem, OperatorInbox, ProjectInfo, Run } from '@/lib/types'
 
 // A run quiet this long is worth surfacing on the dashboard. It is not the
 // guard's reap threshold (that is --idle-timeout, shown in the panel): this is
 // the "looks stuck" line, far earlier than the destructive one.
 const QUIET_SECONDS = 300
+
+// How one durable review attempt is named. Run failure, missing material and an
+// independent veto are different operator problems, and the overview must not
+// flatten them into "待复核".
+const REVIEW_OUTCOME_LABEL: Record<string, string> = {
+  run_failed: '运行失败，等待重试',
+  needs_evidence: '缺少可复现材料，等待证据或断言变化',
+  rejected: '独立复核否决',
+}
 
 /**
  * 概览 = 这个项目的作战台。
@@ -268,22 +281,31 @@ export function Overview({
                 </div>
               </Callout>
             )}
-            {board?.reviews && (board.reviews.pending > 0 || board.reviews.processing > 0 || board.reviews.paused) && (
-              <Callout tone={board.reviews.paused || board.reviews.disabled ? 'warning' : 'info'}>
-                <span className="text-[12px] leading-relaxed">
-                  复核中：<span className="font-mono saker-nums">{board.reviews.processing}</span> 项，
-                  <span className="font-mono saker-nums">{board.reviews.pending}</span> 项待复核
-                  {board.reviews.cooling > 0 ? `（${board.reviews.cooling} 项等待重试）` : ''}。
-                  {board.reviews.disabled
-                    ? '复核已关闭：不会再有复核 run，可在结论页开启。'
-                    : board.reviews.paused
-                      ? '复核已暂停，可在结论页恢复。'
-                      : board.reviews.automatic
-                        ? '队列会自动继续推进。'
-                        : '自动复核未开启，可在结论页发起复核。'}
-                </span>
-              </Callout>
-            )}
+            {board?.reviews && (() => {
+              const r = board.reviews
+              const unverified = board.facts.reviewable_unverified ?? 0
+              const attempts = visibleReviewAttempts(r)
+              if (unverified === 0 && r.processing === 0 && r.pending === 0 && r.cooling === 0 && (r.blocked ?? 0) === 0 && (r.rejected ?? 0) === 0 && !r.paused && !r.disabled) return null
+              return (
+                <Callout tone={r.paused || r.disabled ? 'warning' : 'info'}>
+                  <div className="text-[12px] leading-relaxed">{reviewSummaryText(r, unverified)}</div>
+                  {attempts.length > 0 && (
+                    <ul className="mt-2 space-y-1 text-[11px] leading-5 text-ink-2">
+                      {attempts.map((a) => (
+                        <li key={`${a.fact}:${a.outcome}:${a.claim_version}`} className="saker-break">
+                          <span className="font-mono">{a.fact}</span>
+                          {a.title ? ` ${a.title}` : ''}：{REVIEW_OUTCOME_LABEL[a.outcome] ?? a.outcome}
+                          {a.reason ? `（${a.reason}）` : ''}
+                          {(a.missing_evidence?.length ?? 0) > 0 && (
+                            <span className="text-ink-3"> · 需补充：{a.missing_evidence!.join('、')}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Callout>
+              )
+            })()}
             {dataError && (
               <Callout tone="warning" icon={<CircleAlert className="h-4 w-4" />}>
                 部分数据读取失败，当前保留上次成功结果：<span className="saker-break">{dataError}</span>
@@ -402,10 +424,13 @@ export function Overview({
                 </details>
                 <BriefingBar board={board} />
                 <div className="flex flex-wrap gap-3 text-xs text-ink-3">
-                  <span>指挥官上下文 {decider?.context_percent ?? '—'}%</span>
+                  <span>指挥官上下文 {fmtPercent(decider?.context_percent)}</span>
                   <span>交接未回执 {decider?.handoff_missing ?? 0} 轮{decider?.handoff_released ? '（已释放压力）' : ''}</span>
                   <span>非交接轮无动作 {decider?.no_action_rounds ?? 0} 轮</span>
-                  <span>待复核 {board.facts.reviewable_unverified ?? 0} · 笔记 {board.facts.notes ?? 0}</span>
+                  <span>未核验 {board.facts.reviewable_unverified ?? 0} · 笔记 {board.facts.notes ?? 0}</span>
+                  {!board.reviews?.disabled && (
+                    <span>待复核 {board.reviews?.pending ?? 0}</span>
+                  )}
                 </div>
                 {(board.handoff_warnings?.length ?? 0) > 0 && (
                   <Callout tone="warning" icon={<CircleAlert className="h-4 w-4" />}>
@@ -1040,22 +1065,20 @@ function GuardPanel({
   const dec = board.decider
   const guard = board.guard
   const interval = guard?.interval_seconds ?? 30
-  const lastTick = guard?.last_tick_at ? Math.max(0, Math.round((now - new Date(guard.last_tick_at).getTime()) / 1000)) : null
+  const lastTick = secondsSince(guard?.last_tick_at, now)
   const freshTick = lastTick !== null && lastTick <= interval * 3
   const loopStatus = !dec?.enabled ? 'error' : dec?.paused ? 'warning' : 'success'
   const loopLabel = !dec?.enabled ? '未启用' : dec?.paused ? '已暂停' : '运行中'
-  const lastRoundAt = dec?.last_round_at
-    ? Math.max(0, Math.round((now - new Date(dec.last_round_at).getTime()) / 1000))
-    : null
+  const lastRoundAt = secondsSince(dec?.last_round_at, now)
   // Three full passes over the run list per render; the clock made that happen
   // once a second. The list only changes when polling delivers a new one.
-  const { quiet, recovered, recoveries, failed, stalled } = useMemo(() => {
-    const watchdogRuns = runs.filter((r) => r.cancel_cause === 'watchdog')
-    const sorted = [...watchdogRuns].sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at))
+  const { quiet, canceled, redispatched, recoveries, failed, stalled } = useMemo(() => {
+    const events = watchdogEvents(runs)
     return {
       quiet: (board.running_intents ?? []).filter((it) => (it.pulse?.idle_seconds ?? 0) >= QUIET_SECONDS),
-      recovered: sorted.slice(0, 3),
-      recoveries: watchdogRuns.length,
+      canceled: events.canceled.slice(0, 3),
+      redispatched: events.redispatched.slice(0, 3),
+      recoveries: events.canceled.length,
       failed: runs.filter((r) => r.status === 'failed').length,
       stalled: dec?.stalled ?? 0,
     }
@@ -1108,15 +1131,35 @@ function GuardPanel({
         </Callout>
       )}
 
-      {recovered.length > 0 && (
-        <SubSection label="最近自动重派">
+      {canceled.length > 0 && (
+        <SubSection label="最近取消">
           <div className="divide-y divide-hairline/70">
-            {recovered.map((r) => (
-              <div key={r.id} className="flex items-center gap-2 py-1.5 text-[11px]">
-                <span className="shrink-0 font-mono saker-nums text-ink-3">{r.id.slice(-6)}</span>
-                <span className="min-w-0 flex-1 truncate text-ink-2" title={r.exit_reason}>
-                  {r.exit_reason || '运行守卫超时'}
+            {canceled.map(({ run }) => (
+              <div key={run.id} className="flex items-center gap-2 py-1.5 text-[11px]">
+                <span className="shrink-0 font-mono saker-nums text-ink-3">{run.id.slice(-6)}</span>
+                <span className="min-w-0 flex-1 truncate text-ink-2" title={run.exit_reason}>
+                  {run.exit_reason || '运行守卫超时'}
                 </span>
+                <time className="shrink-0 font-mono text-ink-3" title={run.ended_at || '取消时间未记录'}>
+                  {run.ended_at ? fmtTime(run.ended_at) : '取消时间未知'}
+                </time>
+              </div>
+            ))}
+          </div>
+        </SubSection>
+      )}
+
+      {redispatched.length > 0 && (
+        <SubSection label="最近重派">
+          <div className="divide-y divide-hairline/70">
+            {redispatched.map(({ run, successor }) => (
+              <div key={`${run.id}:${successor.id}`} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 py-1.5 text-[11px]">
+                <span className="shrink-0 font-mono saker-nums text-ink-3">{run.id.slice(-6)}</span>
+                <span className="shrink-0 text-ink-3">→</span>
+                <span className="min-w-0 flex-1 truncate font-mono text-ink-2" title={successor.id}>{successor.id.slice(-6)}</span>
+                <time className="shrink-0 font-mono text-ink-3" title={successor.started_at}>
+                  {fmtTime(successor.started_at)}
+                </time>
               </div>
             ))}
           </div>
