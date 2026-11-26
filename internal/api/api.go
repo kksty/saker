@@ -199,10 +199,8 @@ type Server struct {
 	// run's live context_tokens into a pressure bar. It changes when the
 	// settings page saves, so it is atomic rather than a plain field.
 	contextWindow atomic.Int64
-	// lastWatch is when the watchdog last swept (unix nano). It is observation
-	// for the console's guard panel, not scheduling state: the loop itself owns
-	// its ticker.
-	lastWatch atomic.Int64
+	// watchPulse publishes the start and completion of a single sweep together.
+	watchPulse atomic.Pointer[watchTimes]
 	// paused is the project-level gate (projectPause). A decision round that
 	// already passed the decider's own pause check used to dispatch anyway;
 	// starting a run is the point where "paused" must be enforced.
@@ -221,7 +219,8 @@ type Server struct {
 	// classifies inside that same section. The manifest persists the same cause
 	// next to the boolean, and a boot attach restores it, so a restart keeps
 	// saying who stopped the project instead of collapsing to "operator".
-	pauseCause string
+	pauseCause           string
+	restartRecoveryError string // guarded by controlMu
 	// scopeMu guards resumeScope. The operator's "continue current goal" resume
 	// attaches the named goal to exactly one commander round (StartCommander
 	// consumes it), so the round continues that goal without a persistent
@@ -1104,6 +1103,16 @@ func (s *Server) runIntent(w http.ResponseWriter, r *http.Request) {
 // StartRun claims an intent and dispatches it. It is exported because the
 // decider uses it to start the work it just created.
 func (s *Server) StartRun(id string) (string, error) {
+	return s.startRunAfterInterruption(id, "")
+}
+
+func (s *Server) startRunAfterInterruption(id, autoRedispatchedFrom string) (string, error) {
+	start := func(prompt, continuedFrom string, resume bool) (string, error) {
+		if autoRedispatchedFrom != "" {
+			return s.Lifecycle.StartAutoRedispatch(id, prompt, continuedFrom, resume, resume, autoRedispatchedFrom)
+		}
+		return s.startRunWith(id, prompt, continuedFrom, resume, resume)
+	}
 	// Administrative interruption keeps the task alive. Prefer its preserved
 	// native session; an explicit retry with resume=false still opens a fresh one.
 	if in, ok := s.Store.GetIntent(id); ok && in.Status == model.StatusPending && in.RunID != "" {
@@ -1115,9 +1124,9 @@ func (s *Server) StartRun(id string) (string, error) {
 			}
 			if executor.CanResume(s.Exec, nodeID, work) {
 				prompt := s.continuePrompt(in, previous, "项目暂停或进程重启后恢复；按当前有效指令核对断点，再继续未完成工作", s.readWorkerNote(work))
-				return s.startRunWith(id, prompt, previous.ID, true, true)
+				return start(prompt, previous.ID, true)
 			}
-			newRun, err := s.startRun(id, "", "")
+			newRun, err := start("", "", false)
 			if err == nil {
 				_, _ = s.Store.UpdateRun(newRun, func(r *model.Run) {
 					r.Infos = append(r.Infos, "暂停恢复：原 harness 会话不可用，本轮以账本、工作区和 worker-note 重建会话")
@@ -1126,7 +1135,7 @@ func (s *Server) StartRun(id string) (string, error) {
 			return newRun, err
 		}
 	}
-	return s.startRun(id, "", "")
+	return start("", "", false)
 }
 
 // SetPaused arms/disarms the project-level dispatch gate. The decider's own
@@ -2486,7 +2495,7 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 		// The pulse keeps one line of the event so the board says what the run
 		// is doing, not just that it moved. The journal above stays the full
 		// record; the decider reads its tail through run_events (D57).
-		s.noteRunEvent(runID, time.Now(), ev.Kind, ev.Tool, ev.Text)
+		s.Store.NoteHarnessEvent(runID, time.Now(), ev.Kind, ev.Tool, s.redactSecrets(ev.Text), ev.CallID)
 		if ev.ContextTokens > 0 {
 			s.Store.ProgressRun(runID, ev.ContextTokens)
 		}
@@ -2715,45 +2724,63 @@ func (s *Server) finish(runID, intentID, status, reason string, res executor.Res
 // host.SweepStaleSessions, before projects attach — see watchdog-liveness §4.2
 // for why scanning the case tree in every Recover would be wasteful and why the
 // endpoint comparison belongs to whoever knows the live host.
-func (s *Server) Recover() {
+func (s *Server) Recover() (int, error) {
+	s.controlMu.Lock()
+	defer s.controlMu.Unlock()
+	return s.recoverLocked()
+}
+
+func (s *Server) recoverLocked() (int, error) {
 	// Crash repair is owned by the lifecycle service. Snapshot the orphan rows
 	// first so the Phase 1 sidecar sees the same restart cancels the ledger does:
 	// the lifecycle sweep writes rows directly and has no recorder handle.
 	var live []model.Run
-	if s.Metrics != nil && s.Store != nil {
+	if s.Store != nil {
 		for _, r := range s.Store.Runs() {
 			if r.Status == model.RunRunning {
 				live = append(live, r)
 			}
 		}
 	}
-	s.Lifecycle.Recover()
-	// The runs this sweep just settled were killed with the previous process, so
-	// their journals end mid-flight and cannot say why. Write the cause into each
-	// one: "restart" is the answer a review needs, and without this line the only
-	// possible reading is "something killed it" (20 of the 49 cancelled runs in the
-	// TSecBench 2026-11-22 package looked exactly like that).
-	for _, before := range live {
-		cur, ok := s.Store.GetRun(before.ID)
-		if !ok || cur.Status != model.RunCanceled {
-			continue
-		}
-		if err := s.appendJournalOnDisk(before.ID, map[string]any{
-			"kind": "run_cancel", "at": time.Now(), "run_id": before.ID,
-			"cause": model.CancelCauseRestart, "reason": s.redactSecrets(cur.ExitReason), "source": "recover",
-		}); err != nil {
-			log.Printf("run %s: 记录重启取消原因失败：%v", before.ID, err)
+	n, err := s.Lifecycle.Recover()
+	s.restartRecoveryError = ""
+	if err != nil {
+		s.restartRecoveryError = s.redactSecrets(err.Error())
+		s.SetPaused(true)
+		if s.Decider != nil && !s.Decider.Paused() {
+			s.Decider.PauseFor("项目已暂停，等待启动对账")
 		}
 	}
-	if s.Metrics != nil {
-		for _, before := range live {
-			cur, ok := s.Store.GetRun(before.ID)
-			if !ok || cur.Status != model.RunCanceled {
-				continue
+	// Mirror committed restart cancellations to the audit streams.
+	for _, before := range live {
+		cur, ok := s.Store.GetRun(before.ID)
+		if !ok || cur.Status != model.RunCanceled || cur.CancelCause != model.CancelCauseRestart {
+			continue
+		}
+		if cur.LogPath != "" || s.Metrics != nil {
+			if err := s.appendJournalOnDisk(before.ID, map[string]any{
+				"kind": "run_cancel", "at": time.Now(), "run_id": before.ID,
+				"cause": model.CancelCauseRestart, "reason": s.redactSecrets(cur.ExitReason), "source": "recover",
+			}); err != nil {
+				log.Printf("run %s: 记录重启取消原因失败：%v", before.ID, err)
 			}
+		}
+		if s.Metrics != nil {
 			s.Metrics.Cancel(before.ID, model.CancelCauseRestart, cur.ExitReason, before.StopReason)
 		}
 	}
+	if err == nil && !s.paused.Load() {
+		go s.pump()
+	}
+	return n, err
+}
+
+func (s *Server) retryRestartRecoveryLocked() error {
+	if s.restartRecoveryError == "" {
+		return nil
+	}
+	_, err := s.recoverLocked()
+	return err
 }
 
 // watchInterval is the guard's cadence. It is exported to the console as
@@ -2764,32 +2791,49 @@ const watchInterval = 30 * time.Second
 // Watch runs the watchdog: intents whose dispatcher disappeared go back to
 // pending so the next decision round can pick them up.
 func (s *Server) Watch(ctx context.Context) {
-	// Sweep once before the first tick: a process that was down for a while
-	// would otherwise keep dead queue rows for another full interval, and
-	// "restart then immediately read the queue" is exactly when that shows.
-	s.sweepMessages()
-	s.routeAndDeliver()
 	t := time.NewTicker(watchInterval)
 	defer t.Stop()
+	s.watchOnce(func() {
+		s.sweepMessages()
+		s.routeAndDeliver()
+	})
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			s.lastWatch.Store(time.Now().UnixNano())
-			s.reapOrphans()
-			s.reapIdle()
-			s.reapClaims()
-			s.reapDanglingIntents()
-			// The scheduler is also the wait-deadline tick: pump evaluates stored
-			// waits and starts unstarted children that were waiting for a slot.
-			s.pump()
-			// Queue cleanup is a tick too: a queued message that no run is going
-			// to carry expires instead of growing the ledger forever.
-			s.sweepMessages()
-			s.routeAndDeliver()
+			s.watchOnce(func() {
+				s.reapOrphans()
+				s.reapIdle()
+				s.reapClaims()
+				s.reapDanglingIntents()
+				s.pump()
+				s.sweepMessages()
+				s.routeAndDeliver()
+			})
 		}
 	}
+}
+
+type watchTimes struct {
+	started, completed time.Time
+	inProgress         bool
+}
+
+func (s *Server) watchOnce(sweep func()) {
+	s.controlMu.Lock()
+	blocked := s.restartRecoveryError != ""
+	s.controlMu.Unlock()
+	if blocked {
+		return
+	}
+	pulse := watchTimes{started: time.Now(), inProgress: true}
+	if previous := s.watchPulse.Load(); previous != nil {
+		pulse.completed = previous.completed
+	}
+	s.watchPulse.Store(&pulse)
+	sweep()
+	s.watchPulse.Store(&watchTimes{started: pulse.started, completed: time.Now()})
 }
 
 func (s *Server) reapOrphans() {
@@ -4463,15 +4507,6 @@ func (s *Server) listRuns(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"runs": runs})
 }
 
-// guardInfo is the watchdog's public pulse for the console: cadence, idle
-// threshold, and when it last swept. It is observation only — the guard has no
-// model and no policy; the page must not have to guess its numbers.
-type guardInfo struct {
-	IntervalSeconds    int        `json:"interval_seconds"`
-	IdleTimeoutSeconds int        `json:"idle_timeout_seconds,omitempty"`
-	LastTickAt         *time.Time `json:"last_tick_at,omitempty"`
-}
-
 // boardRunWarnings is one run's handoff problems as the board shows them. The
 // board is the operator's first look, so "why is this evidence missing" must be
 // answerable there without opening the run list (task-17).
@@ -4542,10 +4577,15 @@ func (s *Server) getBoard(w http.ResponseWriter, r *http.Request) {
 		if s.IdleTimeout > 0 {
 			g.IdleTimeoutSeconds = int(s.IdleTimeout / time.Second)
 		}
-		if n := s.lastWatch.Load(); n > 0 {
-			t := time.Unix(0, n)
-			g.LastTickAt = &t
+		if pulse := s.watchPulse.Load(); pulse != nil {
+			g.StartedAt = &pulse.started
+			if !pulse.completed.IsZero() {
+				g.CompletedAt = &pulse.completed
+			}
+			g.InProgress = pulse.inProgress
 		}
+		g.observeRuns(db.Runs)
+		g.Activity = s.guardActivity(db, v.Running)
 		guard = &g
 	}
 	// Review/report queue state is operator-side post-processing: the commander
@@ -4908,6 +4948,9 @@ func (s *Server) setProjectPaused(paused bool) error {
 // keeps whatever the manifest already carries (a pause is a transition, not a
 // reclassification); resuming always clears it.
 func (s *Server) setProjectPausedKind(paused bool, kind string) error {
+	if !paused && s.restartRecoveryError != "" {
+		return errors.New(s.restartRecoveryError)
+	}
 	if s.persistPausedKind != nil {
 		return s.persistPausedKind(paused, kind)
 	}
@@ -4989,6 +5032,14 @@ func (s *Server) projectResume(w http.ResponseWriter, r *http.Request) {
 	// projectStateLocked reads the pause cause under the lock we already hold.
 	before := s.projectStateLocked()
 	verdict := s.resumeActionLocked(before, s.projectFactsLocked())
+	if before.RecoveryError != "" && verdict.ReasonCode == reasonRestartRecovery {
+		if err := s.retryRestartRecoveryLocked(); err != nil {
+			writeJSON(w, http.StatusConflict, map[string]any{"code": reasonRestartRecovery, "error": s.restartRecoveryError, "paused": true})
+			return
+		}
+		before = s.projectStateLocked()
+		verdict = s.resumeActionLocked(before, s.projectFactsLocked())
+	}
 	if verdict.ReasonCode == reasonCloseoutInProgress {
 		writeJSON(w, http.StatusConflict, map[string]any{
 			"error": verdict.Reason,
@@ -5098,7 +5149,7 @@ func (s *Server) ResumeAfterRestart() {
 	before := s.projectStateLocked()
 	verdict := s.resumeActionLocked(before, s.projectFactsLocked())
 	switch verdict.ReasonCode {
-	case reasonDeleting, reasonCloseoutInProgress:
+	case reasonDeleting, reasonCloseoutInProgress, reasonRestartRecovery:
 		// Neither is the restart's to clear: deletion owns the tree, and a
 		// closeout owns the runtime until its round settles.
 		return

@@ -124,6 +124,9 @@ test('cancelCauseText explains the mechanism behind the short label', () => {
   assert.match(cancelCauseText('worker_kill'), /终止/)
   assert.match(cancelCauseText('restart'), /重启/)
   assert.match(cancelCauseText('pause'), /暂停/)
+  // A cancellation may leave the intent held. Its cause cannot promise a successor.
+  assert.doesNotMatch(cancelCauseText('watchdog'), /自动重派/)
+  assert.doesNotMatch(cancelCauseText('stop_loss'), /连续多轮|没有新事实/)
   // The review switch is a different stop than the project pause: a canceled
   // review must not read as "the whole engagement was paused".
   assert.match(cancelCauseText('review_pause'), /复核暂停/)

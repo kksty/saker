@@ -1,6 +1,10 @@
 package store
 
-import "github.com/kksty/saker/internal/model"
+import (
+	"maps"
+
+	"github.com/kksty/saker/internal/model"
+)
 
 func detachGoal(g model.Goal) model.Goal {
 	if g.ClosedAt != nil {
@@ -88,6 +92,11 @@ func detachFact(f model.Fact) model.Fact {
 	return f
 }
 func detachRun(r model.Run) model.Run {
+	r.OpenToolCalls = maps.Clone(r.OpenToolCalls)
+	if r.RedispatchDisposition != nil {
+		disposition := *r.RedispatchDisposition
+		r.RedispatchDisposition = &disposition
+	}
 	r.NoteWrites = append([]model.NoteRef(nil), r.NoteWrites...)
 	if r.NoteRead != nil {
 		v := *r.NoteRead

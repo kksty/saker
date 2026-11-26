@@ -963,12 +963,14 @@ const MaxRunWarnings = 20
 
 // Run is one executor invocation for one intent.
 type Run struct {
-	NativeSubagentCalls      int       `json:"native_subagent_calls,omitempty"`
-	NativeSubagentActive     int       `json:"native_subagent_active,omitempty"`
-	NativeSubagentDurationMS int64     `json:"native_subagent_duration_ms,omitempty"`
-	CommanderRound           int       `json:"commander_round,omitempty"`
-	NoteRead                 *NoteRef  `json:"note_read,omitempty"`
-	NoteWrites               []NoteRef `json:"note_writes,omitempty"`
+	NativeSubagentCalls      int             `json:"native_subagent_calls,omitempty"`
+	NativeSubagentActive     int             `json:"native_subagent_active,omitempty"`
+	OpenToolCalls            map[string]bool `json:"open_tool_calls,omitempty"`
+	HarnessTurnEnded         bool            `json:"harness_turn_ended,omitempty"`
+	NativeSubagentDurationMS int64           `json:"native_subagent_duration_ms,omitempty"`
+	CommanderRound           int             `json:"commander_round,omitempty"`
+	NoteRead                 *NoteRef        `json:"note_read,omitempty"`
+	NoteWrites               []NoteRef       `json:"note_writes,omitempty"`
 	// Queue time is distinct from execution; nil means it was not measured.
 	QueuedAt           *time.Time `json:"queued_at,omitempty"`
 	ExecutionStartedAt *time.Time `json:"execution_started_at,omitempty"`
@@ -1133,5 +1135,12 @@ type Run struct {
 	// ContinuedFrom is the run this one continues (a steer), "" for a fresh
 	// dispatch. Two runs on one intent are otherwise indistinguishable from two
 	// independent attempts in the ledger (D42).
-	ContinuedFrom string `json:"continued_from,omitempty"`
+	ContinuedFrom         string                 `json:"continued_from,omitempty"`
+	AutoRedispatchedFrom  string                 `json:"auto_redispatched_from,omitempty"`
+	RedispatchDisposition *RedispatchDisposition `json:"redispatch_disposition,omitempty"`
+}
+
+type RedispatchDisposition struct {
+	State  string `json:"state"`
+	Reason string `json:"reason"`
 }

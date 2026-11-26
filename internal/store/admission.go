@@ -1,11 +1,14 @@
 package store
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/kksty/saker/internal/model"
 )
+
+var ErrAutoRedispatchSkipped = errors.New("跳过自动重派")
 
 // StartIntentRun commits ownership, generation, run and wait transfer together.
 // A failed write leaves neither a claimed intent nor an orphan running row.
@@ -21,6 +24,16 @@ func (s *Store) StartIntentRun(id, node, owner string, run model.Run) (model.Int
 	}
 	if in.Status != model.StatusPending && in.Status != model.StatusFailed && in.Status != model.StatusReviewFailed {
 		return model.Intent{}, model.Run{}, fmt.Errorf("intent %s 无法认领（状态为 %s）", id, in.Status)
+	}
+	if previous := run.AutoRedispatchedFrom; previous != "" {
+		if in.RunID != previous || in.Status != model.StatusPending || in.Hold || in.Aborted || in.Wait != nil {
+			return model.Intent{}, model.Run{}, fmt.Errorf("%w：运行 %s 的意图状态或归属已改变", ErrAutoRedispatchSkipped, previous)
+		}
+		for _, action := range s.db.Actions {
+			if action.RunID == previous && (action.State == model.ActionStarted || action.State == model.ActionUnknown) {
+				return model.Intent{}, model.Run{}, fmt.Errorf("%w：外部动作 %s 的结果尚未确认", ErrAutoRedispatchSkipped, action.ID)
+			}
+		}
 	}
 	now := time.Now()
 	previousRun := in.RunID

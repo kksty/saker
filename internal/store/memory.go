@@ -71,10 +71,13 @@ type Memory struct {
 	// alert can name the reshuffling instead of saying only "no progress". They
 	// are durable on purpose: a restart that reset the count would hide a
 	// direction that has been idling for hours.
-	StallThrough    uint64 `json:"stall_through,omitempty"`
-	StallRounds     int    `json:"stall_rounds,omitempty"`
-	StallEscalated  bool   `json:"stall_escalated,omitempty"`
-	StallDirections int    `json:"stall_directions,omitempty"`
+	StallThrough      uint64 `json:"stall_through,omitempty"`
+	StallRounds       int    `json:"stall_rounds,omitempty"`
+	StallEscalated    bool   `json:"stall_escalated,omitempty"`
+	StallDirections   int    `json:"stall_directions,omitempty"`
+	StallParked       int    `json:"stall_parked,omitempty"`
+	StallFailed       int    `json:"stall_failed,omitempty"`
+	StallReviewFailed int    `json:"stall_review_failed,omitempty"`
 }
 
 type record struct {

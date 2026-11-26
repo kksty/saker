@@ -11,7 +11,7 @@ import (
 
 func stallAlerted(d *Decision) bool {
 	for _, note := range d.Notes {
-		if strings.Contains(note, "没有进展") {
+		if strings.Contains(note, "没有新增事实、有效核验或意图完成") {
 			return true
 		}
 	}
@@ -115,11 +115,11 @@ func TestDirectionOnlyStallAlertsWithDirectionCount(t *testing.T) {
 		if i == stallEscalationRounds {
 			note := ""
 			for _, n := range d.Notes {
-				if strings.Contains(n, "没有进展") {
+				if strings.Contains(n, "没有新增事实、有效核验或意图完成") {
 					note = n
 				}
 			}
-			if !strings.Contains(note, "期间新增 6 条意图、零新增事实") {
+			if !strings.Contains(note, "期间新开 6 条") {
 				t.Fatalf("direction-only alert does not name the directions: %q", note)
 			}
 		}

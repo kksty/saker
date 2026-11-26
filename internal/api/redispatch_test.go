@@ -2,6 +2,7 @@ package api
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,6 +36,10 @@ func TestWatchdogCancelRedispatchesSameIntent(t *testing.T) {
 	got, _ := s.Store.GetIntent(in.ID)
 	if got.Status != model.StatusRunning {
 		t.Fatalf("intent after redispatch = %s, want running", got.Status)
+	}
+	runs := runsOf(t, s.Store, in.ID)
+	if runs[1].AutoRedispatchedFrom != runs[0].ID {
+		t.Fatalf("successor %s has no durable source link to %s", runs[1].ID, runs[0].ID)
 	}
 	stopRunning(t, s)
 }
@@ -199,4 +204,28 @@ func stopRunning(t *testing.T, s *Server) {
 		}
 	}
 	waitFor(t, 5*time.Second, func() bool { return s.RunningIntentCount() == 0 })
+}
+
+// A crash after registering an external action leaves its result unknown.
+// Automatic redispatch must leave that state available for reconciliation.
+func TestWatchdogRedispatchSkipsUnknownExternalAction(t *testing.T) {
+	s, ex, in := newSteerServer(t)
+	live, _ := s.Store.GetIntent(in.ID)
+	action, _, err := s.Store.BeginAction(in.ID, live.RunID, "fixture-key", "fixture action", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CancelRunWithCause(live.RunID, model.CancelCauseWatchdog, "fixture cancellation"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, 5*time.Second, func() bool {
+		run, _ := s.Store.GetRun(live.RunID)
+		return run.RedispatchDisposition != nil
+	})
+	run, _ := s.Store.GetRun(live.RunID)
+	got, _ := s.Store.GetAction(action.ID)
+	if run.RedispatchDisposition.State != "skipped" || !strings.Contains(run.RedispatchDisposition.Reason, action.ID) ||
+		got.State != model.ActionUnknown || len(runsOf(t, s.Store, in.ID)) != 1 || len(ex.requests()) != 1 {
+		t.Fatalf("unconfirmed action was not held for review: run=%+v action=%+v", run, got)
+	}
 }

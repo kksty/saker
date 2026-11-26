@@ -64,7 +64,7 @@ Linux / macOS 用 `scripts/build-harness.sh`，`bin/saker` 不带后缀。启动
 | Go 测试（串行） | `go test ./cmd/... ./internal/... -p 1 -count=1` |
 | 前端检查 | `pnpm --dir web typecheck` 与 `pnpm --dir web test` |
 | 收一个 run 供复盘 | `pwsh -File scripts/collect-run.ps1 -Project <项目ID> -Out <out.zip>` |
-| 长跑外部看护（默认只观察） | `pwsh -File scripts/watchdog.ps1 -Project <项目ID>` |
+| 长跑外部状态观察 | `pwsh -File scripts/watchdog.ps1 -Project <项目ID>` |
 | 版本 | `./bin/saker.exe --version` |
 
 ## 架构与目录
