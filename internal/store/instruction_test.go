@@ -171,7 +171,10 @@ func TestTaskResultsAndExplicitDurableMessagesSurviveChatRetention(t *testing.T)
 	}
 }
 
-func TestPreviousProjectSchemaIsRejectedWithoutUpgrade(t *testing.T) {
+// A project written by the previous build opens here, and opening it must not
+// rewrite the stamp: the file stays readable by that build for as long as it
+// holds only rows both layouts can place.
+func TestPreviousProjectSchemaOpensWithoutRewritingMetadata(t *testing.T) {
 	s := open(t)
 	var raw []byte
 	if err := s.sqlite.db.QueryRow("SELECT payload FROM meta WHERE id=1").Scan(&raw); err != nil {
@@ -186,14 +189,18 @@ func TestPreviousProjectSchemaIsRejectedWithoutUpgrade(t *testing.T) {
 	if _, err := s.sqlite.db.Exec("UPDATE meta SET payload=? WHERE id=1", raw); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Open(s.Path()); err == nil || !strings.Contains(err.Error(), "migration is not supported") {
-		t.Fatalf("old project accepted: %v", err)
+	reopened, err := Open(s.Path())
+	if err != nil {
+		t.Fatalf("a previous-build project was refused: %v", err)
+	}
+	if err := reopened.Close(); err != nil {
+		t.Fatal(err)
 	}
 	var after []byte
 	if err := s.sqlite.db.QueryRow("SELECT payload FROM meta WHERE id=1").Scan(&after); err != nil {
 		t.Fatal(err)
 	}
 	if string(after) != string(raw) {
-		t.Fatal("opening an old project rewrote its metadata")
+		t.Fatal("opening an earlier project rewrote its metadata")
 	}
 }

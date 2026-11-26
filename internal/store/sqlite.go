@@ -129,8 +129,8 @@ func readSQLiteDB(sqlDB *sql.DB) (DB, error) {
 	if err := json.Unmarshal(raw, &meta); err != nil {
 		return DB{}, err
 	}
-	if meta.Version != schemaVersion || meta.Memory == nil {
-		return DB{}, fmt.Errorf("unsupported ledger schema %d (expected %d; use a new data directory; migration is not supported)", meta.Version, schemaVersion)
+	if meta.Version < schemaMinReadable || meta.Version > schemaVersion || meta.Memory == nil {
+		return DB{}, fmt.Errorf("unsupported ledger schema %d (expected %d-%d; use a new data directory; migration is not supported)", meta.Version, schemaMinReadable, schemaVersion)
 	}
 	db := DB{Version: meta.Version, MessageSeq: meta.MessageSeq, Memory: meta.Memory}
 	rows, err := sqlDB.Query("SELECT kind,payload FROM objects ORDER BY kind,position,id")
@@ -298,7 +298,18 @@ func (s *Store) flushSQLite(kinds ...string) (err error) {
 	}
 	mem := *memory
 	mem.History = nil
-	raw, err := json.Marshal(sqliteMeta{s.db.Version, s.db.MessageSeq, &mem})
+	// The stamp says what the file may contain, not who opened it. A proposal is
+	// the only row the older layout cannot place, so the first commit that writes
+	// one raises the stamp in this same transaction: an older build then refuses
+	// the file as "schema 14" instead of tripping over an unknown row, and a
+	// project that never wrote one keeps its 13 stamp and stays readable by both.
+	// It never goes back down: lowering it while a proposal row is inside would
+	// promise a file the older build cannot read.
+	version := s.db.Version
+	if len(s.db.Proposals) > 0 && version < schemaVersion {
+		version = schemaVersion
+	}
+	raw, err := json.Marshal(sqliteMeta{version, s.db.MessageSeq, &mem})
 	if err != nil {
 		return err
 	}
@@ -308,6 +319,7 @@ func (s *Store) flushSQLite(kinds ...string) (err error) {
 	if err = tx.Commit(); err != nil {
 		return err
 	}
+	s.db.Version = version
 	s.db.Memory = memory
 	for _, r := range next {
 		s.putRecord(r)

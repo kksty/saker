@@ -130,8 +130,17 @@ func (s *Store) evidenceURIsLocked(ids []string) []string {
 	return out
 }
 
-// schemaVersion identifies the current SQLite layout; older layouts are unsupported.
+// schemaVersion identifies the layout this build writes once it uses the
+// proposal rows; schemaMinReadable is the oldest layout it can still read.
+//
+// 13 and 14 are the same physical ledger: the proposal feature added a row kind
+// and a JSON field, not DDL, so a project that never wrote a proposal is read by
+// either build. A newer layout is refused outright — reading rows this build does
+// not understand would be a guess, and a refusal is what stops a downgrade from
+// looking like success.
 const schemaVersion = 14
+
+const schemaMinReadable = 13
 
 // CurrentSchemaVersion is the layout this build writes and accepts. It is
 // exported for fixtures that build a ledger snapshot directly: a hard-coded
