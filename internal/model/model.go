@@ -320,9 +320,25 @@ type Intent struct {
 	DoneFactIDs    []string   `json:"done_fact_ids,omitempty"`
 	DoneRunIDs     []string   `json:"done_run_ids,omitempty"`
 	DoneAt         *time.Time `json:"done_at,omitempty"`
-	RunID          string     `json:"run_id,omitempty"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	// DoneFactClaims and DoneFactStatuses freeze what the settler actually
+	// accepted: the claim version and the review status each cited fact had at
+	// settlement time. They are written once and never moved by a later edit, so
+	// "what did we accept then" stays answerable after the assertion changes.
+	DoneFactClaims   map[string]uint64 `json:"done_fact_claims,omitempty"`
+	DoneFactStatuses map[string]string `json:"done_fact_statuses,omitempty"`
+	// DoneUnverified records the settlement-time verdict the response already
+	// returned (`done_unverified`); it belongs to the receipt, not to a per-read
+	// calculation.
+	DoneUnverified bool `json:"done_unverified,omitempty"`
+	// DoneReceiptStale and DoneReceiptChanged are read-side observations: the
+	// stored receipt is left as stamped, and a cited claim that has since been
+	// corrected, withdrawn or rejected is named here so the console can ask for
+	// re-confirmation.
+	DoneReceiptStale   bool      `json:"done_receipt_stale,omitempty"`
+	DoneReceiptChanged []string  `json:"done_receipt_changed,omitempty"`
+	RunID              string    `json:"run_id,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 // DoneDeclared reports a completion written by a person/commander judgement
@@ -340,6 +356,11 @@ func (in *Intent) ClearDoneDeclared() {
 	in.DoneFactIDs = nil
 	in.DoneRunIDs = nil
 	in.DoneAt = nil
+	in.DoneFactClaims = nil
+	in.DoneFactStatuses = nil
+	in.DoneUnverified = false
+	in.DoneReceiptStale = false
+	in.DoneReceiptChanged = nil
 }
 
 // Wait is the persisted condition a direction yielded on. Evaluation, the

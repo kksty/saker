@@ -27,7 +27,7 @@ func TestHandoffSectionPutsVerbatimAuthorizationBeforeTheNote(t *testing.T) {
 		SourceRun:   "r_old",
 		SourceBrief: ".saker/briefs/r_old.md",
 	}
-	got := handoffSection(store.DB{}, in, h, auth)
+	got := handoffSection(store.DB{}, in, h, auth, false)
 
 	authAt := strings.Index(got, auth.Briefing)
 	noteAt := strings.Index(got, "### 交接说明")
@@ -56,7 +56,7 @@ func TestHandoffSectionPutsVerbatimAuthorizationBeforeTheNote(t *testing.T) {
 // above is what the previous run saw, when it is only what this task book says.
 func TestHandoffSectionNamesTheMissingArchive(t *testing.T) {
 	got := handoffSection(store.DB{}, model.Intent{ID: "in_1"}, model.Handoff{FromRun: "r_gone", Note: "旧的"},
-		handoffAuthorization{Briefing: "10.0.0.0/24", SourceRun: "r_gone"})
+		handoffAuthorization{Briefing: "10.0.0.0/24", SourceRun: "r_gone"}, false)
 	if !strings.Contains(got, "没有下发归档") {
 		t.Fatalf("a missing archive is not named:\n%s", got)
 	}

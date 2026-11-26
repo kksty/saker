@@ -267,7 +267,7 @@ type handoffAuthorization struct {
 	SourceBrief string
 }
 
-func handoffSection(db store.DB, in model.Intent, h model.Handoff, auth handoffAuthorization) string {
+func handoffSection(db store.DB, in model.Intent, h model.Handoff, auth handoffAuthorization, showUnverified bool) string {
 	byID := map[string]model.Fact{}
 	for _, f := range db.Facts {
 		byID[f.ID] = f
@@ -307,10 +307,21 @@ func handoffSection(db store.DB, in model.Intent, h model.Handoff, auth handoffA
 				fmt.Fprintf(&b, "- `%s`：交接时记录 v%d / 断言 v%d，当前断言 v%d（%s）；引用已过期，按 ID 重读后重新判断\n", id, h.FactVersions[id], version, f.ClaimVersion, f.Status)
 				continue
 			}
-			if version, known := h.FactVersions[id]; known {
-				fmt.Fprintf(&b, "  交接引用：记录 v%d / 断言 v%d\n", version, h.FactClaimVersions[id])
+			claim, claimKnown := h.FactClaimVersions[id]
+			record, recordKnown := h.FactVersions[id]
+			switch {
+			case !claimKnown:
+				fmt.Fprintf(&b, "- `%s`：交接时未记录断言版本；当前断言 v%d；按当前账本重读后判断：\n", id, f.ClaimVersion)
+			case recordKnown:
+				fmt.Fprintf(&b, "- `%s`：交接时记录 v%d / 断言 v%d；按当前账本状态展示：\n", id, record, claim)
+			default:
+				fmt.Fprintf(&b, "- `%s`：断言 v%d；按当前账本状态展示：\n", id, claim)
 			}
-			fmt.Fprintf(&b, "- `%s` 断言 v%d（%s）%s：%s\n", id, f.ClaimVersion, f.Status, f.Title, clipRunes(f.Summary, 240))
+			// Same display rule as an ordinary dispatch: the id, kind, status and
+			// evidence index are fixed, and the body follows the project's review
+			// configuration and the current claim version. A handoff snapshot must
+			// not expose more of an unverified assertion than a normal brief does.
+			b.WriteString(renderFact(f, showUnverified))
 		}
 	}
 	if len(h.Evidence) > 0 {

@@ -2333,7 +2333,7 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 	case slimPrompt:
 		prompt = buildPromptWithoutOptionalSummaries(db, in, brief, s.pocDir(), s.KBDir, s.Timeout, graphOK, focusOK, probes, s.ReviewsDisabled())
 		if in.Handoff != nil {
-			prompt += handoffSection(db, in, *in.Handoff, handoffAuth) + "\n\n" + handoffIndexNote
+			prompt += handoffSection(db, in, *in.Handoff, handoffAuth, s.ReviewsDisabled()) + "\n\n" + handoffIndexNote
 		}
 		s.noteContextSlimRetry(runID,
 			"harness 报告上下文超限：本次改用精简任务书（可选摘要省略，硬约束与交接契约保留；按本轮输入清单与 fact ID 读取）")
@@ -2341,7 +2341,7 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 		prompt = buildDispatchPrompt(db, in, brief, s.pocDir(), s.KBDir, s.Timeout, graphOK, focusOK,
 			s.readWorkerNote(workDir), probes, s.ReviewsDisabled())
 		if in.Handoff != nil {
-			prompt += handoffSection(db, in, *in.Handoff, handoffAuth) + "\n\n" + handoffIndexNote
+			prompt += handoffSection(db, in, *in.Handoff, handoffAuth, s.ReviewsDisabled()) + "\n\n" + handoffIndexNote
 		}
 	default:
 		// A continued session still holds the task it was started with, and that
@@ -2354,7 +2354,7 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 		current := buildDispatchPrompt(db, in, brief, s.pocDir(), s.KBDir, s.Timeout, graphOK, focusOK,
 			s.readWorkerNote(workDir), probes, s.ReviewsDisabled())
 		if in.Handoff != nil {
-			current += handoffSection(db, in, *in.Handoff, handoffAuth) + "\n\n" + handoffIndexNote
+			current += handoffSection(db, in, *in.Handoff, handoffAuth, s.ReviewsDisabled()) + "\n\n" + handoffIndexNote
 		}
 		prompt = continuationBriefHeader + current + "\n\n## 本轮续跑\n" + prompt
 	}
@@ -3555,12 +3555,24 @@ const unreportedLimit = 20
 // or a report whose validation failed is not a delivered citation, and letting
 // it vouch for its facts would hide exactly the gap this view exists to show.
 // The projection is a set difference, not a coverage claim.
-const unreportedNote = "只按已通过校验（status=ready）报告的 findings.json 里的 fact id 算差：命中即算已入，不判断该报告是否已过期，也不判断引用的是否为当前断言版本；没通过校验的报告的引用不算已入，单独列在 uncounted；没出现在名单里不代表结论未复核或报告有误。"
+const unreportedNote = "按「事实 ID + 断言版本」算差：只有已通过校验（status=ready）报告里的 fact_claim_version 与当前断言版本相同才算已收录；旧报告引用过 v1、事实已是 v2 时，本清单仍列出该事实并给出历史引用。没有版本信息的历史报告标为版本未知，不用当前状态倒推历史。没通过校验的报告的引用不算已入，单独列在 uncounted；没出现在名单里不代表结论未复核或报告有误。"
 
-// unreportedFact is one verified conclusion no report cites.
+// unreportedFact is one verified conclusion no delivered report cites at its
+// current claim version.
 type unreportedFact struct {
 	ID    string `json:"fact"`
 	Title string `json:"title"`
+	// Previous lists the delivered reports that cite this fact at another (or
+	// unknown) version. The gap is "v2 not covered", not "never mentioned".
+	Previous []reportCitationRef `json:"previous,omitempty"`
+}
+
+// reportCitationRef is one delivered report's citation of a fact. ClaimVersion
+// is zero for rows written before findings carried the assertion version; those
+// are version-unknown and never count as coverage of the current claim.
+type reportCitationRef struct {
+	Report       string `json:"report"`
+	ClaimVersion uint64 `json:"claim_version,omitempty"`
 }
 
 // reportPrecheck answers "what would the report contain right now" without
@@ -3594,18 +3606,29 @@ func (s *Server) reportPrecheck(w http.ResponseWriter, r *http.Request) {
 			verified = append(verified, f)
 		}
 	}
-	cited, unreadable, uncounted := s.reportFactCitations()
+	citations, unreadable, uncounted := s.reportFactCitations()
 	sort.Slice(verified, func(i, j int) bool { return verified[i].ID < verified[j].ID })
 	unreported := make([]unreportedFact, 0, len(verified))
 	for _, f := range verified {
-		if cited[f.ID] {
+		if citedAtClaim(citations[f.ID], f.ClaimVersion) {
 			continue
 		}
-		unreported = append(unreported, unreportedFact{ID: f.ID, Title: f.Title})
+		previous := citations[f.ID]
+		sort.SliceStable(previous, func(i, j int) bool { return previous[i].Report < previous[j].Report })
+		unreported = append(unreported, unreportedFact{ID: f.ID, Title: f.Title, Previous: previous})
 	}
 	total := len(unreported)
 	if len(unreported) > unreportedLimit {
 		unreported = unreported[:unreportedLimit]
+	}
+	unknownVersions := unknownVersionReports(citations)
+	// The polled precheck stays a light count. The full evidence check runs only
+	// when the operator asks to generate (`?evidence=1`), using the same rule the
+	// final generation uses, and names the evidence and the facts it supports.
+	var evidence *evidencePrecheck
+	if r.URL.Query().Get("evidence") == "1" {
+		missing, conflicts := report.EvidenceIssues(s.CaseRoot, db)
+		evidence = &evidencePrecheck{Checked: true, Missing: missing, Conflicts: conflicts}
 	}
 	writeJSON(w, 200, map[string]any{
 		"reportable":       reportable,
@@ -3614,20 +3637,33 @@ func (s *Server) reportPrecheck(w http.ResponseWriter, r *http.Request) {
 		"withdrawn":        withdrawn,
 		"running":          s.Reports != nil && s.Reports.Busy(),
 		"reviews_disabled": s.ReviewsDisabled(),
+		"evidence":         evidence,
 		"unreported": map[string]any{
-			"total":      total,
-			"limit":      unreportedLimit,
-			"items":      unreported,
-			"note":       unreportedNote,
-			"unreadable": unreadable,
-			"uncounted":  uncounted,
+			"total":                   total,
+			"limit":                   unreportedLimit,
+			"items":                   unreported,
+			"note":                    unreportedNote,
+			"unreadable":              unreadable,
+			"uncounted":               uncounted,
+			"unknown_version_reports": unknownVersions,
 		},
 	})
 }
 
-// reportFactCitations is the read-only half of the precheck: the fact ids a
-// delivered report's findings.json cites, the ids of reports whose rows could not
-// be read, and the ids of reports whose rows were readable but do not count.
+// evidencePrecheck is the on-demand evidence completeness answer. Checked
+// distinguishes "the scan ran and found nothing" from an older server that did
+// not answer the field at all.
+type evidencePrecheck struct {
+	Checked   bool                   `json:"checked"`
+	Missing   []report.EvidenceIssue `json:"missing,omitempty"`
+	Conflicts []report.EvidenceIssue `json:"conflicts,omitempty"`
+}
+
+// reportFactCitations is the read-only half of the precheck: every citation a
+// delivered report's findings.json makes, keyed by fact id and carrying the
+// assertion version the row was written against. Keeping the whole list — not a
+// set of fact ids — is what lets the precheck say "v1 is covered, v2 is not"
+// instead of treating a correction as already reported.
 //
 // A report that cannot be read is not treated as citing nothing — that would
 // report its facts as unreported when the opposite may be true — so it is named.
@@ -3636,8 +3672,8 @@ func (s *Server) reportPrecheck(w http.ResponseWriter, r *http.Request) {
 // fact reached a report. Counting them would let a failed check vouch for the
 // very facts it failed on, so they are listed separately instead of silently
 // dropped. A draft without rows yet is normal and not an error.
-func (s *Server) reportFactCitations() (cited map[string]bool, unreadable, uncounted []string) {
-	cited = map[string]bool{}
+func (s *Server) reportFactCitations() (byFact map[string][]reportCitationRef, unreadable, uncounted []string) {
+	byFact = map[string][]reportCitationRef{}
 	unreadable = make([]string, 0)
 	uncounted = make([]string, 0)
 	for _, m := range report.List(s.CaseRoot) {
@@ -3658,14 +3694,50 @@ func (s *Server) reportFactCitations() (cited map[string]bool, unreadable, uncou
 			continue
 		}
 		for _, row := range rows {
-			if row.Fact != "" {
-				cited[row.Fact] = true
+			if row.Fact == "" {
+				continue
 			}
+			byFact[row.Fact] = append(byFact[row.Fact], reportCitationRef{
+				Report: m.ID, ClaimVersion: row.FactClaimVersion,
+			})
 		}
 	}
 	sort.Strings(unreadable)
 	sort.Strings(uncounted)
-	return cited, unreadable, uncounted
+	return byFact, unreadable, uncounted
+}
+
+// citedAtClaim reports whether one fact is covered by a delivered report at the
+// exact assertion version. A zero version is unknown, not current: assuming it
+// matched would let a pre-version report vouch for an assertion it never read.
+func citedAtClaim(citations []reportCitationRef, claimVersion uint64) bool {
+	if claimVersion == 0 {
+		return false
+	}
+	for _, c := range citations {
+		if c.ClaimVersion == claimVersion {
+			return true
+		}
+	}
+	return false
+}
+
+// unknownVersionReports names the delivered reports that cite at least one fact
+// without a version. It is a set: the console shows the reports once, not once
+// per row.
+func unknownVersionReports(byFact map[string][]reportCitationRef) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0)
+	for _, citations := range byFact {
+		for _, c := range citations {
+			if c.ClaimVersion == 0 && !seen[c.Report] {
+				seen[c.Report] = true
+				out = append(out, c.Report)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 func (s *Server) getReport(w http.ResponseWriter, r *http.Request) {

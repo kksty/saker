@@ -245,7 +245,7 @@ func (s *Store) ListIntents() []model.Intent {
 	defer s.mu.RUnlock()
 	out := make([]model.Intent, len(s.db.Intents))
 	for i, in := range s.db.Intents {
-		out[i] = detachIntent(in)
+		out[i] = markIntentDoneReceipt(detachIntent(in), s.db.Facts)
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
 	return out
@@ -256,7 +256,7 @@ func (s *Store) GetIntent(id string) (model.Intent, bool) {
 	defer s.mu.RUnlock()
 	for _, in := range s.db.Intents {
 		if in.ID == id {
-			return detachIntent(in), true
+			return markIntentDoneReceipt(detachIntent(in), s.db.Facts), true
 		}
 	}
 	return model.Intent{}, false
@@ -1637,7 +1637,7 @@ func (db DB) clone() DB {
 	out.Actions = append([]model.ExternalAction(nil), db.Actions...)
 	out.Intents = append([]model.Intent(nil), db.Intents...)
 	for i := range out.Intents {
-		out.Intents[i] = detachIntent(out.Intents[i])
+		out.Intents[i] = markIntentDoneReceipt(detachIntent(out.Intents[i]), out.Facts)
 	}
 	out.Facts = append([]model.Fact(nil), db.Facts...)
 	for i := range out.Facts {

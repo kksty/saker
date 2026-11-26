@@ -385,6 +385,17 @@ export interface Intent {
   /** Runs cited as proof of the declared completion. */
   done_run_ids?: string[]
   done_at?: string
+  /** Claim version and review status each cited fact had when the direction was
+   *  declared done. The stored receipt is never moved by a later edit. */
+  done_fact_claims?: Record<string, number>
+  done_fact_statuses?: Record<string, string>
+  /** The settlement-time verdict: the cited facts were not all verified. */
+  done_unverified?: boolean
+  /** Read-side observation: a cited claim was corrected, withdrawn or rejected
+   *  after the receipt was written. The original note stays; the console asks for
+   *  re-confirmation instead of rewriting history. */
+  done_receipt_stale?: boolean
+  done_receipt_changed?: string[]
   created_at: string
   updated_at: string
 }
@@ -1681,6 +1692,9 @@ export interface ReportMeta {
  */
 export interface ReportFinding {
   fact: string
+  /** The assertion version the row described; absent on reports written before
+   *  citations carried a version (unknown, never assumed current). */
+  fact_claim_version?: number
   verdict: string
   title: string
   severity?: string
@@ -1698,11 +1712,21 @@ export interface VerifyPendingResult {
   skipped: number
 }
 
-/** One verified conclusion no delivered report cites yet (`unreported.items`). */
+/** One delivered report's citation of a fact. `claim_version` absent means the
+ *  report predates versioned citations and cannot vouch for the current claim. */
+export interface ReportCitationRef {
+  report: string
+  claim_version?: number
+}
+
+/** One verified conclusion no delivered report cites at its current claim
+ *  version (`unreported.items`). `previous` keeps the reports that cite an older
+ *  (or unknown) version, so "v2 not covered" is not shown as "never mentioned". */
 export interface ReportUnreportedFact {
   /** The fact id. The API names this key `fact`, not `id`. */
   fact: string
   title: string
+  previous?: ReportCitationRef[]
 }
 
 /**
@@ -1721,6 +1745,26 @@ export interface ReportUnreported {
   note?: string
   unreadable?: string[]
   uncounted?: string[]
+  /** Delivered reports whose citations carry no assertion version. Their rows
+   *  cannot count as coverage of the current claim. */
+  unknown_version_reports?: string[]
+}
+
+export interface ReportEvidenceIssue {
+  evidence?: string
+  uri?: string
+  fact_ids?: string[]
+  /** missing | digest_mismatch | unreadable | no_ledger_row */
+  kind: string
+  detail?: string
+}
+
+/** The on-demand completeness answer (`?evidence=1`). `checked` separates a
+ *  clean scan from a server that did not answer the field. */
+export interface ReportEvidencePrecheck {
+  checked: boolean
+  missing?: ReportEvidenceIssue[]
+  conflicts?: ReportEvidenceIssue[]
 }
 
 /** GET /p/<p>/api/reports/precheck, read before a report run starts.
@@ -1739,6 +1783,8 @@ export interface ReportPrecheck {
   withdrawn?: number
   running: boolean
   unreported?: ReportUnreported
+  /** Present only on the generation-time request (`?evidence=1`). */
+  evidence?: ReportEvidencePrecheck
 }
 
 /**

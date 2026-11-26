@@ -911,6 +911,9 @@ export const api = {
   // land, how many are still unverified (they can only be candidates), how many
   // are rejected, and whether a report is already being written (D100).
   reportPrecheck: () => get<ReportPrecheck>(`${pbase()}/api/reports/precheck`),
+  /** Generation-time check: the same evidence verification the report itself
+   *  runs, so a missing original or altered digest is shown before the run. */
+  reportPrecheckEvidence: () => get<ReportPrecheck>(`${pbase()}/api/reports/precheck?evidence=1`),
   createReport: () => post<{ queued: boolean; run_id: string }>(`${pbase()}/api/reports`),
   report: (id: string) => get<ReportMeta>(`${pbase()}/api/reports/${encodeURIComponent(id)}`),
   // A body is only served for a report that passed its own checks and still
