@@ -164,3 +164,35 @@ jev:
 		})
 	}
 }
+
+func TestSettingsPUTGuardrailAppliesConnectionWithoutEchoingSecrets(t *testing.T) {
+	// The summary previously had no write path. The actual operator route must
+	// save the judge while preserving the stored model and write-only secrets.
+	h := settingsHubWith(t, "")
+	put := func(body string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/settings/guardrail", strings.NewReader(body)))
+		return rec
+	}
+	before := h.settings.Effective()
+	if rec := put(`{"provider":"llm","llm_model":"judge"}`); rec.Code != http.StatusBadRequest {
+		t.Fatalf("incomplete judge = %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := put(`{"provider":"llm","llm_model":"judge","llm_base_url":"http://judge.test/v1","llm_api_key":"fixture-judge-secret"}`); rec.Code != http.StatusOK ||
+		!strings.Contains(rec.Body.String(), `"applied":"saved"`) || strings.Contains(rec.Body.String(), "fixture-judge-secret") {
+		t.Fatalf("save = %d %s", rec.Code, rec.Body.String())
+	}
+	if got := h.settings.Effective(); got != before {
+		t.Fatalf("saving the judge changed the primary model: %+v", got)
+	}
+	if rec := put(`{"provider":"llm","llm_model":"judge-two"}`); rec.Code != http.StatusOK {
+		t.Fatalf("update = %d %s", rec.Code, rec.Body.String())
+	}
+	if got := h.settings.GuardrailPolicy(); !got.Configured || got.LLM.Model != "judge-two" || got.LLM.BaseURL != "http://judge.test/v1" {
+		t.Fatalf("stored policy = %+v", got)
+	}
+	saved, err := os.ReadFile(h.settings.Path())
+	if err != nil || !strings.Contains(string(saved), "fixture-judge-secret") {
+		t.Fatalf("write-only judge credential did not survive update: %v", err)
+	}
+}

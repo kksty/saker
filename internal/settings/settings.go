@@ -418,12 +418,9 @@ type View struct {
 	SearchKeyCount int                  `json:"search_key_count,omitempty"`
 	ProductError   string               `json:"product_error,omitempty"`
 
-	// Guardrail is the read-only tool-admission policy summary (the guardrail /
-	// jev sections). It is never written by the settings API: the
-	// operator edits those sections directly, and the console only reports
-	// whether admission is in effect, fail-open, or shadowing.
-	Guardrail GuardrailPolicyView `json:"guardrail"`
-	Gateway   GatewayView         `json:"gateway"`
+	Guardrail         GuardrailPolicyView `json:"guardrail"`
+	GuardrailEditable bool                `json:"guardrail_editable"`
+	Gateway           GatewayView         `json:"gateway"`
 
 	// TrafficBodyRetentionBytes is the explicit scan capture-directory retention
 	// override in bytes, or 0 when the operator has not set one. GET reports 0 for
@@ -482,6 +479,7 @@ func (s *Store) View() View {
 		v.SearchKeyCount = product.SearchKeyCount
 	}
 	v.Guardrail = s.GuardrailPolicy()
+	v.GuardrailEditable = s.harness != "" && v.HarnessError == ""
 	v.Gateway = s.gatewayView()
 	retention := s.TrafficRetention()
 	// The wire value is the explicit override or 0: GET must not make the

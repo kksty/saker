@@ -2053,6 +2053,15 @@ export interface SettingsGuardrailSummary {
   reason?: string
 }
 
+export interface SettingsGuardrailInput {
+  provider: string
+  llm_base_url?: string
+  llm_model?: string
+  llm_api_key?: string
+  jev_base_url?: string
+  jev_api_key?: string
+}
+
 /** Instance-level LLM configuration; the key itself is never returned. */
 export interface SettingsView {
   base_url: string
@@ -2091,6 +2100,7 @@ export interface SettingsView {
   traffic_body_retention_bytes?: number
   /** Read-only judge summary (absent on servers that predate the projection). */
   guardrail?: SettingsGuardrailSummary
+  guardrail_editable?: boolean
   gateway?: { instances: number; enabled: number; proxy_configured: boolean; reason?: string }
 }
 

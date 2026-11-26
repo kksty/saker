@@ -137,6 +137,7 @@ type hub struct {
 	// Runtime patches merge omitted fields with the last save. Keep the read,
 	// persistence and live concurrency update in the same critical section.
 	runtimeSettingsMu sync.Mutex
+	settingsApplyMu   sync.Mutex
 
 	// ioaClients are per host: the embedded IOA server is on the same endpoint
 	// as AOP, but its space/sender/target ids are resolved lazily and cached.
@@ -868,6 +869,8 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"version": buildVersion})
 	case r.URL.Path == "/api/settings":
 		h.serveSettings(w, r)
+	case r.URL.Path == "/api/settings/guardrail":
+		h.serveGuardrailSettings(w, r)
 	case r.URL.Path == "/api/runtime-settings":
 		h.serveRuntimeSettings(w, r)
 	case r.URL.Path == "/api/models":
@@ -929,6 +932,8 @@ func (h *hub) serveSettings(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		writeJSON(w, http.StatusOK, h.settings.View())
 	case http.MethodPut:
+		h.settingsApplyMu.Lock()
+		defer h.settingsApplyMu.Unlock()
 		var in settings.View
 		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求体不是 JSON"})

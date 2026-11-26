@@ -80,6 +80,7 @@ import type {
   RuntimeSettings,
   SettingsCheck,
   SettingsView,
+  SettingsGuardrailInput,
   ToolsResponse,
   RuntimeToolsResponse,
   UsageSummary,
@@ -395,6 +396,7 @@ export const api = {
   // run read them, so they are not under /p/<id>/.
   settings: () => get<SettingsView>('/api/settings'),
   saveSettings: (body: Partial<SettingsView>) => put<SettingsView>('/api/settings', body),
+  saveGuardrail: (body: SettingsGuardrailInput) => put<SettingsView>('/api/settings/guardrail', body),
   // The instance-level gate shared by verifier and report runs. It is not a
   // project setting: one value bounds every project's auxiliary calls.
   runtimeSettings: () => get<RuntimeSettings>('/api/runtime-settings'),

@@ -77,7 +77,10 @@ export function SettingsPage() {
       <ReviewDefaultPanel runtime={runtime} />
       <RuntimeConcurrencyPanel runtime={runtime} />
       <TrafficRetentionPanel settings={settings} />
-      {settings.data?.guardrail && <GuardrailPolicyCard guardrail={settings.data.guardrail} />}
+      {settings.data?.guardrail && <GuardrailPolicyCard
+       guardrail={settings.data.guardrail}
+       onSaved={settings.data.guardrail_editable ? settings.setData : undefined}
+      />}
      </div>
     </section>
    </div>
@@ -105,7 +108,7 @@ function GatewayStatus({ gateway }: { gateway: NonNullable<SettingsView['gateway
       <dd className="text-ink-2">{gateway.instances === 0 ? '未配置' : `${gateway.instances} 个实例，${gateway.enabled} 个启用`}</dd>
      </div>
      <div>
-      <dt className="text-ink-3">Cyberhub 代理</dt>
+      <dt className="text-ink-3">Cyberhub 代理（工具出站）</dt>
       <dd className="text-ink-2">{gateway.proxy_configured ? '已配置' : '未指定'}</dd>
      </div>
     </dl>

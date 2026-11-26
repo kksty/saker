@@ -75,6 +75,33 @@ test('settings shows saved gateway and proxy configuration', async () => {
   assert.match(page, /已保存配置 · 只读/)
 })
 
+test('guardrail settings can save a judge and display the saved outcome', async () => {
+  // The settings page previously exposed only the read-only summary even when
+  // the operator needed to enable a judge. Exercise the form and API boundary.
+  const original = await mountSettings({ guardrail_editable: true, guardrail: { provider: 'none', configured: false } })
+  await act(async () => renderer!.root.findByType('select').props.onChange({ target: { value: 'llm' } }))
+  assert.ok(renderer!.root.findAllByType('input').some(node => node.props.name === 'llm_model'))
+  const writes: unknown[] = []
+  api.saveGuardrail = async (body: unknown) => {
+    writes.push(body)
+    return { ...original, guardrail: { provider: 'llm', configured: true }, applied: 'restart' }
+  }
+  const previous = globalThis.FormData
+  let reset = false
+  try {
+    globalThis.FormData = class {
+      entries() { return [['llm_base_url', 'http://fixture.test/v1'], ['llm_model', 'judge'], ['llm_api_key', 'fixture-key']] }
+    } as unknown as typeof FormData
+    const form = renderer!.root.findAllByType('form').find(node => node.findAllByType('input').some(input => input.props.name === 'llm_model'))!
+    await act(async () => form.props.onSubmit({ preventDefault() {}, currentTarget: { reset() { reset = true } } }))
+  } finally {
+    globalThis.FormData = previous
+  }
+  assert.deepEqual(writes, [{ provider: 'llm', llm_base_url: 'http://fixture.test/v1', llm_model: 'judge', llm_api_key: 'fixture-key' }])
+  assert.ok(reset)
+  assert.match(JSON.stringify(renderer!.toJSON()), /正在按新配置重启/)
+})
+
 test('a detected model can be selected before explicitly saving it', async () => {
   const original = await mountSettings()
   api.checkModel = async () => ({ available: true, source: 'host', returned_model: 'route', models: ['route', 'gateway/second'] })

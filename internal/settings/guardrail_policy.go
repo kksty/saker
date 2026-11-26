@@ -5,8 +5,7 @@ package settings
 // The console has to be able to say whether tool admission is actually in
 // effect, whether a judge failure fails open, and whether a shadow rollout is
 // silently allowing everything. That answer lives in the operator's cyber.yaml
-// (the flat `guardrail` and `jev` sections), which the control plane never
-// edits: this file only reads it.
+// (the flat `guardrail` and `jev` sections).
 //
 // The shape follows the harness fork's pluggable-judge configuration:
 //
@@ -81,14 +80,18 @@ var guardrailSectionKeys = map[string]bool{
 // read: no file is written, no host is contacted, and every credential stays
 // out of the returned value.
 func (s *Store) GuardrailPolicy() GuardrailPolicyView {
+	_, doc, err := s.readDocument()
+	if err == nil {
+		return guardrailPolicy(doc)
+	}
+	view := guardrailPolicy(nil)
+	view.Reason = "无法读取 harness 配置，守门状态未知"
+	return view
+}
+
+func guardrailPolicy(doc *yaml.Node) GuardrailPolicyView {
 	view := GuardrailPolicyView{
 		Provider: "none", Mode: "auto", Scope: []string{},
-		JEVConfigured: jevKeyConfigured(nil),
-	}
-	_, doc, err := s.readDocument()
-	if err != nil {
-		view.Reason = "无法读取 harness 配置，守门状态未知"
-		return view
 	}
 	guardrailNode := sectionNode(doc, "guardrail")
 	jevNode := sectionNode(doc, "jev")

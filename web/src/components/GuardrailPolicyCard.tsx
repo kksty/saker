@@ -1,6 +1,8 @@
+import { useRef, useState, type FormEvent } from 'react'
 import { ShieldCheck, ShieldOff, TriangleAlert } from 'lucide-react'
-import { Badge, Callout } from '@cyber/ui'
+import { Badge, Button, Callout, Input } from '@cyber/ui'
 import { Panel } from '@/components/Page'
+import { ApiError, api } from '@/lib/api'
 import {
   guardrailAllowPrefixesExplainText,
   guardrailAllowPrefixesSummary,
@@ -13,15 +15,12 @@ import {
   guardrailScopeExplainText,
   guardrailScopeSummary,
   guardrailUsesLLM,
+  settingsApplyNotice,
 } from '@/lib/settings'
-import type { SettingsGuardrailSummary } from '@/lib/types'
+import type { SettingsGuardrailSummary, SettingsView } from '@/lib/types'
 
 /**
- * Read-only summary of the operator's `guardrail` policy.
- *
- * The settings page does not edit the judge (the operator writes the section in
- * cyber.yaml directly), so this card only reports what is in effect — and, just
- * as important, how to read it:
+ * Summary of the saved `guardrail` policy and its judge connection.
  *
  *  - provider none / configured=false is "守门未启用" in neutral grey — a
  *    configuration state, not an error; JEV is optional (llm-only is valid);
@@ -35,7 +34,10 @@ import type { SettingsGuardrailSummary } from '@/lib/types'
  *  - JEV/LLM show only whether they are configured (plus model/base_url), never
  *    a key.
  */
-export function GuardrailPolicyCard({ guardrail }: { guardrail?: SettingsGuardrailSummary }) {
+export function GuardrailPolicyCard({ guardrail, onSaved }: {
+  guardrail?: SettingsGuardrailSummary
+  onSaved?: (view: SettingsView) => void
+}) {
   // An older server has no guardrail projection at all: render nothing instead
   // of inventing a "not configured" state that could be wrong.
   if (!guardrail) return null
@@ -45,7 +47,7 @@ export function GuardrailPolicyCard({ guardrail }: { guardrail?: SettingsGuardra
   return (
     <Panel
       title="守门策略"
-      extra={<Badge variant="outline" size="sm">只读 · cyber.yaml guardrail</Badge>}
+      extra={<Badge variant="outline" size="sm">{onSaved ? '已保存配置' : '只读'} · cyber.yaml guardrail</Badge>}
       bodyClassName="space-y-3"
       data-testid="guardrail-policy"
     >
@@ -57,7 +59,7 @@ export function GuardrailPolicyCard({ guardrail }: { guardrail?: SettingsGuardra
         )}
         <Badge size="sm" variant={flags.enabled ? 'success' : 'muted'}>{flags.label}</Badge>
         {flags.shadow && <Badge size="sm" variant="info">影子模式：只判定不拦截</Badge>}
-        <span className="text-[11px] text-ink-3">控制台只读展示，配置由操作员直接写在 cyber.yaml。</span>
+        {!onSaved && <span className="text-[11px] text-ink-3">配置由操作员直接写在 cyber.yaml。</span>}
       </div>
 
       {!flags.enabled && guardrail.reason && <Callout tone="info">{guardrail.reason}</Callout>}
@@ -140,6 +142,91 @@ export function GuardrailPolicyCard({ guardrail }: { guardrail?: SettingsGuardra
       {flags.failOpen && (
         <p className="text-[11px] leading-relaxed text-ink-3">{guardrailFailOpenText}</p>
       )}
+      {onSaved && <GuardrailConnection guardrail={guardrail} onSaved={onSaved} />}
     </Panel>
   )
+}
+
+function GuardrailConnection({ guardrail, onSaved }: {
+  guardrail: SettingsGuardrailSummary
+  onSaved: (view: SettingsView) => void
+}) {
+  const activeProvider = guardrail.provider !== 'none' ? guardrail.provider : ''
+  const [selected, setSelected] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState<ReturnType<typeof settingsApplyNotice>>(null)
+  const [error, setError] = useState('')
+  const saving = useRef(false)
+  const provider = activeProvider || selected
+  const usesLLM = guardrailUsesLLM(provider)
+  const usesJEV = provider === 'jev' || provider === 'hybrid'
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (saving.current || !provider) return
+    const form = event.currentTarget
+    const values = Object.fromEntries(new FormData(form).entries())
+    saving.current = true
+    setBusy(true)
+    setError('')
+    setNotice(null)
+    try {
+      const next = await api.saveGuardrail({ ...values, provider })
+      onSaved(next)
+      form.reset()
+      setNotice(settingsApplyNotice(next) ?? { tone: 'info', text: '配置与已保存内容一致。' })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (err instanceof ApiError && err.code === 'settings_saved_apply_failed' &&
+          err.body && typeof err.body === 'object' && 'settings' in err.body) {
+        onSaved(err.body.settings as SettingsView)
+        form.reset()
+        setNotice({ tone: 'warning', text: message })
+      } else if (err instanceof ApiError && err.status < 500) {
+        setError(message)
+      } else {
+        setError(`保存结果未确认。${message}`)
+      }
+    } finally {
+      saving.current = false
+      setBusy(false)
+    }
+  }
+
+  return <form onSubmit={save} className="space-y-3 border-t border-hairline pt-3">
+    <fieldset disabled={busy} className="grid gap-2 sm:grid-cols-2">
+      {!activeProvider && <label className="grid gap-1 text-xs text-ink-2 sm:col-span-2">
+        审批裁判
+        <select value={selected} onChange={event => setSelected(event.target.value)} className="h-9 rounded-md border border-hairline bg-surface-2 px-2 text-ink">
+          <option value="">请选择</option>
+          <option value="llm">LLM</option>
+          <option value="jev">JEV</option>
+          <option value="hybrid">LLM + JEV</option>
+        </select>
+      </label>}
+      {usesLLM && <>
+        <label className="grid gap-1 text-xs text-ink-2">LLM 裁判端点
+          <Input name="llm_base_url" type="url" placeholder={guardrail.llm?.base_url || 'https://example.com/v1'} required={!guardrail.llm?.base_url} />
+        </label>
+        <label className="grid gap-1 text-xs text-ink-2">LLM 裁判模型
+          <Input name="llm_model" placeholder={guardrail.llm?.model || '模型名称'} required={!guardrail.llm?.model} />
+        </label>
+        <label className="grid gap-1 text-xs text-ink-2 sm:col-span-2">LLM 裁判 API Key
+          <Input name="llm_api_key" type="password" autoComplete="new-password" placeholder="选填，留空保留已保存的凭据" />
+        </label>
+      </>}
+      {usesJEV && <>
+        <label className="grid gap-1 text-xs text-ink-2">JEV 端点
+          <Input name="jev_base_url" type="url" placeholder={guardrail.jev_custom_endpoint ? '留空保留自定义端点' : '留空使用默认端点'} />
+        </label>
+        <label className="grid gap-1 text-xs text-ink-2">JEV API Key
+          <Input name="jev_api_key" type="password" autoComplete="new-password" placeholder={guardrail.jev_configured ? '留空保留已配置的凭据' : '输入 JEV API Key'} required={!guardrail.jev_configured} />
+        </label>
+      </>}
+    </fieldset>
+    <p className="text-[11px] text-ink-3">留空的字段保留原值。配置变更会重启本机宿主并结束其当前会话。</p>
+    <Button type="submit" size="sm" disabled={busy || !provider}>{busy ? '保存中…' : '保存并应用守门策略'}</Button>
+    {error && <Callout tone="destructive">{error}</Callout>}
+    {notice && <Callout tone={notice.tone}>{notice.text}</Callout>}
+  </form>
 }
