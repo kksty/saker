@@ -20,7 +20,7 @@ import (
 //
 // The type name is a wire contract with another process; see
 // WorkDirExtensionURL for why it is not renamed with the product.
-const RunGoalExtensionURL = "type.googleapis.com/tianwu.RunGoal"
+const RunGoalExtensionURL = "type.googleapis.com/saker.RunGoal"
 
 type runGoalPayload struct {
 	Goal string `json:"goal"`

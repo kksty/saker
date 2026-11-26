@@ -23,7 +23,7 @@ type isolatedWorkflowExec struct{}
 
 func (isolatedWorkflowExec) Name() string { return "isolated-workflow" }
 func (isolatedWorkflowExec) Run(_ context.Context, req executor.Request, emit func(executor.Event)) (executor.Result, error) {
-	if err := os.MkdirAll(filepath.Join(req.WorkDir, ".tw"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(req.WorkDir, ".saker"), 0700); err != nil {
 		return executor.Result{}, err
 	}
 	emit(executor.Event{Kind: executor.KindToolCall, Tool: "fixture_write"})
@@ -31,7 +31,7 @@ func (isolatedWorkflowExec) Run(_ context.Context, req executor.Request, emit fu
 		return executor.Result{}, err
 	}
 	body, _ := json.Marshal(map[string]any{"kind": "vuln", "declaration_id": "output", "title": "isolated result " + req.IntentID, "summary": "fixture observation", "evidence": []string{"proof.txt"}})
-	if err := os.WriteFile(filepath.Join(req.WorkDir, ".tw", "facts.jsonl"), append(body, '\n'), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(req.WorkDir, ".saker", "facts.jsonl"), append(body, '\n'), 0600); err != nil {
 		return executor.Result{}, err
 	}
 	emit(executor.Event{Kind: executor.KindToolResult, Tool: "fixture_write", OK: executor.BoolPtr(true)})

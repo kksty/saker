@@ -292,7 +292,7 @@ func (s *Server) notifyCommanderOfResolvedRequest(ctx context.Context, out model
 		text += "（" + action + "）"
 	}
 	text += "。处理说明：" + strings.TrimSpace(out.Resolution) + "。"
-	text += "请求只是待办，不阻塞其他方向：按项目文档与当前账本判断下一步，其它可推进方向照常派发；需要更多授权时再登记一条具体请求。"
+	text += "请求只是待办，不阻塞其他意图：按项目文档与当前账本判断下一步，其它可推进意图照常派发；需要更多授权时再登记一条具体请求。"
 	msg, _, err := s.Store.AddMessage(model.Message{
 		ProjectID:         s.projectID(),
 		FromParticipantID: collab.OperatorID,

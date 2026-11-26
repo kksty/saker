@@ -215,7 +215,7 @@ func TestCommanderMessageDeliveryIsJournaled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir := filepath.Join(f.srv.CommanderDir(), ".tw")
+	dir := filepath.Join(f.srv.CommanderDir(), ".saker")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}

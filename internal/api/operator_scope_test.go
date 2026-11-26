@@ -79,7 +79,7 @@ func withAgentSurface(req *http.Request) *http.Request {
 }
 
 func withCommanderActorClaim(req *http.Request) *http.Request {
-	req.Header.Set("X-Tw-Actor", collab.CommanderID)
+	req.Header.Set("X-Saker-Actor", collab.CommanderID)
 	return req
 }
 

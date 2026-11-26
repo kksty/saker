@@ -52,7 +52,7 @@ func TestProjectDeletionRevokesTheCommanderIdentity(t *testing.T) {
 	if _, _, err := srv.StartCommander(context.Background(), "## 本轮\n\n## board\n{}\n", false); err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile(filepath.Join(filepath.Dir(p.CaseDir), "commander", ".tw", "identity.json"))
+	raw, err := os.ReadFile(filepath.Join(filepath.Dir(p.CaseDir), "commander", ".saker", "identity.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

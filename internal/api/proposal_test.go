@@ -45,7 +45,7 @@ func proposalTestRequest(method, path string, body any, id *collab.Identity, com
 	}
 	if commander {
 		ctx = WithAgentSurface(ctx)
-		req.Header.Set("X-Tw-Actor", collab.CommanderID)
+		req.Header.Set("X-Saker-Actor", collab.CommanderID)
 	}
 	return req.WithContext(ctx)
 }

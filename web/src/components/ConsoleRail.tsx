@@ -52,7 +52,7 @@ export function ConsoleRail({ title, active, context, children, footer }: {
   return <>
     <SkipLink />
     <header className="saker-rail flex h-[52px] shrink-0 items-center justify-between border-b border-hairline px-3.5 lg:hidden">
-      <Brand />
+      <Brand cap={16} />
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild><Button size="sm" variant="outline" className="gap-1.5" aria-label="打开导航"><Menu className="h-4 w-4" />导航</Button></SheetTrigger>
         <SheetContent side="left" closeLabel="关闭导航" className="saker-rail flex w-[280px] max-w-[85vw] flex-col gap-0 overscroll-contain p-0" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }} onClick={event => {

@@ -1,11 +1,11 @@
 // Preserved-media events (kind=media): the journal row's Text is a case-relative
-// path below .tw/media (see internal/aopexec/media.go). The console reads it
+// path below .saker/media (see internal/aopexec/media.go). The console reads it
 // back through GET /api/runs/{id}/media/{name}, whose handler only accepts one
 // plain file name — so the path is reduced to its basename here.
 
 export type MediaKind = 'image' | 'audio' | 'video' | 'pdf' | 'text' | 'other'
 
-const mediaPath = /(?:^|\/)\.tw\/media\/([A-Za-z0-9._-]+)\s*$/
+const mediaPath = /(?:^|\/)\.saker\/media\/([A-Za-z0-9._-]+)\s*$/
 
 /**
  * The generated media file name from a journal path, or '' when the text is not

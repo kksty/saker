@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Build the rc10 Hub + scan node from the independent tianwu/fixes fork.
+# Build the rc10 Hub + scan node from the independent saker/fixes fork.
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -12,8 +12,8 @@ command -v go >/dev/null 2>&1 || {
 
 [ -f "$harness/go.mod" ] || {
   echo "找不到 $harness/go.mod：本仓库不内置 harness/" >&2
-  echo "先单独 clone kksty/cyber-harness 的 tianwu/fixes，再用 HARNESS_DIR 指过去：" >&2
-  echo "  git clone --branch tianwu/fixes https://github.com/kksty/cyber-harness.git .build/harness-src" >&2
+  echo "先单独 clone kksty/cyber-harness 的 saker/fixes，再用 HARNESS_DIR 指过去：" >&2
+  echo "  git clone --branch saker/fixes https://github.com/kksty/cyber-harness.git .build/harness-src" >&2
   echo "  HARNESS_DIR=.build/harness-src ./scripts/build-harness.sh" >&2
   exit 1
 }

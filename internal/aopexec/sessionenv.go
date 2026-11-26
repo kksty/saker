@@ -10,7 +10,7 @@ import (
 )
 
 // sessionToolEnv computes the environment a session's shell needs to reach the
-// control plane, from the case directory's .tw state the dispatcher already
+// control plane, from the case directory's .saker state the dispatcher already
 // writes for the turn. The values are absolute: the host has no reliable notion
 // of the control-plane base, and asking the model to walk up from $PWD is what
 // produced guessed URLs and the 404 storm.
@@ -22,8 +22,8 @@ func sessionToolEnv(caseDir string) map[string]string {
 	if strings.TrimSpace(caseDir) == "" {
 		return nil
 	}
-	twDir := filepath.Join(caseDir, ".tw")
-	raw, err := os.ReadFile(filepath.Join(twDir, "identity.json"))
+	handoffDir := filepath.Join(caseDir, ".saker")
+	raw, err := os.ReadFile(filepath.Join(handoffDir, "identity.json"))
 	if err != nil {
 		return nil
 	}
@@ -48,11 +48,11 @@ func sessionToolEnv(caseDir string) map[string]string {
 		"SAKER_BATTLE":                 api + "/p/" + project + "/api",
 		aop.DisableNativeIOASendEnv: "1",
 	}
-	// .tw/auth holds the ready-to-use "Authorization: Bearer …" line, which is
+	// .saker/auth holds the ready-to-use "Authorization: Bearer …" line, which is
 	// exactly what $SAKER_AUTH is documented to be. Reading it (instead of the raw
 	// token in identity.json) keeps the shell contract identical to the init
 	// script's fallback.
-	if auth, err := os.ReadFile(filepath.Join(twDir, "auth")); err == nil {
+	if auth, err := os.ReadFile(filepath.Join(handoffDir, "auth")); err == nil {
 		if line := strings.TrimSpace(string(auth)); line != "" {
 			env["SAKER_AUTH"] = line
 		}

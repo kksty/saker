@@ -25,7 +25,7 @@ import (
 //   - The command line has no `agent` subcommand: a one-shot audit is
 //     `--workdir … --report-dir … -p … --output-format stream-json`.
 //   - The product is a report directory (findings.json, coverage.json, index.md,
-//     evidence/…), not a `.tw/facts.jsonl` handoff. The ledger only reads the
+//     evidence/…), not a `.saker/facts.jsonl` handoff. The ledger only reads the
 //     handoff, so this executor translates the report the same way a human
 //     would: confirmed/candidate findings become vuln facts, inconclusive ones
 //     become notes, dismissed ones are dropped, and every cited evidence file
@@ -49,7 +49,7 @@ func (a Audit) Name() string { return "audit" }
 const AuditReportPrefix = "audit-"
 
 // AuditPromptFile keeps the task off argv for the same reason as PromptFile.
-const AuditPromptFile = ".tw/audit-prompt.txt"
+const AuditPromptFile = ".saker/audit-prompt.txt"
 
 func (a Audit) Run(ctx context.Context, req Request, emit func(Event)) (Result, error) {
 	if strings.TrimSpace(a.Bin) == "" {
@@ -235,7 +235,7 @@ func importAuditFacts(workDir, report string) (total, imported int, err error) {
 		return total, 0, nil
 	}
 
-	dir := filepath.Join(workDir, ".tw")
+	dir := filepath.Join(workDir, ".saker")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return total, 0, err
 	}

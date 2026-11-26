@@ -134,7 +134,7 @@ function SettingsTabs({ tab, onTab }: { tab: SettingsTab; onTab: (tab: SettingsT
 }
 
 /**
- * The cyber-ui <Field> is a label wrapper with an implicit association; these
+ * The <Field> from web/packages/ui is a label wrapper with an implicit association; these
  * settings fields need explicit for/id plus hint and error ids so the control's
  * `aria-describedby` can point at the hint and only at the error while it is
  * shown. Same type ramp and spacing as Field, so the panel keeps its look.

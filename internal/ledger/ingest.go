@@ -1,7 +1,7 @@
 // Package ledger turns raw executor events into ledger records.
 //
 // Since D18 the executor is expected to declare its own facts in
-// <workdir>/.tw/facts.jsonl. The event stream is still useful for the run log,
+// <workdir>/.saker/facts.jsonl. The event stream is still useful for the run log,
 // but it is a poor fact source: guessing facts out of tool arguments is how a
 // board fills up with `bash -c ...`. What remains here are the derived records
 // the ledger can prove by looking at the filesystem.

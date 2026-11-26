@@ -51,7 +51,7 @@ func TestPreserveMediaWritesMessageImage(t *testing.T) {
 	if len(medias) != 1 {
 		t.Fatalf("preserved %d media, want 1: %+v", len(medias), medias)
 	}
-	want := ".tw/media/evt-1-0.png"
+	want := ".saker/media/evt-1-0.png"
 	if medias[0].Path != want {
 		t.Fatalf("path = %q, want %q", medias[0].Path, want)
 	}
@@ -82,8 +82,8 @@ func TestPreserveMediaWritesToolResultAndNestedMedia(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PreserveMedia: %v", err)
 	}
-	if len(medias) != 1 || medias[0].Path != ".tw/media/evt-2-0.wav" {
-		t.Fatalf("tool_result media = %+v, want .tw/media/evt-2-0.wav", medias)
+	if len(medias) != 1 || medias[0].Path != ".saker/media/evt-2-0.wav" {
+		t.Fatalf("tool_result media = %+v, want .saker/media/evt-2-0.wav", medias)
 	}
 
 	nested := messageEvent("evt-3", &pb.Content{Value: &pb.Content_ToolResult{ToolResult: &pb.ToolResult{
@@ -94,10 +94,10 @@ func TestPreserveMediaWritesToolResultAndNestedMedia(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nested PreserveMedia: %v", err)
 	}
-	if len(medias) != 1 || medias[0].Path != ".tw/media/evt-3-0.bin" {
-		t.Fatalf("nested tool_result media = %+v, want .tw/media/evt-3-0.bin", medias)
+	if len(medias) != 1 || medias[0].Path != ".saker/media/evt-3-0.bin" {
+		t.Fatalf("nested tool_result media = %+v, want .saker/media/evt-3-0.bin", medias)
 	}
-	if data, err := os.ReadFile(filepath.Join(workdir, ".tw", "media", "evt-3-0.bin")); err != nil || string(data) != "raw" {
+	if data, err := os.ReadFile(filepath.Join(workdir, ".saker", "media", "evt-3-0.bin")); err != nil || string(data) != "raw" {
 		t.Fatalf("nested media bytes = %q, %v", data, err)
 	}
 }
@@ -117,7 +117,7 @@ func TestPreserveMediaSkipsURIOnlyResource(t *testing.T) {
 	if len(medias) != 0 {
 		t.Fatalf("URI-only resource was written: %+v", medias)
 	}
-	if _, err := os.Stat(filepath.Join(workdir, ".tw", "media")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(workdir, ".saker", "media")); !os.IsNotExist(err) {
 		t.Fatalf("media dir created without bytes: %v", err)
 	}
 }
@@ -164,16 +164,16 @@ func TestPreserveMediaEnforcesItemAndTotalLimits(t *testing.T) {
 	if _, err := PreserveMedia(workdir, huge); err == nil {
 		t.Fatal("over MaxMediaBytes media was accepted")
 	}
-	if _, err := os.Stat(filepath.Join(workdir, ".tw", "media", "evt-8-0.png")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(workdir, ".saker", "media", "evt-8-0.png")); !os.IsNotExist(err) {
 		t.Fatalf("oversized media was written: %v", err)
 	}
 }
 
 // A bad workdir must return an error, not panic or half-write outside the case:
-// here .tw is a regular file, so the media directory cannot be created.
+// here .saker is a regular file, so the media directory cannot be created.
 func TestPreserveMediaReportsUnwritableWorkdir(t *testing.T) {
 	workdir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(workdir, ".tw"), []byte("not a directory"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(workdir, ".saker"), []byte("not a directory"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	ev := messageEvent("evt-9", mediaContent("image", "image/png", "", []byte("x")))
@@ -187,7 +187,7 @@ func TestPreserveMediaReportsUnwritableWorkdir(t *testing.T) {
 }
 
 // The event id is protocol data: path separators and "." segments must not let a
-// medium escape <workdir>/.tw/media.
+// medium escape <workdir>/.saker/media.
 func TestPreserveMediaSanitizesEventID(t *testing.T) {
 	workdir := t.TempDir()
 	ev := messageEvent(`../../evil\id`, mediaContent("image", "image/png", "", []byte("x")))

@@ -63,7 +63,7 @@ func TestCommanderStandbyPausesProjectAndSparesTheAskingRound(t *testing.T) {
 	// The gate stamps this header for the shared harness credential; the handler
 	// additionally proves the caller is a commander and that a commander round is
 	// live (see the negative cases below).
-	req.Header.Set("X-Tw-Actor", collab.CommanderID)
+	req.Header.Set("X-Saker-Actor", collab.CommanderID)
 	req = req.WithContext(WithAgentSurface(req.Context()))
 	rec = do(req)
 	if rec.Code != http.StatusOK {
@@ -161,7 +161,7 @@ func TestCommanderStandbyPausesProjectAndSparesTheAskingRound(t *testing.T) {
 
 // The commander's global stop is a declared role action, not a credential every
 // harness session may use: the handler needs a commander attribution (the auth
-// gate stamps X-Tw-Actor for the shared harness credential; a commander
+// gate stamps X-Saker-Actor for the shared harness credential; a commander
 // participant identity also counts) and a live commander round. This is a
 // declarative boundary for a trusted internal session, not a sandbox (D78).
 func TestProjectStandbyRequiresCommanderDeclaration(t *testing.T) {
@@ -215,7 +215,7 @@ func TestProjectStandbyRequiresLiveCommanderRound(t *testing.T) {
 	mux := http.NewServeMux()
 	s.Register(mux)
 	req := standbyRequest(t, `{"reason":"没有在跑的轮次"}`)
-	req.Header.Set("X-Tw-Actor", collab.CommanderID)
+	req.Header.Set("X-Saker-Actor", collab.CommanderID)
 	req = req.WithContext(WithAgentSurface(req.Context()))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -251,7 +251,7 @@ func TestCommanderStandbyGoalAchievedRequiresMetGoal(t *testing.T) {
 	}
 	stop := func(body string) *httptest.ResponseRecorder {
 		req := standbyRequest(t, body)
-		req.Header.Set("X-Tw-Actor", collab.CommanderID)
+		req.Header.Set("X-Saker-Actor", collab.CommanderID)
 		req = req.WithContext(WithAgentSurface(req.Context()))
 		return do(req)
 	}

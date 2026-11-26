@@ -43,7 +43,7 @@ func newFixture(t *testing.T) *fixture {
 	for _, dir := range []string{
 		filepath.Join(dataDir, "runs"),
 		filepath.Join(dataDir, "projects", "p1", "runs"),
-		filepath.Join(dataDir, "projects", "p1", "cases", "in_x", ".tw"),
+		filepath.Join(dataDir, "projects", "p1", "cases", "in_x", ".saker"),
 	} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
@@ -84,7 +84,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	// Things the tool must never touch: case evidence and the ledger.
-	if err := os.WriteFile(filepath.Join(dataDir, "projects", "p1", "cases", "in_x", ".tw", "facts.jsonl"),
+	if err := os.WriteFile(filepath.Join(dataDir, "projects", "p1", "cases", "in_x", ".saker", "facts.jsonl"),
 		[]byte(`{"title":"evidence","detail":"`+testMainKey+`"}`+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +246,7 @@ func TestWeirdSecretStaysValidJSON(t *testing.T) {
 // contain the same secret.
 func TestCaseEvidenceAndLedgerUntouched(t *testing.T) {
 	f := newFixture(t)
-	facts := filepath.Join(f.dataDir, "projects", "p1", "cases", "in_x", ".tw", "facts.jsonl")
+	facts := filepath.Join(f.dataDir, "projects", "p1", "cases", "in_x", ".saker", "facts.jsonl")
 	ledger := filepath.Join(f.dataDir, "projects", "p1", "ledger.json")
 	factsBefore, ledgerBefore := readFileString(t, facts), readFileString(t, ledger)
 	if _, err := runTool(t, config{dataDir: f.dataDir, harness: f.harness, apply: true}); err != nil {
@@ -612,7 +612,7 @@ func TestDeleteBackupsAfterCleanScan(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A .bak outside the run journals is not in scope and must survive.
-	outOfScope := filepath.Join(f.dataDir, "projects", "p1", "cases", "in_x", ".tw", "facts.jsonl.bak")
+	outOfScope := filepath.Join(f.dataDir, "projects", "p1", "cases", "in_x", ".saker", "facts.jsonl.bak")
 	if err := os.WriteFile(outOfScope, []byte("case evidence backup"), 0o600); err != nil {
 		t.Fatal(err)
 	}

@@ -167,11 +167,11 @@ type liveFactExec struct {
 func (l *liveFactExec) Name() string { return "live" }
 
 func (l *liveFactExec) Run(ctx context.Context, req executor.Request, emit func(executor.Event)) (executor.Result, error) {
-	if err := os.MkdirAll(filepath.Join(req.WorkDir, ".tw"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(req.WorkDir, ".saker"), 0o755); err != nil {
 		return executor.Result{ExitCode: -1}, err
 	}
 	line := `{"kind":"vuln","title":"实时事实","summary":"还没结束就写下的结论"}` + "\n"
-	if err := os.WriteFile(filepath.Join(req.WorkDir, ".tw", "facts.jsonl"), []byte(line), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(req.WorkDir, ".saker", "facts.jsonl"), []byte(line), 0o644); err != nil {
 		return executor.Result{ExitCode: -1}, err
 	}
 	select {

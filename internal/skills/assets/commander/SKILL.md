@@ -29,8 +29,8 @@ board 的 `goals.needs_review` 表示旧完成证明的依据已变化。核对�
 `$SAKER_AUTH` 是一行现成的 `Authorization: Bearer …`，`$SAKER_BATTLE` 是战场与笔记基址，
 `$SAKER_AGENT` 是参与者基址，`$SAKER_API` 是控制面地址，`$SAKER_PROJECT` 是项目 id，
 `$SAKER_BIN` 是 saker 可执行文件，读状态优先用它。它们随会话更新，
-不必自己读文件或拼地址；若为空（非 bash 或注入失败），用 `-H "$(cat .tw/auth)"` 并以
-`.tw/identity.json` 的 `api_base` / `project_id` 兜底。
+不必自己读文件或拼地址；若为空（非 bash 或注入失败），用 `-H "$(cat .saker/auth)"` 并以
+`.saker/identity.json` 的 `api_base` / `project_id` 兜底。
 
 ## 推进义务
 
@@ -111,7 +111,7 @@ GNU 参数（如 `--max-filesize`）。
 | 停放 / 取消 / 重派 / 重开 | `POST /api/intents/in_x/park\|cancel\|retry\|reopen`，`{"reason":"…"}` / `{"reason":"…"}` / `{"note":"…"}` / 无 body：停放与重开是一对——等的前提到手就 `reopen` 接回原意图（无 body），不要新建意图接盘；执行者没有这些动作，它要重开或改停只能 handoff 给你 |
 | 判定完成（没有 run 收口的意图） | `POST /api/intents/in_x/settle`，`{"note":"为什么这一轮算达成","fact_ids":["f_x"]}`（或 `run_ids`）：只对 failed / review_failed / parked / 已停止的 pending 生效，必须写说明并至少引用一条已记录的事实或运行；完成行带 `done_declared_by`，与 run 自己收口的完成区分开；操作员停的意图不能这样翻案 |
 | 续跑已结束/停放/失败的意图 | `POST /api/intents/in_x/continue`，`{"note":"…"}`：续同一个 harness 会话、不重发任务书；done/failed/parked 可用，没有原会话时改用 retry 重派新会话 |
-| 请求停止项目（全局暂停，等操作员恢复） | `POST /api/project/standby`，`{"reason":"…","stop_reason":"blocked|low_value|goal_achieved"}`，请求头额外带 `-H "X-Tw-Actor: commander"`：项目暂停、在跑意图取消、本轮正常收尾；恢复只能由操作员点「继续项目」。`goal_achieved` 只能用于目标已经完成的情况：必须先用 `POST /api/goals/g_x/complete` 盖章，否则控制面返回 409；目标未达成但继续无价值时用 `blocked` 或 `low_value`。控制面只接受“有进行中的指挥官轮次可归因 + 指挥官身份声明”的停止请求，执行者不能停整个项目。先写清笔记与证据，判断边界见「判断」一节 |
+| 请求停止项目（全局暂停，等操作员恢复） | `POST /api/project/standby`，`{"reason":"…","stop_reason":"blocked|low_value|goal_achieved"}`，请求头额外带 `-H "X-Saker-Actor: commander"`：项目暂停、在跑意图取消、本轮正常收尾；恢复只能由操作员点「继续项目」。`goal_achieved` 只能用于目标已经完成的情况：必须先用 `POST /api/goals/g_x/complete` 盖章，否则控制面返回 409；目标未达成但继续无价值时用 `blocked` 或 `low_value`。控制面只接受“有进行中的指挥官轮次可归因 + 指挥官身份声明”的停止请求，执行者不能停整个项目。先写清笔记与证据，判断边界见「判断」一节 |
 | 目标完成 | `POST /api/goals/g_x/complete`，`{"from":["f_x"],"note":"说清目标口径怎么被证据满足"}`（`from` 里的**每条**事实都必须有自己的证据；对照目标 statement 与已有观察判断是否达成；目标由操作员定义，你按目标判断完成，变更定义另须操作员明确指令；是否要求独立复核由项目当前前提政策决定，完成同样须通过准入；代码不数条数，也不替你定清单） |
 | 提名打法 | `POST /api/playbooks/nominate`，`{"title":"…","when":"…","doc":"…","tags":["product:x"],"outcome":"success","from_fact_ids":["f_x"]}`（只写候选，必须有出处） |
 | 提名世界事实 | `POST /api/kb/candidates`，`{"entry":{"id":"稳定ID","title":"…","description":"何时查","detail":"事实","applicability":"适用条件","source":"来源说明","source_refs":["来源引用"],"tags":["主题"]},"reason":"为何跨项目成立"}`；只提名，不改已发布知识，不为提炼额外开轮 |
@@ -187,7 +187,7 @@ curl -s -H "$SAKER_AUTH" -H 'Content-Type: application/json' \
 
 - 目标是否达成由你对照目标 statement 与已有观察判断，不由控制面数漏洞条数、工具调用或业务矩阵。依据和未完成部分写进目标 note。目标定义仍由操作员负责；明确变更指令可按出处代办，缺目标而没有明确指令时请操作员补充。
 - **你的交付物是账本里的结论与证据，不是操作员侧的后处理产物。** 不要为了下游交付新建复核/全体复现意图，不要要求所有事实都 verified 才 complete；`complete` 只引用支撑目标的那几条已验证事实。你的职责是把渗透做完、把结论与证据写进账本；后续交付由操作员处理，未复核结论只能作为 candidate。
-- 整个项目是否还值得继续也由你判断：目标不可达、授权阻塞、或继续推进只会空转时，先把结论与证据写进笔记，再带 `-H "X-Tw-Actor: commander"` `POST /api/project/standby` 请求全局停止，并带结构化 `stop_reason`：`blocked`（授权/可达性阻塞）或 `low_value`（继续空转）。**目标已完成不是 standby 的理由**：先用 `POST /api/goals/g_x/complete` 盖章，再按正常收口结束本轮；只有确实要全局停项目时才用 `stop_reason=goal_achieved`，且控制面会拒绝任何仍未达成的目标。它是真暂停（重启后仍暂停、暂停原因持久化、在跑意图取消），只有操作员能恢复，所以不要用它逃避困难或当单步失败的替代。
+- 整个项目是否还值得继续也由你判断：目标不可达、授权阻塞、或继续推进只会空转时，先把结论与证据写进笔记，再带 `-H "X-Saker-Actor: commander"` `POST /api/project/standby` 请求全局停止，并带结构化 `stop_reason`：`blocked`（授权/可达性阻塞）或 `low_value`（继续空转）。**目标已完成不是 standby 的理由**：先用 `POST /api/goals/g_x/complete` 盖章，再按正常收口结束本轮；只有确实要全局停项目时才用 `stop_reason=goal_achieved`，且控制面会拒绝任何仍未达成的目标。它是真暂停（重启后仍暂停、暂停原因持久化、在跑意图取消），只有操作员能恢复，所以不要用它逃避困难或当单步失败的替代。
 - 所有目标已完成、没有待办、在途意图或显式等待事项时结束本轮；没有新工作时不制造收尾任务。
 - 跨意图的分工与推进顺序、是否复查历史结论、是否续话/换人由你自主判断；单个意图内怎么打由执行者决定。历史结论只描述当时条件。
 - 优先复用已记录的前提；某条前提的断言变化后，先 `GET /api/facts/<id>` 重读再依赖它。

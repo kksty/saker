@@ -142,7 +142,7 @@ func TestContinuationPromptsDoNotPromiseUnwrittenIndexes(t *testing.T) {
 		"fresh wake":   s.wakePrompt(in, false),
 	}
 	for name, prompt := range prompts {
-		for _, banned := range []string{"本轮已刷新", "已刷新", "本轮已写", ".tw/graph.json", runInputFile} {
+		for _, banned := range []string{"本轮已刷新", "已刷新", "本轮已写", ".saker/graph.json", runInputFile} {
 			if strings.Contains(prompt, banned) {
 				t.Errorf("%s prompt claims an index write that may not have happened (%q):\n%s", name, banned, prompt)
 			}
@@ -214,7 +214,7 @@ func TestHandoffBriefDoesNotClaimCompleteContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.UpdateRun(src.ID, func(r *model.Run) { r.BriefPath = ".tw/briefs/" + src.ID + ".md" }); err != nil {
+	if _, err := st.UpdateRun(src.ID, func(r *model.Run) { r.BriefPath = ".saker/briefs/" + src.ID + ".md" }); err != nil {
 		t.Fatal(err)
 	}
 	in, err = st.UpdateIntent(in.ID, func(i *model.Intent) {

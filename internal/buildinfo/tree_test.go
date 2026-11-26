@@ -147,7 +147,7 @@ func TestRedactSecretsRemovesRawAndEscapedForms(t *testing.T) {
 
 func TestHarnessCloneHintMentionsBothPaths(t *testing.T) {
 	hint := HarnessCloneHint("/repo")
-	if !strings.Contains(hint, "tianwu/fixes") || !strings.Contains(hint, "HARNESS_DIR") {
+	if !strings.Contains(hint, "saker/fixes") || !strings.Contains(hint, "HARNESS_DIR") {
 		t.Fatalf("hint = %q", hint)
 	}
 }

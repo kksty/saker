@@ -284,7 +284,7 @@ func (s *Server) accessSection(workDir string) (string, error) {
 			rows[i].Session = ""
 		}
 	}
-	dir := filepath.Join(workDir, ".tw", "access")
+	dir := filepath.Join(workDir, ".saker", "access")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return "", err
 	}
@@ -310,10 +310,10 @@ func (s *Server) accessSection(workDir string) (string, error) {
 			return "", err
 		}
 		if i < 8 {
-			fmt.Fprintf(&b, "- %s · %s · %s · 站点 %s · 材料 `.tw/access/%s.json`\n", row.ID, row.Name, row.Kind, row.Origin, row.ID)
+			fmt.Fprintf(&b, "- %s · %s · %s · 站点 %s · 材料 `.saker/access/%s.json`\n", row.ID, row.Name, row.Kind, row.Origin, row.ID)
 		}
 	}
-	fmt.Fprintf(&b, "完整登录材料目录（%d 份，元数据）：`.tw/access/index.json`。\n", len(rows))
+	fmt.Fprintf(&b, "完整登录材料目录（%d 份，元数据）：`.saker/access/index.json`。\n", len(rows))
 	b.WriteString("材料只说明操作员提供了什么；使用前核对身份和有效性。人工登录/扫码/验证码交接契约见 harness skill `collaborate`。原生结果索引可按项目查询，不等于已确认发现。\n")
 	return b.String(), nil
 }

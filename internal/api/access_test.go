@@ -67,7 +67,7 @@ func (e *loginYieldExec) Run(ctx context.Context, req executor.Request, emit fun
 		in, _ := e.s.Store.GetIntent(req.IntentID)
 		emit(executor.Event{Kind: "artifact", NativeEventID: "event_1", Native: &tool.Artifact{ResultId: "native_1", Tool: "gogo", Kind: "service", MediaType: "application/json", Data: []byte(`{"port":443}`)}})
 		raw, _ := json.Marshal(map[string]any{"kind": "service", "title": "服务观察", "evidence": []map[string]string{{"artifact": in.RunID + "/native_1"}}})
-		if err := os.WriteFile(filepath.Join(req.WorkDir, ".tw", "facts.jsonl"), append(raw, '\n'), 0600); err != nil {
+		if err := os.WriteFile(filepath.Join(req.WorkDir, ".saker", "facts.jsonl"), append(raw, '\n'), 0600); err != nil {
 			return executor.Result{}, err
 		}
 		request := httptest.NewRequest("POST", "/api/intents/"+in.ID+"/operator", strings.NewReader(`{"request":"请完成扫码"}`))
@@ -199,7 +199,7 @@ func TestAccessMetadataAndBriefDoNotContainRawLoginSecrets(t *testing.T) {
 	if got := s.redactSecrets("Authorization: Bearer this-is-a-long-secret-value"); strings.Contains(got, "this-is-a-long-secret-value") {
 		t.Fatal("imported credential is not redacted")
 	}
-	if raw, err := os.ReadFile(filepath.Join(work, ".tw", "access", entry.ID+".json")); err != nil || !strings.Contains(string(raw), "this-is-a-long-secret-value") {
+	if raw, err := os.ReadFile(filepath.Join(work, ".saker", "access", entry.ID+".json")); err != nil || !strings.Contains(string(raw), "this-is-a-long-secret-value") {
 		t.Fatal("worker material unavailable")
 	}
 }

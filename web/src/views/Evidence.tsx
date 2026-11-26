@@ -70,7 +70,7 @@ export function EvidenceView() {
           <EmptyState
             icon={Eye}
             title="还没有证据"
-            description="执行者产出新文件后，项目图谱按 mtime 收集；.tw/ 是交接通道，不进证据。"
+            description="执行者产出新文件后，项目图谱按 mtime 收集；.saker/ 是交接通道，不进证据。"
           />
         )}
 

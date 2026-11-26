@@ -11,7 +11,7 @@ import (
 // start claiming a trajectory that was never opened.
 func TestAdoptSessionForResumeRewritesPointer(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, ".tw"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, ".saker"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	path := markerPath(dir)
@@ -42,7 +42,7 @@ func TestAdoptSessionForResumeRequiresMarkerAndID(t *testing.T) {
 		t.Fatal("adopted a session for a case with no pointer")
 	}
 	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, ".tw"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, ".saker"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(markerPath(dir), []byte(`{"url":"u","session":"old"}`), 0o644); err != nil {

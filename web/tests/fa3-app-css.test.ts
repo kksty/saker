@@ -1,11 +1,11 @@
 // FA3 global stylesheet contract.
 //
-// `app.css` is the design system's single file: the cyber-ui tokens, the one
+// `app.css` is the design system's single file: the component-library tokens, the one
 // card/type ramp, and the global behaviours every panel inherits. It is also the
 // file where a well-meaning cleanup can silently move the product's visual
 // identity, so this suite pins two things at once:
 //
-//   1. the tokens (and therefore the cyber-ui look) are byte-for-value stable;
+//   1. the tokens (and therefore the component-library look) are byte-for-value stable;
 //   2. the modern platform behaviours the graph/global pass added are present,
 //      and the patterns the guidance explicitly warns against are absent.
 //
@@ -33,7 +33,7 @@ function token(name: string, scope: 'light' | 'dark'): string | null {
   return match ? match[1].trim() : null
 }
 
-test('the cyber-ui tokens keep their exact values in both themes', () => {
+test('the component-library tokens keep their exact values in both themes', () => {
   // A representative cross-section: background/card/primary/ink/radius. If a
   // component pass ever needs a new colour it adds one; it never retunes these.
   assert.equal(token('--radius', 'light'), '0.5rem')

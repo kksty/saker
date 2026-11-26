@@ -16,7 +16,7 @@ import (
 
 func writeSayMarker(t *testing.T, workDir string) {
 	t.Helper()
-	path := filepath.Join(workDir, ".tw")
+	path := filepath.Join(workDir, ".saker")
 	if err := os.MkdirAll(path, 0o755); err != nil {
 		t.Fatal(err)
 	}

@@ -20,7 +20,7 @@ import (
 func seedProject(t *testing.T) (dir string, st *store.Store, proofDigest string) {
 	t.Helper()
 	dir = filepath.Join(t.TempDir(), "projects", "p-test")
-	for _, sub := range []string{"cases/in_1/tmp", "cases/in_1/.tw", "cases/in_1/.verify", "cases/in_1/.native", "cases/.access/ac_1", "commander/.tw", "runs"} {
+	for _, sub := range []string{"cases/in_1/tmp", "cases/in_1/.saker", "cases/in_1/.verify", "cases/in_1/.native", "cases/.access/ac_1", "commander/.saker", "runs"} {
 		if err := os.MkdirAll(filepath.Join(dir, filepath.FromSlash(sub)), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -35,17 +35,17 @@ func seedProject(t *testing.T) (dir string, st *store.Store, proofDigest string)
 		"runs/r_1.jsonl":                          []byte(`{"event":"start"}` + "\n"),
 		"cases/in_1/tmp/admin.txt":                proof,
 		"cases/in_1/notes.md":                     []byte("direction notes"),
-		"cases/in_1/.tw/worker-note.md":           []byte("跨轮记忆：下一步读后台"),
-		"cases/in_1/.tw/facts.jsonl":              []byte("{\"kind\":\"note\",\"declaration_id\":\"fixture\",\"title\":\"fixture\"}\n"),
-		"cases/in_1/.tw/facts.offset":             []byte("0"),
-		"cases/in_1/.tw/auth":                     []byte("Bearer stale-credential"),
-		"cases/in_1/.tw/aop-session.json":         []byte(`{"url":"http://old","session":"s"}`),
+		"cases/in_1/.saker/worker-note.md":           []byte("跨轮记忆：下一步读后台"),
+		"cases/in_1/.saker/facts.jsonl":              []byte("{\"kind\":\"note\",\"declaration_id\":\"fixture\",\"title\":\"fixture\"}\n"),
+		"cases/in_1/.saker/facts.offset":             []byte("0"),
+		"cases/in_1/.saker/auth":                     []byte("Bearer stale-credential"),
+		"cases/in_1/.saker/aop-session.json":         []byte(`{"url":"http://old","session":"s"}`),
 		"cases/in_1/.verify/leftover.md":          []byte("review scratch"),
 		"cases/in_1/.native/result.json":          []byte(`{"tool":"curl"}`),
 		"cases/.access/ac_1/entry.json":           []byte(`{"id":"ac_1","kind":"request"}`),
 		"cases/.access/ac_1/material.json":        []byte(`{"method":"GET"}`),
 		"cases/.access/ac_1/control-session.json": []byte(`{"live":true}`),
-		"commander/.tw/auth":                      []byte("Bearer commander"),
+		"commander/.saker/auth":                      []byte("Bearer commander"),
 		"commander/scratch.json":                  []byte(`{}`),
 	} {
 		p := filepath.Join(dir, filepath.FromSlash(path))
@@ -104,7 +104,7 @@ func TestProjectExportImportRoundTrip(t *testing.T) {
 	found := map[string]bool{}
 	for _, f := range m.Files {
 		found[f.Path] = true
-		if strings.Contains(f.Path, ".tw/auth") || strings.Contains(f.Path, "aop-session") ||
+		if strings.Contains(f.Path, ".saker/auth") || strings.Contains(f.Path, "aop-session") ||
 			strings.Contains(f.Path, "control-session") || strings.Contains(f.Path, ".verify/") ||
 			strings.HasPrefix(f.Path, "commander/") {
 			t.Fatalf("runtime or credential file exported: %s", f.Path)
@@ -112,7 +112,7 @@ func TestProjectExportImportRoundTrip(t *testing.T) {
 	}
 	for _, want := range []string{
 		"project.json", "ledger.sqlite", "state.md", "decisions.jsonl", "operator-actions.jsonl", "runs/r_1.jsonl",
-		"cases/in_1/tmp/admin.txt", "cases/in_1/.tw/worker-note.md", "cases/in_1/.tw/facts.jsonl", "cases/in_1/.tw/facts.offset",
+		"cases/in_1/tmp/admin.txt", "cases/in_1/.saker/worker-note.md", "cases/in_1/.saker/facts.jsonl", "cases/in_1/.saker/facts.offset",
 		"cases/in_1/.native/result.json", "cases/.access/ac_1/entry.json", "cases/.access/ac_1/material.json",
 	} {
 		if !found[want] {
@@ -131,13 +131,13 @@ func TestProjectExportImportRoundTrip(t *testing.T) {
 	target := filepath.Join(targetData, "projects", "p-test")
 	for _, want := range []string{
 		"project.json", "ledger.sqlite", "state.md", "decisions.jsonl", "operator-actions.jsonl", "runs/r_1.jsonl",
-		"cases/in_1/tmp/admin.txt", "cases/in_1/.tw/worker-note.md", "cases/in_1/.tw/facts.jsonl", "cases/in_1/.tw/facts.offset",
+		"cases/in_1/tmp/admin.txt", "cases/in_1/.saker/worker-note.md", "cases/in_1/.saker/facts.jsonl", "cases/in_1/.saker/facts.offset",
 	} {
 		if _, err := os.Stat(filepath.Join(target, filepath.FromSlash(want))); err != nil {
 			t.Fatalf("imported file missing: %s: %v", want, err)
 		}
 	}
-	for _, forbidden := range []string{"cases/in_1/.tw/auth", "cases/in_1/.tw/aop-session.json", "cases/.access/ac_1/control-session.json", "commander"} {
+	for _, forbidden := range []string{"cases/in_1/.saker/auth", "cases/in_1/.saker/aop-session.json", "cases/.access/ac_1/control-session.json", "commander"} {
 		if _, err := os.Stat(filepath.Join(target, filepath.FromSlash(forbidden))); !os.IsNotExist(err) {
 			t.Fatalf("runtime file survived import: %s (%v)", forbidden, err)
 		}

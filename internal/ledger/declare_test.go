@@ -218,12 +218,12 @@ func TestResolveEvidenceClassifies(t *testing.T) {
 	if got, state := resolveEvidence(casesRoot, dir, "ok.txt"); state != evidenceOK || got != "ok.txt" {
 		t.Fatalf("ok = %q/%v", got, state)
 	}
-	// The auto-collector skips .tw/ and .cyber/ so control files never become
+	// The auto-collector skips .saker/ and .cyber/ so control files never become
 	// evidence by accident. A *declared* path is different: the ledger only
-	// asks whether it opens, so a file under .tw counts when it is named
+	// asks whether it opens, so a file under .saker counts when it is named
 	// exactly. The dispatch prompt therefore tells the model to keep evidence
 	// at the case root, and to spell the prefix when it does not.
-	if got, state := resolveEvidence(casesRoot, dir, ".tw/ok.txt"); state != evidenceOK || got != ".tw/ok.txt" {
+	if got, state := resolveEvidence(casesRoot, dir, ".saker/ok.txt"); state != evidenceOK || got != ".saker/ok.txt" {
 		t.Fatalf("declared control-dir file = %q/%v, want ok", got, state)
 	}
 }

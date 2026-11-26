@@ -123,7 +123,7 @@ func (s *Server) documentHistory(w http.ResponseWriter, r *http.Request) {
 //
 // An empty return is not a fallback: the store refuses an unsigned save, so a
 // caller that cannot be attributed (a session identity without a run, or a bare
-// X-Tw-Actor claim) is refused instead of being recorded as the operator.
+// X-Saker-Actor claim) is refused instead of being recorded as the operator.
 func documentAuthor(r *http.Request) string {
 	if id, ok := identityOf(r); ok {
 		return strings.TrimSpace(id.RunID)

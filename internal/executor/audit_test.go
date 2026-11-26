@@ -14,7 +14,7 @@ import (
 // directly, and its report directory must be per run (D47).
 func TestAuditCommandHasNoAgentSubcommand(t *testing.T) {
 	a := Audit{Extra: []string{"--debug"}, Timeout: 90 * time.Second}
-	args := a.command("/cases/i-1", "audit-1", ".tw/audit-prompt.txt", []string{"src-audit"})
+	args := a.command("/cases/i-1", "audit-1", ".saker/audit-prompt.txt", []string{"src-audit"})
 
 	if args[0] == "agent" {
 		t.Fatal("audit command must not start with the aiscan `agent` subcommand")
@@ -25,7 +25,7 @@ func TestAuditCommandHasNoAgentSubcommand(t *testing.T) {
 		"--report-dir " + filepath.Join("/cases/i-1", "audit-1"),
 		"--output-format stream-json",
 		"--timeout 90",
-		"-p .tw/audit-prompt.txt",
+		"-p .saker/audit-prompt.txt",
 		"-s src-audit",
 		"--debug",
 	} {
@@ -67,7 +67,7 @@ func TestImportAuditFactsMapsSeverityAtImport(t *testing.T) {
 	if _, imported, err := importAuditFacts(dir, report); err != nil || imported != 2 {
 		t.Fatalf("imported = %d, %v", imported, err)
 	}
-	data, err := os.ReadFile(filepath.Join(dir, ".tw", "facts.jsonl"))
+	data, err := os.ReadFile(filepath.Join(dir, ".saker", "facts.jsonl"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ func TestImportAuditFacts(t *testing.T) {
 		t.Fatalf("total/imported = %d/%d, want 3/2", total, imported)
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, ".tw", "facts.jsonl"))
+	data, err := os.ReadFile(filepath.Join(dir, ".saker", "facts.jsonl"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +183,7 @@ func TestImportAuditFacts(t *testing.T) {
 	if _, imported2, err := importAuditFacts(dir, report); err != nil || imported2 != 2 {
 		t.Fatalf("re-import = %d, %v", imported2, err)
 	}
-	again, _ := os.ReadFile(filepath.Join(dir, ".tw", "facts.jsonl"))
+	again, _ := os.ReadFile(filepath.Join(dir, ".saker", "facts.jsonl"))
 	if n := len(strings.Split(strings.TrimSpace(string(again)), "\n")); n != 4 {
 		t.Fatalf("append changed line count to %d, want 4", n)
 	}
@@ -240,7 +240,7 @@ func TestImportAuditFactsKeepsFindingsThatShareEvidence(t *testing.T) {
 	if total != 2 || imported != 2 {
 		t.Fatalf("total/imported = %d/%d, want 2/2: a shared evidence file is not a shared finding", total, imported)
 	}
-	data, err := os.ReadFile(filepath.Join(dir, ".tw", "facts.jsonl"))
+	data, err := os.ReadFile(filepath.Join(dir, ".saker", "facts.jsonl"))
 	if err != nil {
 		t.Fatal(err)
 	}

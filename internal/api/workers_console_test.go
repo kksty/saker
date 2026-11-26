@@ -25,7 +25,7 @@ func consoleCall(t *testing.T, s *Server, method, path, actor string, body any) 
 	}
 	req := httptest.NewRequest(method, path, &buf)
 	if actor != "" {
-		req.Header.Set("X-Tw-Actor", actor)
+		req.Header.Set("X-Saker-Actor", actor)
 	}
 	mux := http.NewServeMux()
 	s.Register(mux)

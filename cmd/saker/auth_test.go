@@ -15,7 +15,7 @@ import (
 // The agent token is the credential of a harness session on the battle surface,
 // and the only harness session that talks to the project mux directly is the
 // commander (executors arrive through /agent/). The gate therefore stamps the
-// actor from the credential: a say without X-Tw-Actor used to land as
+// actor from the credential: a say without X-Saker-Actor used to land as
 // `operator` in the ledger.
 func TestAgentTokenStampsProjectWritesAsCommander(t *testing.T) {
 	const operatorToken = "operator-token-for-the-auth-test"
@@ -27,7 +27,7 @@ func TestAgentTokenStampsProjectWritesAsCommander(t *testing.T) {
 	}
 	var seen string
 	protected := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		seen = r.Header.Get("X-Tw-Actor")
+		seen = r.Header.Get("X-Saker-Actor")
 		w.WriteHeader(http.StatusOK)
 	})
 	wrapped := auth.wrap(protected)
@@ -48,7 +48,7 @@ func TestAgentTokenStampsProjectWritesAsCommander(t *testing.T) {
 		t.Fatalf("session token on the project mux: %d", code)
 	}
 	if seen != collab.CommanderID {
-		t.Fatalf("X-Tw-Actor = %q, want %q", seen, collab.CommanderID)
+		t.Fatalf("X-Saker-Actor = %q, want %q", seen, collab.CommanderID)
 	}
 
 	// The operator's own credential stays the operator: it authors messages
@@ -212,7 +212,7 @@ func TestExecutorCredentialReadsBattlefieldOnly(t *testing.T) {
 	auth := newConsoleAuth(token, registry)
 	var actor string
 	protected := auth.wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		actor = r.Header.Get("X-Tw-Actor")
+		actor = r.Header.Get("X-Saker-Actor")
 		w.WriteHeader(http.StatusOK)
 	}))
 	call := func(method, path string) int {

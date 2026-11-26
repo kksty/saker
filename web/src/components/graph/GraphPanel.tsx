@@ -1012,7 +1012,7 @@ export function GraphPanel({
       {model.nodes.some((n) => n.type !== 'project') && (graph.data?.facts ?? []).length === 0 && (
         <div className="pointer-events-none absolute bottom-16 left-1/2 -translate-x-1/2 px-3">
           <div className="rounded-full border border-hairline bg-card/90 px-3.5 py-1.5 text-center text-[11px] text-ink-3 shadow-soft backdrop-blur">
-            执行者还没有交接事实：写 `.tw/facts.jsonl` 后，事实会以圆点出现在意图周围
+            执行者还没有交接事实：写 `.saker/facts.jsonl` 后，事实会以圆点出现在意图周围
           </div>
         </div>
       )}

@@ -386,13 +386,13 @@ func TestMetricTrafficBodyCoverageUnavailable(t *testing.T) {
 func TestMetricMediaPreservedCountsAndBytes(t *testing.T) {
 	journals := []RunJournal{
 		eventJournal("r_1",
-			mediaEvent(`{"path":".tw/media/e-0.png","mime":"image/png","bytes":100}`),
-			mediaEvent(`{"path":".tw/media/e-1.jpg","mime":"image/jpeg","bytes":200}`),
+			mediaEvent(`{"path":".saker/media/e-0.png","mime":"image/png","bytes":100}`),
+			mediaEvent(`{"path":".saker/media/e-1.jpg","mime":"image/jpeg","bytes":200}`),
 			JournalEvent{Kind: "message"}, // total journal rows behind the denominator
 		),
 		eventJournal("r_2",
-			mediaEvent(`{"path":".tw/media/e-2.bin"}`),           // raw present, no bytes
-			mediaEvent(`{"path":".tw/media/e-3.bin","bytes":0}`), // reported as not positive
+			mediaEvent(`{"path":".saker/media/e-2.bin"}`),           // raw present, no bytes
+			mediaEvent(`{"path":".saker/media/e-3.bin","bytes":0}`), // reported as not positive
 		),
 		eventJournal("r_3", JournalEvent{Kind: "media"}), // raw missing entirely
 	}

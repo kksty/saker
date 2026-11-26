@@ -224,7 +224,7 @@ func (c *cliConfig) resolve(getenv func(string) string) (cliConn, error) {
 }
 
 // cliParseToken accepts the three shapes the session may hand over: a raw
-// token, "Bearer …", or the whole "Authorization: Bearer …" line from .tw/auth.
+// token, "Bearer …", or the whole "Authorization: Bearer …" line from .saker/auth.
 func cliParseToken(raw string) string {
 	s := strings.TrimSpace(raw)
 	if s == "" {

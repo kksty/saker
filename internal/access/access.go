@@ -149,7 +149,7 @@ func Create(cases string, in Input) (Entry, error) {
 			(cdp.Hostname() != "127.0.0.1" && cdp.Hostname() != "localhost" && cdp.Hostname() != "::1")) {
 			return Entry{}, fmt.Errorf("单机浏览器接管需要本机 loopback CDP 地址")
 		}
-		entry.Session = "tw_" + entry.ID
+		entry.Session = "saker_" + entry.ID
 		if in.Session != "" {
 			if len(in.Session) > 160 || strings.ContainsAny(in.Session, " \t/\\") {
 				return Entry{}, fmt.Errorf("浏览器 session 无效")

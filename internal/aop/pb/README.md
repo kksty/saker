@@ -1,9 +1,9 @@
 # Vendored AOP 生成代码
 
 本目录（以及 `pty/`、`traffic/`、`tool/`、`command/`、`operation/`、`guardrail/`）
-下的 `*.pb.go` 是 cyber-harness 生成文件的副本。Saker不重新生成也不修改 AOP
+下的 `*.pb.go` 是 cyber-harness 生成文件的副本。Saker 不重新生成也不修改 AOP
 wire 协议：只把 import 指到 `internal/aop` 并给 `command` 改 package 名，其余
-字节保持上游生成结果。手改这些文件会让Saker的 wire 格式与 harness 静默分叉，
+字节保持上游生成结果。手改这些文件会让 Saker 的 wire 格式与 harness 静默分叉，
 因此不要手工编辑；升级时用仓库根的同步脚本从 harness 源重新复制。
 
 ## 映射
@@ -39,7 +39,7 @@ bash scripts/sync-aop-protos.sh               # Linux/macOS 同上
 ```
 
 比较不是逐字节 diff：先去掉注释与空行（含 `// Code generated` 下的
-protoc-gen-go / protoc 版本行、proto 文档注释、Saker本地说明），把 package 行
+protoc-gen-go / protoc 版本行、proto 文档注释、Saker 本地说明），把 package 行
 按名字无关比较，把 `internal/aop` 的 import 折回 harness 路径，把 CRLF 归一为
 LF，再做规范化 SHA-256。消息号、descriptor 字节与 enum 值都会参与比较，所以
 协议语义的分叉一定失败；只有生成工具版本、本地注释、换行与上述路径改写不算
@@ -51,7 +51,7 @@ fingerprint；配置源的方式与 gate 相同：`-harness-dir`、`HARNESS_DIR`
 
 ## 升级流程
 
-1. 更新 harness checkout（`tianwu/fixes`）并确认 `go build ./...` 通过。
+1. 更新 harness checkout（`saker/fixes`）并确认 `go build ./...` 通过。
 2. 运行 `scripts/sync-aop-protos.ps1`（或 `.sh`）复制生成文件。
 3. 查看 `git diff internal/aop`：应只有协议升级带来的生成代码变化；确认没有
    手工改动混入。

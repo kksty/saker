@@ -39,7 +39,7 @@ func (e *graphExec) Run(ctx context.Context, req executor.Request, emit func(exe
 	}
 	e.raw = string(b)
 	line := `{"kind":"note","title":"读完图了"}` + "\n"
-	if err := os.WriteFile(filepath.Join(req.WorkDir, ".tw", "facts.jsonl"), []byte(line), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(req.WorkDir, ".saker", "facts.jsonl"), []byte(line), 0o644); err != nil {
 		return executor.Result{ExitCode: -1}, err
 	}
 	return executor.Result{ExitCode: 0, StopReason: "completed"}, nil
@@ -93,7 +93,7 @@ func TestDispatchWritesTheGraphSnapshot(t *testing.T) {
 	})
 
 	if ex.raw == "" {
-		t.Fatal("the executor could not read .tw/graph.json")
+		t.Fatal("the executor could not read .saker/graph.json")
 	}
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(ex.raw), &raw); err != nil {

@@ -369,7 +369,7 @@ func TestNotePromptIsASoftReminderNotASizeRule(t *testing.T) {
 // participant-mux endpoint and the case file that holds its bearer.
 func TestStateSectionCarriesTheCommanderNoteEndpoint(t *testing.T) {
 	const api = "http://127.0.0.1:9000/p/p1/api/state"
-	const token = "/data/projects/p1/commander/.tw/auth"
+	const token = "/data/projects/p1/commander/.saker/auth"
 	rc := RoundContext{Resume: false, StateAPI: api, StateToken: token}
 	p := CommanderRoundPrompt(board.View{}, testNote, "", ContextStatus{}, rc)
 	for _, want := range []string{"GET " + api, "PUT " + api, token, "$SAKER_AUTH"} {

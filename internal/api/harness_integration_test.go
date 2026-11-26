@@ -48,7 +48,7 @@ func TestHarnessProjectPauseCancelsModelAndPreventsFurtherRequests(t *testing.T)
 		}
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		calls.Add(1)
-		if strings.Contains(string(req.Messages), "TW-PAUSE-MODEL-TEST") {
+		if strings.Contains(string(req.Messages), "SAKER-PAUSE-MODEL-TEST") {
 			startOnce.Do(func() { close(started) })
 			<-r.Context().Done()
 			stopOnce.Do(func() { close(disconnected) })
@@ -81,7 +81,7 @@ func TestHarnessProjectPauseCancelsModelAndPreventsFurtherRequests(t *testing.T)
 	r.ModelName = "fixture-model"
 	s.Decider = r
 	r.Commander = func(ctx context.Context, prompt string, resume bool) (decider.RoundResult, error) {
-		res, actions, err := s.StartCommander(ctx, withBoardAnchor(prompt+"\nTW-PAUSE-MODEL-TEST"), resume)
+		res, actions, err := s.StartCommander(ctx, withBoardAnchor(prompt+"\nSAKER-PAUSE-MODEL-TEST"), resume)
 		return decider.RoundResult{Tokens: res.Tokens, Actions: actions}, err
 	}
 	done := make(chan *decider.Decision, 1)
@@ -183,11 +183,11 @@ func TestHarnessModelFailureKeepsConsoleTerminalAndRecovers(t *testing.T) {
 	// Closing on timeout bounds the blocking WebSocket reader too.
 	stop := context.AfterFunc(ctx, func() { _ = sock.Close() })
 	defer stop()
-	if err := sock.WriteBinary([]byte("echo TW-PTY-AVAILABLE\r\n")); err != nil {
+	if err := sock.WriteBinary([]byte("echo SAKER-PTY-AVAILABLE\r\n")); err != nil {
 		t.Fatal(err)
 	}
 	var output string
-	for !strings.Contains(output, "TW-PTY-AVAILABLE") {
+	for !strings.Contains(output, "SAKER-PTY-AVAILABLE") {
 		kind, data, err := sock.ReadMessageType()
 		if err != nil {
 			t.Fatalf("terminal unavailable while model failed: %v; output=%q", err, output)

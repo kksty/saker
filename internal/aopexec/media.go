@@ -6,7 +6,7 @@ package aopexec
 // and a tool_result can return media instead of text (browser screenshots,
 // audio). contentText only concatenates text, so without a copy the run journal
 // can cite a medium by name but nobody can read it back. PreserveMedia writes
-// those bytes below the case's own directory — <workdir>/.tw/media — and returns
+// those bytes below the case's own directory — <workdir>/.saker/media — and returns
 // path+mime+size so the run can append a journal event (kind=media) next to the
 // message/tool_result it belongs to.
 //
@@ -35,9 +35,9 @@ import (
 
 const (
 	// MediaDir is the directory that holds preserved media, relative to the
-	// case's working directory. It lives under the existing .tw area so project
+	// case's working directory. It lives under the existing .saker area so project
 	// export/import and the workspace sweeps already know it.
-	MediaDir = ".tw/media"
+	MediaDir = ".saker/media"
 
 	// MaxMediaBytes bounds one preserved medium (8 MiB). It matches the traffic
 	// body limit: anything larger is streamed by the tool itself, not embedded
@@ -66,7 +66,7 @@ type Media struct {
 }
 
 // PreserveMedia writes the media content of a message or tool_result event to
-// <workdir>/.tw/media/<event-id>-<idx>.<ext>.
+// <workdir>/.saker/media/<event-id>-<idx>.<ext>.
 //
 // index is the zero-based order of the media content inside the event, so paths
 // stay unique and stable when the same event is replayed. A URI-only resource is

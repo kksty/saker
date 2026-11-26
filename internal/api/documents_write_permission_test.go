@@ -25,7 +25,7 @@ func TestDocumentWritesAreOperatorOnly(t *testing.T) {
 			req = req.WithContext(WithIdentity(req.Context(), *id))
 		}
 		if actor != "" {
-			req.Header.Set("X-Tw-Actor", actor)
+			req.Header.Set("X-Saker-Actor", actor)
 		}
 		w := httptest.NewRecorder()
 		mux.ServeHTTP(w, req)

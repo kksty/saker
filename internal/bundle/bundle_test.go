@@ -28,11 +28,11 @@ func seedCase(t *testing.T) (caseRoot, ledgerPath string) {
 	if err := os.WriteFile(filepath.Join(caseRoot, "reports", "rp_1", "report.json"), []byte(`{"id":"rp_1"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// .tw must not travel: it is the handoff channel, not a product.
-	if err := os.MkdirAll(filepath.Join(caseRoot, "in_1", ".tw"), 0o755); err != nil {
+	// .saker must not travel: it is the handoff channel, not a product.
+	if err := os.MkdirAll(filepath.Join(caseRoot, "in_1", ".saker"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(caseRoot, "in_1", ".tw", "facts.jsonl"), []byte("{}\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(caseRoot, "in_1", ".saker", "facts.jsonl"), []byte("{}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -78,14 +78,14 @@ func TestExportImportRoundTrip(t *testing.T) {
 			t.Fatalf("restored file missing: %s", p)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(dest, "case", "in_1", ".tw", "facts.jsonl")); err == nil {
-		t.Fatal(".tw must not be exported")
+	if _, err := os.Stat(filepath.Join(dest, "case", "in_1", ".saker", "facts.jsonl")); err == nil {
+		t.Fatal(".saker must not be exported")
 	}
 }
 
 func TestExportOmitsPrivateInputsAndIncludesSelectedNativeEvidence(t *testing.T) {
 	root, ledger := seedCase(t)
-	for _, rel := range []string{".access/ac_test/material.json", ".native/result/raw.json", "in_1/.tw/access/ac_test.json", "in_1/native-evidence/selected.json"} {
+	for _, rel := range []string{".access/ac_test/material.json", ".native/result/raw.json", "in_1/.saker/access/ac_test.json", "in_1/native-evidence/selected.json"} {
 		path := filepath.Join(root, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 			t.Fatal(err)
@@ -100,7 +100,7 @@ func TestExportOmitsPrivateInputsAndIncludesSelectedNativeEvidence(t *testing.T)
 	}
 	found := false
 	for _, file := range m.Files {
-		if strings.Contains(file.Path, "/.access/") || strings.Contains(file.Path, "/.native/") || strings.Contains(file.Path, "/.tw/") {
+		if strings.Contains(file.Path, "/.access/") || strings.Contains(file.Path, "/.native/") || strings.Contains(file.Path, "/.saker/") {
 			t.Fatalf("private input exported: %s", file.Path)
 		}
 		if strings.HasSuffix(file.Path, "/native-evidence/selected.json") {

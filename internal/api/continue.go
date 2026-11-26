@@ -23,7 +23,7 @@ import (
 // act on while writing. Length stays the worker's judgement, the same contract
 // the commander note has (D106).
 const (
-	workerNoteFile = ".tw/worker-note.md"
+	workerNoteFile = ".saker/worker-note.md"
 	// continueNoteRunes caps the operator's remark on a continue, matching the
 	// retry note budget.
 	continueNoteRunes = 500
@@ -207,7 +207,7 @@ func (s *Server) continuePrompt(in model.Intent, prev model.Run, note, workerNot
 			writeWorkerNote(&b, workerNoteFromPreviousRun, workerNote)
 		} else {
 			b.WriteString("\n## 你的笔记\n")
-			b.WriteString("上一轮压缩过上下文，但 `.tw/worker-note.md` 不存在或为空：先按 facts 与 graph 重建已完成的部分。\n")
+			b.WriteString("上一轮压缩过上下文，但 `.saker/worker-note.md` 不存在或为空：先按 facts 与 graph 重建已完成的部分。\n")
 		}
 	} else {
 		b.WriteString("\n## 你的笔记\n")

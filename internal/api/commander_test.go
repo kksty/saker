@@ -96,7 +96,7 @@ func TestStartCommanderLoadsSkillOnFirstTurn(t *testing.T) {
 	if !strings.HasPrefix(ex.req.Prompt, "/skill:commander ") {
 		t.Fatalf("prompt = %q", ex.req.Prompt)
 	}
-	for _, needle := range []string{"http://127.0.0.1:9000", "$SAKER_AUTH", "$SAKER_BATTLE", ".tw/auth", "## 本轮"} {
+	for _, needle := range []string{"http://127.0.0.1:9000", "$SAKER_AUTH", "$SAKER_BATTLE", ".saker/auth", "## 本轮"} {
 		if !strings.Contains(ex.req.Prompt, needle) {
 			t.Fatalf("prompt missing %q: %q", needle, ex.req.Prompt)
 		}
@@ -430,7 +430,7 @@ func TestCommanderSessionKeepsItsNoteIdentity(t *testing.T) {
 		if _, ok := s.Collab.Resolve(ident.Token); !ok {
 			t.Errorf("commander token does not resolve: %+v", ident)
 		}
-		// `.tw/auth` is the shell-friendly form of the same token, and it must
+		// `.saker/auth` is the shell-friendly form of the same token, and it must
 		// match the identity file (a stale header would be worse than none).
 		auth, err := os.ReadFile(authPath(s.CommanderDir()))
 		if err != nil || strings.TrimSpace(string(auth)) != "Authorization: Bearer "+ident.Token {

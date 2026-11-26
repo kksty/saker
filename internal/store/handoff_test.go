@@ -131,7 +131,7 @@ func TestBeginHandoffCASLeavesStateUntouchedOnConflict(t *testing.T) {
 // it because the gate refuses to replace a run that never archived its prompt.
 func archiveRun(t *testing.T, s *Store, runID string) {
 	t.Helper()
-	if _, err := s.UpdateRun(runID, func(r *model.Run) { r.BriefPath = ".tw/briefs/" + r.ID + ".md" }); err != nil {
+	if _, err := s.UpdateRun(runID, func(r *model.Run) { r.BriefPath = ".saker/briefs/" + r.ID + ".md" }); err != nil {
 		t.Fatal(err)
 	}
 }

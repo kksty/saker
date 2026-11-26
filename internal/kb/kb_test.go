@@ -160,7 +160,7 @@ func TestCopyToCase(t *testing.T) {
 	if err := os.WriteFile(local, []byte(`{"id":"kb999","title":"现场条目","detail":"随 case 带走"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	dst := filepath.Join(t.TempDir(), ".tw", "kb")
+	dst := filepath.Join(t.TempDir(), ".saker", "kb")
 	if err := CopyTo(src, dst); err != nil {
 		t.Fatal(err)
 	}

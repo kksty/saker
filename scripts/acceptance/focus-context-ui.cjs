@@ -341,7 +341,7 @@ function focusPage(query) {
     index_query: '/api/focus?intent=intent_in_1',
     cold_query: '/api/focus?intent=intent_in_1&layer=cold',
     fact_query: '/api/facts?intent=intent_in_1',
-    premises: '.tw/context.json',
+    premises: '.saker/context.json',
     experience_query: '/api/experience?intent=intent_in_1',
     total: 0,
     has_more: false,

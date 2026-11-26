@@ -95,7 +95,7 @@ export function FocusPanel({
     <div className="flex h-full min-h-0 flex-col" data-testid="focus-panel">
       <div className="shrink-0 border-b border-hairline px-5 py-3 text-[12px] leading-5 text-ink-2 sm:px-6 lg:px-8">
         焦点是本次派发的有界索引：热层是必要前提、固定与参考事实，温层是来源链与同一记录实体的跨分支观察，冷层是其余事实。索引截断或未列出不等于事实不存在；冷层、完整前提目录（
-        <code className="font-mono text-[11px] text-ink-3">.tw/context.json</code>）与按 id 读取始终可用。只读，不是新结论。
+        <code className="font-mono text-[11px] text-ink-3">.saker/context.json</code>）与按 id 读取始终可用。只读，不是新结论。
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline px-5 py-2 sm:px-6 lg:px-8">

@@ -81,7 +81,7 @@ func TestFocusIndexAndAPIExposeTheSameContract(t *testing.T) {
 	if err := writeFocusFiles(workDir, db, in.ID); err != nil {
 		t.Fatal(err)
 	}
-	rawManifest, err := os.ReadFile(filepath.Join(workDir, ".tw", "focus.json"))
+	rawManifest, err := os.ReadFile(filepath.Join(workDir, ".saker", "focus.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +216,7 @@ func TestFocusIndexIsDeterministicAndSurvivesHistoryLoss(t *testing.T) {
 	if err := writeFocusFiles(secondDir, db, in.ID); err != nil {
 		t.Fatal(err)
 	}
-	for _, rel := range []string{".tw/focus.json"} {
+	for _, rel := range []string{".saker/focus.json"} {
 		a, err := os.ReadFile(filepath.Join(firstDir, filepath.FromSlash(rel)))
 		if err != nil {
 			t.Fatal(err)
@@ -337,7 +337,7 @@ func TestDispatchContextContractIsSessionIndependentForOldPremise(t *testing.T) 
 		Prerequisites int      `json:"prerequisites_total"`
 		Pages         []string `json:"pages"`
 	}
-	raw, err := os.ReadFile(filepath.Join(workDir, ".tw", "context.json"))
+	raw, err := os.ReadFile(filepath.Join(workDir, ".saker", "context.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

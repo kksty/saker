@@ -266,10 +266,10 @@ func TestRouterCanResumePerTransport(t *testing.T) {
 	if executor.CanResume(ex, "hub", work) {
 		t.Fatal("empty case must not be resumable")
 	}
-	if err := os.MkdirAll(filepath.Join(work, ".tw"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(work, ".saker"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(work, ".tw", "aop-session.json"), []byte(`{"url":"http://127.0.0.1:1","session":"s1"}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(work, ".saker", "aop-session.json"), []byte(`{"url":"http://127.0.0.1:1","session":"s1"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if !executor.CanResume(ex, "hub", work) {
@@ -278,7 +278,7 @@ func TestRouterCanResumePerTransport(t *testing.T) {
 	if executor.CanResume(ex, "audit", work) {
 		t.Fatal("a one-shot audit report must not be treated as a resumable trajectory")
 	}
-	if err := os.WriteFile(filepath.Join(work, ".tw", "aop-session.json"), []byte(`{"url":"http://old-host","session":"s1"}`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(work, ".saker", "aop-session.json"), []byte(`{"url":"http://old-host","session":"s1"}`), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if executor.CanResume(ex, "hub", work) {

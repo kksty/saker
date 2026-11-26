@@ -4,7 +4,7 @@
   "engines": {
     "node": ">=24"
   },
-  "description": "Saker 控制台前端（cyber-ui）。Go 侧只用构建产物，见 web/。",
+  "description": "Saker 控制台前端（web/packages/ui 组件库）。Go 侧只用构建产物，见 web/。",
   "scripts": {
     "dev": "pnpm --filter @saker/web dev",
     "build": "pnpm --filter @saker/web build",

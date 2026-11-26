@@ -331,10 +331,10 @@ func TestResumeGoneRetriesOnResetSession(t *testing.T) {
 	defer srv.Close()
 	f := newNativeFixture(t, srv.URL)
 	work := filepath.Join(f.server.CaseRoot, f.intent.ID)
-	if err := os.MkdirAll(filepath.Join(work, ".tw"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(work, ".saker"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(work, ".tw", "aop-session.json"),
+	if err := os.WriteFile(filepath.Join(work, ".saker", "aop-session.json"),
 		[]byte(`{"url":"`+srv.URL+`","agent":"local","session":"sess-gone"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}

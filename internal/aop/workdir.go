@@ -21,7 +21,7 @@ import (
 // log line, the session quietly keeps the agent's process directory, and every
 // relative path a run writes lands there instead of the case directory. Change
 // both sides together, or neither.
-const WorkDirExtensionURL = "type.googleapis.com/tianwu.WorkDir"
+const WorkDirExtensionURL = "type.googleapis.com/saker.WorkDir"
 
 type workDirPayload struct {
 	WorkDir    string `json:"work_dir"`

@@ -1,26 +1,14 @@
-<!-- 占位图标（几何标记）：正式 logo 素材到位后整份替换，不自造图案。 -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Saker">
+<!-- Saker tab icon: the wordmark's S, drawn at the same weight as the rail
+     (see web/src/components/Wordmark.tsx). Two tones because a tab strip can be
+     light or dark; no background tile, the letter is the mark. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 22.6 26" role="img" aria-label="Saker">
   <style>
-    svg {
-      --mark: #14161b;
-    }
+    svg { color: #14161b; }
     @media (prefers-color-scheme: dark) {
-      svg {
-        --mark: #fff4ea;
-      }
+      svg { color: #eeeae1; }
     }
   </style>
-  <g stroke="var(--mark)" stroke-width="13" stroke-linecap="round">
-    <path d="M100 100 L100 30"/>
-    <path d="M100 100 L170 100"/>
-    <path d="M100 100 L100 170"/>
-    <path d="M100 100 L30 100"/>
+  <g fill="currentColor" stroke="currentColor">
+    <g transform="translate(0 0)"><polygon points="0,0 18.6,0 15.7,5.2 0,5.2"/><polygon points="0,0 2.6,0 2.6,13.6 0,13.6"/><polygon points="0,8.4 18.6,8.4 18.6,13.6 0,13.6"/><polygon points="16,8.4 18.6,8.4 18.6,22 16,22"/><polygon points="2.9,16.8 18.6,16.8 18.6,22 0,22"/></g>
   </g>
-  <g fill="var(--mark)">
-    <circle cx="100" cy="30" r="20"/>
-    <circle cx="170" cy="100" r="20"/>
-    <circle cx="100" cy="170" r="20"/>
-    <circle cx="30" cy="100" r="20"/>
-  </g>
-  <circle cx="100" cy="100" r="28" fill="#e23325"/>
 </svg>

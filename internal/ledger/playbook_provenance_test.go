@@ -19,7 +19,7 @@ func settlePlaybookLine(t *testing.T, st *store.Store, runID, intentID string, s
 	dir := t.TempDir()
 	caseRoot := filepath.Join(dir, "cases")
 	work := filepath.Join(caseRoot, intentID)
-	if err := os.MkdirAll(filepath.Join(work, ".tw"), 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Join(work, ".saker"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	raw, err := json.Marshal(map[string]any{
@@ -29,7 +29,7 @@ func settlePlaybookLine(t *testing.T, st *store.Store, runID, intentID string, s
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(work, ".tw", "facts.jsonl"), append(raw, '\n'), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(work, ".saker", "facts.jsonl"), append(raw, '\n'), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	g := Ingestor{Store: st}

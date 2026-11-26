@@ -31,7 +31,7 @@ func applyLine(id, summary string, offset int64) DeclaredFact {
 	return DeclaredFact{
 		DeclarationID: id,
 		Offset:        offset,
-		Location:      ".tw/facts.jsonl#bytes=0-10",
+		Location:      ".saker/facts.jsonl#bytes=0-10",
 		Kind:          "vuln",
 		Title:         "同一观察",
 		Summary:       summary,

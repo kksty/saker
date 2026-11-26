@@ -346,14 +346,14 @@ func TestRunStreamsTurnEvents(t *testing.T) {
 // short control-plane goal as the separate RunGoal extension: the evaluator
 // judges the goal, the agent reads the whole brief. The old workaround (write
 // the brief to a case file, send a short "read that file" input) is gone, so no
-// `.tw/brief.md` may appear and the turn input must carry the full brief.
+// `.saker/brief.md` may appear and the turn input must carry the full brief.
 func TestEvaluatedRunSendsGoalExtensionAndFullBrief(t *testing.T) {
 	work := t.TempDir()
 	h := &fakeHost{sessions: map[string]bool{}, hostDir: filepath.Dir(work)}
 	ex, done := newFake(t, h)
 	defer done()
 
-	brief := "## 意图\nUNIQUE-EXECUTOR-BRIEF 枚举攻击面\n\n## 交接（必做）\n写 .tw/facts.jsonl"
+	brief := "## 意图\nUNIQUE-EXECUTOR-BRIEF 枚举攻击面\n\n## 交接（必做）\n写 .saker/facts.jsonl"
 	_, err := ex.Run(context.Background(), executor.Request{
 		IntentID: "i1", Prompt: brief, WorkDir: work,
 		Goal: "枚举攻击面", Eval: "产出一份候选清单", EvalRounds: "3",
@@ -362,11 +362,11 @@ func TestEvaluatedRunSendsGoalExtensionAndFullBrief(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := os.Stat(filepath.Join(work, ".tw", "brief.md")); !os.IsNotExist(err) {
-		t.Fatalf("the removed brief-file workaround wrote .tw/brief.md: %v", err)
+	if _, err := os.Stat(filepath.Join(work, ".saker", "brief.md")); !os.IsNotExist(err) {
+		t.Fatalf("the removed brief-file workaround wrote .saker/brief.md: %v", err)
 	}
 	p := h.prompts[0]
-	if !strings.Contains(p, "UNIQUE-EXECUTOR-BRIEF") || strings.Contains(p, "先读取 `.tw/brief.md`") {
+	if !strings.Contains(p, "UNIQUE-EXECUTOR-BRIEF") || strings.Contains(p, "先读取 `.saker/brief.md`") {
 		t.Fatalf("turn input is not the full executor brief: %q", p)
 	}
 	if len(h.runGoals) != 1 || !h.runGoals[0].Present {

@@ -23,7 +23,7 @@ type identityExec struct {
 func (e *identityExec) Name() string { return "identity-recorder" }
 
 func (e *identityExec) Run(_ context.Context, req executor.Request, _ func(executor.Event)) (executor.Result, error) {
-	path := filepath.Join(req.WorkDir, ".tw", "identity.json")
+	path := filepath.Join(req.WorkDir, ".saker", "identity.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		e.err = err
@@ -68,7 +68,7 @@ func TestDispatchIssuesAndRevokesRunIdentity(t *testing.T) {
 	if _, ok := s.Collab.Resolve(ex.ident.Token); ok {
 		t.Fatal("token still resolves after the run settled")
 	}
-	if _, err := os.Stat(filepath.Join(p.CaseDir, in.ID, ".tw", "identity.json")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(p.CaseDir, in.ID, ".saker", "identity.json")); !os.IsNotExist(err) {
 		t.Fatalf("identity file survived the run: %v", err)
 	}
 }

@@ -145,7 +145,7 @@ func (s *Server) CommanderHeader() string {
 		id = s.Project.ID
 	}
 	base := s.apiBase()
-	return fmt.Sprintf("- 项目：`%s`\n- 控制面：`%s`\n- 令牌与地址已在每个命令里就绪：`$SAKER_AUTH`（一行 `Authorization: Bearer …`）、`$SAKER_BATTLE`（战场与笔记基址）、`$SAKER_AGENT`（参与者基址）、`$SAKER_API`（控制面地址）、`$SAKER_PROJECT`、`$SAKER_BIN`（saker 可执行文件绝对路径）；直接用。为空时用 `$(cat .tw/auth)` 与 `.tw/identity.json` 兜底\n- 读状态优先用原生只读命令（输出已是给模型读的格式化文本，**不得再用 python 解析**）：`\"$SAKER_BIN\" board`、`\"$SAKER_BIN\" wake`、`\"$SAKER_BIN\" facts --ids f_x`；写操作仍用 API/curl\n- 原始接口兜底：读 `$SAKER_BATTLE/board`，请求头用 `$SAKER_AUTH`；笔记是 `$SAKER_BATTLE/state`\n- 署名：控制面按令牌归属，写操作不必自己加署名头\n- 会话目录：`%s`",
+	return fmt.Sprintf("- 项目：`%s`\n- 控制面：`%s`\n- 令牌与地址已在每个命令里就绪：`$SAKER_AUTH`（一行 `Authorization: Bearer …`）、`$SAKER_BATTLE`（战场与笔记基址）、`$SAKER_AGENT`（参与者基址）、`$SAKER_API`（控制面地址）、`$SAKER_PROJECT`、`$SAKER_BIN`（saker 可执行文件绝对路径）；直接用。为空时用 `$(cat .saker/auth)` 与 `.saker/identity.json` 兜底\n- 读状态优先用原生只读命令（输出已是给模型读的格式化文本，**不得再用 python 解析**）：`\"$SAKER_BIN\" board`、`\"$SAKER_BIN\" wake`、`\"$SAKER_BIN\" facts --ids f_x`；写操作仍用 API/curl\n- 原始接口兜底：读 `$SAKER_BATTLE/board`，请求头用 `$SAKER_AUTH`；笔记是 `$SAKER_BATTLE/state`\n- 署名：控制面按令牌归属，写操作不必自己加署名头\n- 会话目录：`%s`",
 		id, base, s.CommanderDir())
 }
 
@@ -310,7 +310,7 @@ func (s *Server) StartCommander(ctx context.Context, prompt string, resume bool)
 		}
 	}
 	workDir := s.CommanderDir()
-	if err := os.MkdirAll(filepath.Join(workDir, ".tw"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(workDir, ".saker"), 0o755); err != nil {
 		return executor.Result{}, nil, err
 	}
 	if resume && !executor.CanResume(s.Exec, node, workDir) {

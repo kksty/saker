@@ -192,7 +192,7 @@ func TestGraphEvidencePathsAreDeclarable(t *testing.T) {
 		t.Fatal(err)
 	}
 	workDir := filepath.Join(casesRoot, "in_b")
-	if err := os.MkdirAll(filepath.Join(workDir, ".tw"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(workDir, ".saker"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -225,7 +225,7 @@ func TestGraphEvidencePathsAreDeclarable(t *testing.T) {
 		t.Fatal(err)
 	}
 	line := `{"kind":"note","title":"复用旧证据","evidence":[` + string(quoted) + `]}` + "\n"
-	if err := os.WriteFile(filepath.Join(workDir, ".tw", "facts.jsonl"), []byte(line), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(workDir, ".saker", "facts.jsonl"), []byte(line), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

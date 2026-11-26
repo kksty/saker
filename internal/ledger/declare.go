@@ -24,7 +24,7 @@ import (
 // writes prose and files. Asking it to write one JSON object per line is the
 // cheapest structured channel that survives a tool wrapper change.
 const (
-	HandoffDir  = ".tw"
+	HandoffDir  = ".saker"
 	HandoffFile = "facts.jsonl"
 	// HandoffOffset marks how much of the handoff earlier runs already
 	// consumed. A case directory outlives its runs — a retry, and now a steer,
@@ -194,7 +194,7 @@ func HandoffPath(workDir string) string {
 	return filepath.Join(workDir, HandoffDir, HandoffFile)
 }
 
-// ReadDeclared parses <workDir>/.tw/facts.jsonl from the beginning. It is the
+// ReadDeclared parses <workDir>/.saker/facts.jsonl from the beginning. It is the
 // whole-file view, used by tests and by anything that wants the raw handoff;
 // a run must use ReadDeclaredSince.
 //
@@ -254,7 +254,7 @@ func readOffset(workDir string) int64 {
 	return n
 }
 
-// readDeclared parses <workDir>/.tw/facts.jsonl. A missing file is not an
+// readDeclared parses <workDir>/.saker/facts.jsonl. A missing file is not an
 // error: it means the executor ignored the contract, which is reported as
 // declared_facts=0 instead of failing the run.
 //
@@ -411,7 +411,7 @@ func readDeclared(casesRoot, workDir string, start int64, final bool) (Declared,
 		df.From = from
 		df.Refs = citations
 
-		df.Location = fmt.Sprintf(".tw/facts.jsonl#bytes=%d-%d", consumed-n, consumed)
+		df.Location = fmt.Sprintf(".saker/facts.jsonl#bytes=%d-%d", consumed-n, consumed)
 		df.DeclarationID = strings.TrimSpace(df.DeclarationID)
 		df.ExecutionContextRef = strings.TrimSpace(df.ExecutionContextRef)
 		// The grade is write-time normalised once. An unusable label loses only
@@ -693,7 +693,7 @@ func resolveEvidence(casesRoot, workDir, name string) (string, evidenceState) {
 		if len(parts) > 0 && (parts[0] == ".access" || parts[0] == ".native") {
 			return "", evidenceInvalid
 		}
-		if len(parts) > 3 && parts[1] == ".tw" && parts[2] == "access" {
+		if len(parts) > 3 && parts[1] == ".saker" && parts[2] == "access" {
 			return "", evidenceInvalid
 		}
 	}

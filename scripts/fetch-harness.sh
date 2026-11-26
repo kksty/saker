@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Download matched zip artifacts built from tianwu/fixes (Hub + scan node).
+# Download matched zip artifacts built from saker/fixes (Hub + scan node).
 set -eu
 [ $# -ge 2 ] || { echo "usage: $0 <hub-zip-url> <scan-zip-url> [hub-sha256] [scan-sha256]" >&2; exit 1; }
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)

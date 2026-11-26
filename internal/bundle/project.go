@@ -536,7 +536,7 @@ func walkProjectEntries(root, prefix string, wanted func(rel string) bool, entri
 
 // projectCaseFileWanted is the durable subset of a case tree.
 //
-// .verify/.cyber are judgement/runtime state; .tw is mostly the handoff channel
+// .verify/.cyber are judgement/runtime state; .saker is mostly the handoff channel
 // and per-run credentials. Worker notes, fact declarations, consumption cursors
 // and explicit repair audits are durable: losing them prevents cross-run memory
 // and makes a stranded declaration impossible to diagnose or recover. Login materials (.access) travel only
@@ -554,16 +554,16 @@ func projectCaseFileWanted(rel string) bool {
 		}
 	}
 	base := parts[len(parts)-1]
-	hasTW, hasAccess := false, false
+	hasHandoff, hasAccess := false, false
 	for _, part := range parts {
 		switch part {
-		case ".tw":
-			hasTW = true
+		case ".saker":
+			hasHandoff = true
 		case ".access":
 			hasAccess = true
 		}
 	}
-	if hasTW {
+	if hasHandoff {
 		return base == "worker-note.md" || base == "facts.jsonl" || base == "facts.offset" || strings.HasPrefix(base, "cursor-repair-") && strings.HasSuffix(base, ".json")
 	}
 	if hasAccess {

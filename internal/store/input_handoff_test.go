@@ -47,7 +47,7 @@ func TestPrepareRunInputRefusesHandoffWithoutArchivedBrief(t *testing.T) {
 
 	// (c) With the archive in place the same run may be prepared: the refusal is
 	// about the missing evidence, not about handoffs in general.
-	if _, err := st.UpdateRun(bare.ID, func(r *model.Run) { r.BriefPath = ".tw/briefs/" + r.ID + ".md" }); err != nil {
+	if _, err := st.UpdateRun(bare.ID, func(r *model.Run) { r.BriefPath = ".saker/briefs/" + r.ID + ".md" }); err != nil {
 		t.Fatal(err)
 	}
 	archived := *inHandoffOn(t, st, in.ID, &model.Handoff{FromRun: bare.ID, Note: "旧的"})

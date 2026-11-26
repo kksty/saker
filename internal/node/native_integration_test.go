@@ -43,7 +43,7 @@ func TestNativeMultiScanDispatchCancelAndResume(t *testing.T) {
 				last = string(m.Content)
 			}
 		}
-		if strings.Contains(last, "TW-MULTI-CANCEL") {
+		if strings.Contains(last, "SAKER-MULTI-CANCEL") {
 			blockedOnce.Do(func() { close(blocked) })
 			<-r.Context().Done()
 			return
@@ -117,7 +117,7 @@ func TestNativeMultiScanDispatchCancelAndResume(t *testing.T) {
 	work := filepath.Join(root, "project", "case")
 	_ = os.MkdirAll(work, 0700)
 	emit := func(executor.Event) {}
-	req := executor.Request{IntentID: "fixture", Node: "scan_" + worker, WorkDir: work, Prompt: "TW-MULTI-FIRST: return fixture complete", MaxTurns: 1}
+	req := executor.Request{IntentID: "fixture", Node: "scan_" + worker, WorkDir: work, Prompt: "SAKER-MULTI-FIRST: return fixture complete", MaxTurns: 1}
 	if _, err = router.Run(ctx, req, emit); err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestNativeMultiScanDispatchCancelAndResume(t *testing.T) {
 	defer cancelTurn()
 	done := make(chan error, 1)
 	req.Resume = true
-	req.Prompt = "TW-MULTI-CANCEL"
+	req.Prompt = "SAKER-MULTI-CANCEL"
 	go func() { _, e := router.Run(cancelCtx, req, emit); done <- e }()
 	select {
 	case <-blocked:
@@ -148,7 +148,7 @@ func TestNativeMultiScanDispatchCancelAndResume(t *testing.T) {
 	if !router.CanResume(req.Node, work) {
 		t.Fatal("cancellation lost the resumable session")
 	}
-	req.Prompt = "TW-MULTI-RESUME: return fixture complete"
+	req.Prompt = "SAKER-MULTI-RESUME: return fixture complete"
 	if _, err = router.Run(ctx, req, emit); err != nil {
 		t.Fatal(err)
 	}

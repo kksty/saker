@@ -9,7 +9,7 @@
 @source "../packages/ui/src/**/*.{ts,tsx}";
 @source "../packages/theme/src/**/*.{ts,tsx}";
 
-/* cyber-ui is built for a class-based dark mode (ThemeProvider toggles `.dark`). */
+/* The component library is built for a class-based dark mode (ThemeProvider toggles `.dark`). */
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
@@ -540,53 +540,19 @@
     scrollbar-gutter: stable;
   }
 
-  /* Brand lockup (Brand.tsx). Pure typographic wordmark: a warm cream→coral
-   * gradient over a 楷体/衬线 stack with a hair of engraving shadow, and a tiny
-   * vermillion seal dot. Keeping it in CSS (not baked into an image) means the
-   * treatment is identical in both shells and on the login page, and the name
-   * stays selectable/readable for assistive tech.
+  /* Brand mark (Brand.tsx). The wordmark is drawn geometry, not text: the CSS
+   * only picks the ink. It follows the rail's foreground so the same file works
+   * in both shells and on the login page, and stays a legible shape for
+   * assistive tech through its aria-label.
    *
-   * Sizes are one lockup, not two unrelated lines: the CJK mark is the name and
-   * the latin caption is its fallback, so the caption has to stay legible at
-   * 1x (7px read as a smudge beside the 22px mark) while the mark steps back a
-   * hair so the pair still reads as one block inside the 216px rail. */
-  .saker-brand-cn {
-    font-family: "Kaiti SC", "STKaiti", "KaiTi", "Noto Serif SC", "Songti SC", serif;
-    font-size: 21px;
-    font-weight: 700;
-    line-height: 1;
-    letter-spacing: 0.1em;
-    background: linear-gradient(180deg, var(--saker-brand-top, #6c1a1b), var(--saker-brand-bottom, #b43730));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+   * Colour is deliberately neutral rather than the vermillion accent: the mark
+   * sits beside every primary action in the console, and a second red mass
+   * there competes with the CTA and the active-marker. */
+  .saker-wordmark {
+    color: var(--ink-1);
+    overflow: visible;
   }
 
-  .dark .saker-brand-cn {
-    --saker-brand-top: #fff8f2;
-    --saker-brand-bottom: #ff9b84;
-    filter: drop-shadow(0 1px 0 rgb(110 8 8 / 0.5));
-  }
-
-  .saker-brand-latin {
-    font-family: var(--font-mono);
-    font-size: 9px;
-    font-weight: 600;
-    line-height: 1;
-    letter-spacing: 0.26em;
-    text-transform: uppercase;
-    color: var(--ink-2);
-  }
-
-  /* The one graphic accent of the wordmark: a stamped vermillion square. */
-  .saker-brand-dot {
-    width: 4px;
-    height: 4px;
-    margin-top: 4px;
-    border-radius: 1px;
-    background: var(--primary);
-    box-shadow: 0 0 8px color-mix(in oklab, var(--primary) 70%, transparent);
-  }
 
   /* ---------------------------------------------------------------- motion */
 
@@ -602,7 +568,7 @@
    *
    * What remains is feedback for a real, in-flight state — a pending destructive
    * action's progress bar — plus the design system's own loading blocks and
-   * spinners (`animate-pulse` / `animate-spin`, which live in cyber-ui).
+   * spinners (`animate-pulse` / `animate-spin`, which live in web/packages/ui).
    *
    * The graph canvas keeps its own motion (simulation settle, marching dashes,
    * ripples, minimap live rings): there the movement *is* the information.

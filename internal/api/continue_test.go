@@ -339,7 +339,7 @@ func TestContinueAfterCompactionInjectsWorkerNote(t *testing.T) {
 		r.ContextWindow = 128000
 	})
 	note := "已确认：/admin 对普通用户返回 200，证据 raw/admin.json\n下一步：拿订单导出验证越权范围"
-	if err := os.WriteFile(filepath.Join(s.CaseRoot, in.ID, ".tw", "worker-note.md"), []byte(note), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(s.CaseRoot, in.ID, ".saker", "worker-note.md"), []byte(note), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -453,7 +453,7 @@ func TestCreateIntentRecordsConsoleActor(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/intents",
 			strings.NewReader(`{"title":"查 /admin","description":"只读"}`))
 		if actor != "" {
-			req.Header.Set("X-Tw-Actor", actor)
+			req.Header.Set("X-Saker-Actor", actor)
 		}
 		rec := httptest.NewRecorder()
 		mux.ServeHTTP(rec, req)
@@ -496,10 +496,10 @@ func TestFreshDispatchInjectsRecoveredWorkerNote(t *testing.T) {
 		t.Fatal(err)
 	}
 	note := "已确认：目标只开了 443\n下一步：从 TLS 证书找内网域名"
-	if err := os.MkdirAll(filepath.Join(s.CaseRoot, in.ID, ".tw"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(s.CaseRoot, in.ID, ".saker"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(s.CaseRoot, in.ID, ".tw", "worker-note.md"), []byte(note), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(s.CaseRoot, in.ID, ".saker", "worker-note.md"), []byte(note), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -533,10 +533,10 @@ func TestReadWorkerNoteRedactsAndKeepsTheWholeNote(t *testing.T) {
 	}
 	s.Secrets = func() []string { return []string{"sk-live-0123456789"} }
 	big := "secret=sk-live-0123456789\n" + strings.Repeat("甲", 20000) + "\n下一步：先验证越权范围" // gitleaks:allow -- deliberately fictional redaction fixture
-	if err := os.MkdirAll(filepath.Join(dir, ".tw"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, ".saker"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, ".tw", "worker-note.md"), []byte(big), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ".saker", "worker-note.md"), []byte(big), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	note := s.readWorkerNote(dir)

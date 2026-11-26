@@ -114,7 +114,7 @@ func (f *agentFixture) makeLive(t *testing.T) model.Run {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	dir := filepath.Join(f.p.CaseDir, f.target.ID, ".tw")
+	dir := filepath.Join(f.p.CaseDir, f.target.ID, ".saker")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}

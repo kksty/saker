@@ -43,7 +43,7 @@ const (
 )
 
 // Graph is the executor's read-only snapshot of the ledger, written to
-// <workdir>/.tw/graph.json at dispatch.
+// <workdir>/.saker/graph.json at dispatch.
 //
 // It carries raw observations and the conclusions someone actually wrote down:
 // facts, notes, the other intents and the goals. It deliberately carries no
@@ -195,7 +195,7 @@ func BuildTaskGraph(db store.DB, scope, intentID string) Graph {
 			count = len(in.FromFactIDs)
 		}
 	}
-	g.Context = &TaskContext{IntentID: intentID, Prerequisites: count, Manifest: ".tw/context.json", Query: "/api/graph?root=intent:" + intentID + "&direction=ancestors&depth=0"}
+	g.Context = &TaskContext{IntentID: intentID, Prerequisites: count, Manifest: ".saker/context.json", Query: "/api/graph?root=intent:" + intentID + "&direction=ancestors&depth=0"}
 	g.Goals = nil
 	return g
 }

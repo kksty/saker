@@ -35,8 +35,8 @@ manifest:
 harness:
 	@test -f "$(HARNESS_DIR)/go.mod" || { \
 	  echo "找不到 $(HARNESS_DIR)/go.mod：本仓库不内置 harness 源码。" >&2; \
-	  echo "先单独 clone kksty/cyber-harness 的 tianwu/fixes，再用 HARNESS_DIR 指过去，例如：" >&2; \
-	  echo "  git clone --branch tianwu/fixes https://github.com/kksty/cyber-harness.git .build/harness-src" >&2; \
+	  echo "先单独 clone kksty/cyber-harness 的 saker/fixes，再用 HARNESS_DIR 指过去，例如：" >&2; \
+	  echo "  git clone --branch saker/fixes https://github.com/kksty/cyber-harness.git .build/harness-src" >&2; \
 	  echo "  make harness HARNESS_DIR=.build/harness-src" >&2; \
 	  exit 1; \
 	}
@@ -44,7 +44,7 @@ harness:
 	cd "$(HARNESS_DIR)" && go build -tags "$(filter-out full,$(TAGS))" -o "$(CURDIR)/$(BIN)/cyber-scan$(EXE)" ./cmd/cyber-scan
 	@echo "ok: $(BIN)/cyber-harness$(EXE) + cyber-scan$(EXE)"
 
-# 离线游标修复工具：停掉 saker 且项目暂停后，对单个方向显式预览/提交消费游标。
+# 离线游标修复工具：停掉 saker 且项目暂停后，对单个意图显式预览/提交消费游标。
 repair:
 	go build -o "$(BIN)/saker-repair$(EXE)" ./cmd/saker-repair
 	@echo "ok: $(BIN)/saker-repair$(EXE)"

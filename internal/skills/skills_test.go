@@ -97,7 +97,7 @@ func TestInstallPutsSkillWhereHarnessLooks(t *testing.T) {
 	// the hit list carries no body, so the skill must name the field that says
 	// a body exists and the call that opens exactly one entry. Without it the
 	// commander either pulls nothing or pulls the whole library.
-	for _, needle := range []string{"name: commander", "$SAKER_API", "$SAKER_API/api/kb", "has_detail", "api/kb?id=", "$SAKER_AUTH", "$SAKER_BATTLE", "`PUT /api/state`", ".tw/auth", "整份重写", "不是轮次日志", "只留对下一轮有价值", "可以自己整份重写或删改", "操作员定义", "说清目标口径怎么被证据满足", "目标是否达成由你", "是否要求独立复核由项目当前前提政策决定，完成同样须通过准入", "没有待办、在途意图或显式等待事项", "结束本轮", "可复核的原始证据", "不当作已验证结论或目标完成证明", "不依赖项目是否启用约束文档", "复核是控制面的 support run", "项目里已有事实时", "不要用无前提意图绕过", "按本轮提示的复核模式", "review_failed", "不会挂起等操作员", "不要抢跑"} {
+	for _, needle := range []string{"name: commander", "$SAKER_API", "$SAKER_API/api/kb", "has_detail", "api/kb?id=", "$SAKER_AUTH", "$SAKER_BATTLE", "`PUT /api/state`", ".saker/auth", "整份重写", "不是轮次日志", "只留对下一轮有价值", "可以自己整份重写或删改", "操作员定义", "说清目标口径怎么被证据满足", "目标是否达成由你", "是否要求独立复核由项目当前前提政策决定，完成同样须通过准入", "没有待办、在途意图或显式等待事项", "结束本轮", "可复核的原始证据", "不当作已验证结论或目标完成证明", "不依赖项目是否启用约束文档", "复核是控制面的 support run", "项目里已有事实时", "不要用无前提意图绕过", "按本轮提示的复核模式", "review_failed", "不会挂起等操作员", "不要抢跑"} {
 		if !strings.Contains(string(body), needle) {
 			t.Errorf("skill body missing %q", needle)
 		}
@@ -268,7 +268,7 @@ func TestCollaborateSkillCarriesIdentityAndBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, needle := range []string{"name: collaborate", ".tw/identity.json", "idempotency_key", "不是事实", "generation", "worker-note.md", "第二份账本", "篇幅由你判断", "战场态势（只读）", "$BATTLE", "has_detail", "$API/kb?id=", "<meta charset=\"utf-8\">", "curl.exe", "内嵌 POSIX sh"} {
+	for _, needle := range []string{"name: collaborate", ".saker/identity.json", "idempotency_key", "不是事实", "generation", "worker-note.md", "第二份账本", "篇幅由你判断", "战场态势（只读）", "$BATTLE", "has_detail", "$API/kb?id=", "<meta charset=\"utf-8\">", "curl.exe", "内嵌 POSIX sh"} {
 		if !strings.Contains(string(body), needle) {
 			t.Errorf("collaborate skill missing %q", needle)
 		}

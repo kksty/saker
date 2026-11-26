@@ -62,7 +62,7 @@ func (s *Server) runContext(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	dir := filepath.Join(s.CaseRoot, in.ID)
-	saker := filepath.Join(dir, ".tw")
+	saker := filepath.Join(dir, ".saker")
 
 	prompt := readCapped(filepath.Join(saker, "prompt.txt"), contextPromptMax)
 	steer := []string{}
@@ -88,7 +88,7 @@ func readRunGraph(dir, runID string) json.RawMessage {
 	if runID == "." || !filepath.IsLocal(runID) || filepath.Base(runID) != runID {
 		return nil
 	}
-	graph := readCapped(filepath.Join(dir, ".tw", "inputs", runID, filepath.FromSlash(graphFile)), contextGraphMax)
+	graph := readCapped(filepath.Join(dir, ".saker", "inputs", runID, filepath.FromSlash(graphFile)), contextGraphMax)
 	if graph == "" {
 		if _, err := os.Lstat(filepath.Join(dir, filepath.FromSlash(runInputFile))); os.IsNotExist(err) {
 			graph = readCapped(filepath.Join(dir, filepath.FromSlash(graphFile)), contextGraphMax)
@@ -140,7 +140,7 @@ func readJSONLines(path string, maxLines int, maxBytes int64) []json.RawMessage 
 	return out
 }
 
-// listCaseFiles lists the top level of the case plus the .tw/ bookkeeping files
+// listCaseFiles lists the top level of the case plus the .saker/ bookkeeping files
 // an executor can reach, so the page can show what exists even when a file is
 // too large to render.
 func listCaseFiles(dir string) []contextFile {
@@ -160,13 +160,13 @@ func listCaseFiles(dir string) []contextFile {
 			add("", e.Name(), info.Size())
 		}
 	}
-	if saker, err := os.ReadDir(filepath.Join(dir, ".tw")); err == nil {
+	if saker, err := os.ReadDir(filepath.Join(dir, ".saker")); err == nil {
 		for _, e := range saker {
 			if e.IsDir() {
 				continue
 			}
 			if info, err := e.Info(); err == nil {
-				add(".tw/", e.Name(), info.Size())
+				add(".saker/", e.Name(), info.Size())
 			}
 		}
 	}

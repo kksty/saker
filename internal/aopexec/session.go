@@ -10,7 +10,7 @@ import (
 // a file in the case directory. What the case needs locally is a pointer to it:
 // which host, which agent, which session. That pointer is also what "is there
 // something to continue?" means (D42).
-const markerFile = ".tw/aop-session.json"
+const markerFile = ".saker/aop-session.json"
 
 type marker struct {
 	// Node records which registry node produced the session. It is history

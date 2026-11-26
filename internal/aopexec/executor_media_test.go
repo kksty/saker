@@ -29,7 +29,7 @@ func TestMediaEventsPreservesAndAttributesTheTurn(t *testing.T) {
 	if got.TurnID != "turn-9" || got.SessionID != "session-1" {
 		t.Fatalf("attribution = turn %q session %q, want turn-9 session-1", got.TurnID, got.SessionID)
 	}
-	if want := ".tw/media/evt-7-0.png"; got.Text != want {
+	if want := ".saker/media/evt-7-0.png"; got.Text != want {
 		t.Fatalf("text = %q, want %q", got.Text, want)
 	}
 	if _, err := os.Stat(filepath.Join(workdir, filepath.FromSlash(got.Text))); err != nil {
@@ -48,7 +48,7 @@ func TestMediaEventsReportsRejectedMedia(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected the over-budget medium to be reported")
 	}
-	if len(events) != 1 || events[0].Text != ".tw/media/evt-8-1.png" {
+	if len(events) != 1 || events[0].Text != ".saker/media/evt-8-1.png" {
 		t.Fatalf("events = %+v, want only the second medium", events)
 	}
 }

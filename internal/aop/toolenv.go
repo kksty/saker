@@ -17,7 +17,7 @@ import (
 //
 // The type name is a wire contract with another process; see
 // WorkDirExtensionURL for why it is not renamed with the product.
-const ToolEnvExtensionURL = "type.googleapis.com/tianwu.ToolEnv"
+const ToolEnvExtensionURL = "type.googleapis.com/saker.ToolEnv"
 
 // DisableNativeIOASendEnv controls the harness command without disabling its IOA connection.
 const DisableNativeIOASendEnv = "CYBER_IOA_SEND_DISABLED"

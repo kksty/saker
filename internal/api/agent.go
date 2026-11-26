@@ -105,14 +105,14 @@ func harnessSession(r *http.Request) bool {
 // participant API. It exists only for the lifetime of the turn (the dispatcher
 // revokes the token and removes the file when the run settles) and grants
 // nothing beyond this project's collaboration/fact surface.
-const identityFile = ".tw/identity.json"
+const identityFile = ".saker/identity.json"
 
 // authFile is the same credential as one ready-to-use Authorization header line.
 // A session shells out once per command, so a line it can `cat` is less work and
 // less error-prone than parsing the JSON with sed. The host's shell init exports
 // it as $SAKER_AUTH at shell start, so a model normally never touches the file; it
 // is the fallback for a shell that did not source the init.
-const authFile = ".tw/auth"
+const authFile = ".saker/auth"
 
 func identityPath(workDir string) string {
 	return filepath.Join(workDir, filepath.FromSlash(identityFile))

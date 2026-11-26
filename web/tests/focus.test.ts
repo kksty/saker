@@ -38,7 +38,7 @@ function page(overrides: Partial<FocusPage> = {}): FocusPage {
     index_query: '/api/focus?intent=in_fixture',
     cold_query: '/api/focus?intent=in_fixture&layer=cold',
     fact_query: '/api/facts?intent=in_fixture',
-    premises: '.tw/context.json',
+    premises: '.saker/context.json',
     experience_query: '/api/experience?intent=in_fixture',
     has_more: false,
     total: 40,
@@ -122,7 +122,7 @@ test('the focus API client reads one page from the project namespace', async () 
       { url: '/p/fixture/api/focus?intent=in_fixture&layer=cold&limit=50', method: 'GET' },
     ])
     assert.equal(result.cold, 40)
-    assert.equal(result.premises, '.tw/context.json')
+    assert.equal(result.premises, '.saker/context.json')
   } finally {
     globalThis.fetch = originalFetch
     if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow)

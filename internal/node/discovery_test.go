@@ -49,8 +49,8 @@ func TestNativeHubDiscoversScanPinsResumeAndRetainsOfflineIdentity(t *testing.T)
 		t.Fatal("native node routing lost pin")
 	}
 	work := t.TempDir()
-	_ = os.MkdirAll(filepath.Join(work, ".tw"), 0700)
-	_ = os.WriteFile(filepath.Join(work, ".tw", "aop-session.json"), []byte(`{"url":"`+server.URL+`","agent":"native-worker","session":"session"}`), 0600)
+	_ = os.MkdirAll(filepath.Join(work, ".saker"), 0700)
+	_ = os.WriteFile(filepath.Join(work, ".saker", "aop-session.json"), []byte(`{"url":"`+server.URL+`","agent":"native-worker","session":"session"}`), 0600)
 	if !router.CanResume("scan_native-worker", work) || router.CanResume("local", work) {
 		t.Fatal("session could resume on the wrong scan")
 	}

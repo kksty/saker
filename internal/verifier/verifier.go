@@ -255,7 +255,7 @@ func (v *Verifier) runClaimed(ctx context.Context, f model.Fact, factID string) 
 	// The work dir is new and empty, and the brief addresses the proof as a path,
 	// so the reviewer's own filesystem cannot show it the bytes it must judge.
 	// Hand it the project's read-only surface instead of copying evidence into the
-	// run: the same .tw pair a dispatched turn gets, which the transport turns
+	// run: the same .saker pair a dispatched turn gets, which the transport turns
 	// into $SAKER_BATTLE/$SAKER_AUTH for the session shell. The gate, not this package,
 	// decides what that credential reaches (cmd/saker/auth.go verifierReadAllowed).
 	if v.IssueRead != nil {
@@ -637,7 +637,7 @@ func BuildPrompt(f model.Fact, evidence []string, scope string, premises []premi
 	// it cannot open by itself. Name the surface it does have, or the credential
 	// handed to it is unusable and every review ends in needs_evidence.
 	b.WriteString("\n## 只读原件\n")
-	b.WriteString("上面的路径是账本里登记的原始位置，不一定在本轮工作目录里。结论与它引用的原件可以按 id 只读读取：`$SAKER_BATTLE` 是本项目的只读基址，`$SAKER_AUTH` 是一行可直接用的 `Authorization: Bearer …`（shell 已导出，缺失时读 `.tw/auth`）。可读：`$SAKER_BATTLE/facts`、`/facts/{id}`、`/facts/{id}/history`、`/evidence`、`/evidence/{id}`、`/runs/{id}/events`；其它路径一律 404，没有写接口。\n")
+	b.WriteString("上面的路径是账本里登记的原始位置，不一定在本轮工作目录里。结论与它引用的原件可以按 id 只读读取：`$SAKER_BATTLE` 是本项目的只读基址，`$SAKER_AUTH` 是一行可直接用的 `Authorization: Bearer …`（shell 已导出，缺失时读 `.saker/auth`）。可读：`$SAKER_BATTLE/facts`、`/facts/{id}`、`/facts/{id}/history`、`/evidence`、`/evidence/{id}`、`/runs/{id}/events`；其它路径一律 404，没有写接口。\n")
 	// The scope is stated for the same reason the other brief sections state it:
 	// a reviewer that goes looking for more (other directions' facts, other
 	// ledger tables) stops re-proving this claim and starts hunting, which is a
@@ -703,13 +703,13 @@ func clip(s string, n int) string {
 	return string(r[:n]) + "…"
 }
 
-// writeReadCredential writes the .tw pair a harness session reads at shell start
+// writeReadCredential writes the .saker pair a harness session reads at shell start
 // (aopexec.sessionToolEnv): identity.json names the API base, project and intent;
 // auth holds one ready-to-use Authorization line. Same files a dispatched turn
 // gets from internal/api (identityFile/authFile), written here because a review
 // run has no dispatcher to place them.
 func writeReadCredential(workDir string, cred ReadCredential, intentID string) error {
-	dir := filepath.Join(workDir, ".tw")
+	dir := filepath.Join(workDir, ".saker")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
@@ -735,7 +735,7 @@ func (v *Verifier) releaseRead(runID, workDir string) {
 		v.ReleaseRead(runID)
 	}
 	for _, name := range []string{"identity.json", "auth"} {
-		_ = os.Remove(filepath.Join(workDir, ".tw", name))
+		_ = os.Remove(filepath.Join(workDir, ".saker", name))
 	}
 }
 

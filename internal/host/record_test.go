@@ -14,7 +14,7 @@ import (
 
 func writeMarkerFile(t *testing.T, caseDir, url, agent, session string) string {
 	t.Helper()
-	path := filepath.Join(caseDir, ".tw", "aop-session.json")
+	path := filepath.Join(caseDir, ".saker", "aop-session.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestSweepRenamesStaleLoopbackSessionMarkers(t *testing.T) {
 	livePath := writeMarkerFile(t, filepath.Join(data, "projects", "p1", "cases", "in_b"), current, LocalAgent, "sess-b")
 	commanderPath := writeMarkerFile(t, filepath.Join(data, "projects", "p1", "commander"), old, LocalAgent, "sess-c")
 
-	invalidPath := filepath.Join(data, "projects", "p1", "cases", "in_c", ".tw", "aop-session.json")
+	invalidPath := filepath.Join(data, "projects", "p1", "cases", "in_c", ".saker", "aop-session.json")
 	if err := os.MkdirAll(filepath.Dir(invalidPath), 0o755); err != nil {
 		t.Fatal(err)
 	}

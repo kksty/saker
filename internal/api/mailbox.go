@@ -341,14 +341,14 @@ func (s *Server) sweepMessages() {
 }
 
 // actorOf resolves who is speaking on the console API. The gate stamps
-// X-Tw-Actor from the agent token (cmd/saker auth.wrap), so a harness write is
+// X-Saker-Actor from the agent token (cmd/saker auth.wrap), so a harness write is
 // attributed to the commander even when the model forgets the header; a request
 // on the operator credential stays the operator. The header remains a claim
 // about the speaker, not a second security boundary; it exists so a say from the
 // commander lands in the same message thread with the same shape as an operator
 // say (D86).
 func actorOf(r *http.Request) string {
-	if r != nil && strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Tw-Actor")), collab.CommanderID) {
+	if r != nil && strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Saker-Actor")), collab.CommanderID) {
 		return collab.CommanderID
 	}
 	return collab.OperatorID

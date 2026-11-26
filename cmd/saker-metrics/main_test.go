@@ -309,7 +309,7 @@ func buildCapabilityProject(t *testing.T) string {
 	journal := strings.Join([]string{
 		`{"kind":"status","state":"eval_start","eval_round":1,"eval_max_rounds":3,"at":"2026-01-02T03:00:00Z"}`,
 		`{"kind":"status","state":"eval_end","eval_round":2,"eval_max_rounds":3,"eval_pass":true,"eval_reason":"通过","at":"2026-01-02T03:01:00Z"}`,
-		`{"kind":"media","text":".tw/media/e-1.png","raw":{"path":".tw/media/e-1.png","mime":"image/png","bytes":1234},"at":"2026-01-02T03:02:00Z"}`,
+		`{"kind":"media","text":".saker/media/e-1.png","raw":{"path":".saker/media/e-1.png","mime":"image/png","bytes":1234},"at":"2026-01-02T03:02:00Z"}`,
 		`{"kind":"guardrail","action":"pending_read","session_id":"s1","at":"2026-01-02T03:03:00Z"}`,
 		`{"kind":"guardrail","action":"resolve","approve":true,"session_id":"s1","at":"2026-01-02T03:04:00Z"}`,
 		// The harness guardrail runtime's own structured verdicts (P4-J).

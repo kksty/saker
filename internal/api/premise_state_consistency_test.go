@@ -12,7 +12,7 @@ import (
 	"github.com/kksty/saker/internal/store"
 )
 
-// The premise catalog (`.tw/context/premises-*.json`) and the admission judge
+// The premise catalog (`.saker/context/premises-*.json`) and the admission judge
 // (`readiness`) answer the same question — "may this direction rely on this
 // premise?" — from two different implementations. Twice already the catalog
 // said "usable" and dispatch refused the direction, and both times it was found
@@ -285,7 +285,7 @@ func TestPremiseCatalogStateAgreesWithReadiness(t *testing.T) {
 // premise: the manifest pages are the catalog's only public surface.
 func readCatalogState(t *testing.T, workDir string) string {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join(workDir, ".tw", "context", "premises-0001.json"))
+	raw, err := os.ReadFile(filepath.Join(workDir, ".saker", "context", "premises-0001.json"))
 	if err != nil {
 		t.Fatalf("read premise page: %v", err)
 	}

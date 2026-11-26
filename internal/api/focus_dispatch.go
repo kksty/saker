@@ -15,8 +15,8 @@ import (
 // the hot/warm rows next to the complete premise directory — not a second
 // ledger and not the full text of anything.
 const (
-	focusFile = ".tw/focus.json"
-	focusDir  = ".tw/focus"
+	focusFile = ".saker/focus.json"
+	focusDir  = ".saker/focus"
 
 	// focusMaxPages bounds the on-disk index. When a projection has more
 	// hot/warm rows than fit, the manifest says how many were omitted and points
@@ -108,7 +108,7 @@ func writeFocusFilesAt(workDir, prefix string, db store.DB, intentID string) err
 		WarmQuery:     retrieval.FocusLayerQuery(intentID, retrieval.FocusWarm),
 		ColdQuery:     retrieval.FocusLayerQuery(intentID, retrieval.FocusCold),
 		FactQuery:     "/api/facts?intent=" + intentID,
-		Premises:      path.Join(prefix, ".tw/context.json"),
+		Premises:      path.Join(prefix, ".saker/context.json"),
 		PremisesQuery: retrieval.FocusPremisesQuery(intentID),
 		Experience:    "/api/experience?intent=" + intentID,
 		ReasonCounts:  retrieval.FocusReasonCounts(items),

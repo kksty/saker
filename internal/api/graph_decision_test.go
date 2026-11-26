@@ -111,7 +111,7 @@ func TestTaskManifestMarksUnverifiedPremises(t *testing.T) {
 	if err := writeTaskManifest(work, "", db, in.ID); err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile(filepath.Join(work, ".tw", "context", "premises-0001.json"))
+	raw, err := os.ReadFile(filepath.Join(work, ".saker", "context", "premises-0001.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

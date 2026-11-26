@@ -25,7 +25,7 @@ func (f *agentFixture) makeCommanderLive(t *testing.T) model.Run {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir := filepath.Join(f.srv.CommanderDir(), ".tw")
+	dir := filepath.Join(f.srv.CommanderDir(), ".saker")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -339,7 +339,7 @@ func TestSayFromCommanderRecordsOneMessage(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/intents/"+in.ID+"/say",
 		strings.NewReader(`{"text":"确认一下 e 系列","interrupt":false}`))
 	req.SetPathValue("id", in.ID)
-	req.Header.Set("X-Tw-Actor", collab.CommanderID)
+	req.Header.Set("X-Saker-Actor", collab.CommanderID)
 	rec := httptest.NewRecorder()
 	s.sayIntent(rec, req)
 	if rec.Code != http.StatusAccepted {

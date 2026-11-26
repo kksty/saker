@@ -62,7 +62,7 @@ func TestHandoffBriefIsRebuiltFromTheFrozenPremise(t *testing.T) {
 	now := time.Now()
 	if _, err := f.p.Store.UpdateRun(f.run.ID, func(r *model.Run) {
 		r.Status, r.EndedAt = model.RunDone, &now
-		r.BriefPath = ".tw/briefs/" + r.ID + ".md"
+		r.BriefPath = ".saker/briefs/" + r.ID + ".md"
 	}); err != nil {
 		t.Fatal(err)
 	}

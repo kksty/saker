@@ -83,9 +83,9 @@ type RuntimeFacts struct {
 	ReviewBootDisabled bool `json:"review_boot_disabled"`
 }
 
-// skipDirs never travel: .tw is the handoff channel, .verify is a judgement,
+// skipDirs never travel: .saker is the handoff channel, .verify is a judgement,
 // .cyber is harness runtime state.
-var skipDirs = map[string]bool{".tw": true, ".verify": true, ".cyber": true, ".access": true, ".native": true}
+var skipDirs = map[string]bool{".saker": true, ".verify": true, ".cyber": true, ".access": true, ".native": true}
 
 // ledgerFacts is the sliver of the ledger export needs: counts, and the evidence
 // rows whose original bytes must still be checkable.

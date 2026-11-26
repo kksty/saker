@@ -174,7 +174,7 @@ func (s *Server) resetGoneSession(ctx context.Context, run model.Run) (string, s
 
 // runMedia is GET /api/runs/{id}/media/{name}: one preserved medium (an image,
 // audio clip or document a message/tool_result carried) from the run's case.
-// aopexec.PreserveMedia wrote it below <case>/.tw/media, so the name is a
+// aopexec.PreserveMedia wrote it below <case>/.saker/media, so the name is a
 // generated single path element — never a user path.
 func (s *Server) runMedia(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")

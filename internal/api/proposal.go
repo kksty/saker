@@ -144,7 +144,7 @@ func writeProposalError(w http.ResponseWriter, err error) {
 }
 
 // proposalActor is who the decision/withdrawal is attributed to. The project
-// gate stamps X-Tw-Actor for the commander's writes; a commander identity is
+// gate stamps X-Saker-Actor for the commander's writes; a commander identity is
 // used directly when present so a test or a direct handler call cannot record
 // the commander's decision as the operator's.
 func proposalActor(r *http.Request) string {

@@ -89,7 +89,7 @@ func TestClaimHashCoversTheAssertionNotTheBookkeeping(t *testing.T) {
 	h := claimHash(base)
 	bookkeeping := base
 	bookkeeping.Status, bookkeeping.Origin, bookkeeping.SourceRunID = "verified", model.OriginDeclared, "r_1"
-	bookkeeping.DeclarationRef, bookkeeping.DeclarationID, bookkeeping.ID = ".tw/facts.jsonl#bytes=1-2", "obs", "f_1"
+	bookkeeping.DeclarationRef, bookkeeping.DeclarationID, bookkeeping.ID = ".saker/facts.jsonl#bytes=1-2", "obs", "f_1"
 	bookkeeping.Title = "another display label"
 	bookkeeping.Severity = model.SeverityHigh
 	if claimHash(bookkeeping) != h {

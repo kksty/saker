@@ -220,7 +220,7 @@ func TestWriteFocusWritesBoundedIndexAndSweepsStalePages(t *testing.T) {
 		t.Fatal(err)
 	}
 	workDir := t.TempDir()
-	dir := filepath.Join(workDir, ".tw", "focus")
+	dir := filepath.Join(workDir, ".saker", "focus")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -231,14 +231,14 @@ func TestWriteFocusWritesBoundedIndexAndSweepsStalePages(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "page-1.json.tmp"), []byte("crashed write"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(workDir, ".tw", "focus.json"), []byte(`{"old":true}`), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(workDir, ".saker", "focus.json"), []byte(`{"old":true}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	db := st.Snapshot()
 	if !writeFocus(workDir, db, in.ID) {
 		t.Fatal("writeFocus reported failure")
 	}
-	raw, err := os.ReadFile(filepath.Join(workDir, ".tw", "focus.json"))
+	raw, err := os.ReadFile(filepath.Join(workDir, ".saker", "focus.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +252,7 @@ func TestWriteFocusWritesBoundedIndexAndSweepsStalePages(t *testing.T) {
 	if manifest.Snapshot == nil || manifest.Snapshot.Seq == 0 {
 		t.Fatalf("manifest snapshot = %+v", manifest.Snapshot)
 	}
-	if manifest.ColdQuery != "/api/focus?intent="+in.ID+"&layer=cold" || manifest.Premises != ".tw/context.json" {
+	if manifest.ColdQuery != "/api/focus?intent="+in.ID+"&layer=cold" || manifest.Premises != ".saker/context.json" {
 		t.Fatalf("manifest read paths = %+v", manifest)
 	}
 	if strings.Contains(string(raw), "resources") {

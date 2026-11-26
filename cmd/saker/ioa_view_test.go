@@ -32,7 +32,7 @@ func TestProjectIOAIncludesNativeMessagesAcrossRestartWithoutRedelivery(t *testi
 	srv := api.New(p.Store, nil, root, p.CaseDir)
 	in, _ := p.Store.CreateIntent(model.Intent{Title: "worker"})
 	_, _ = p.Store.AddRun(model.Run{IntentID: in.ID, SessionID: "historical"})
-	markerDir := filepath.Join(p.CaseDir, in.ID, ".tw")
+	markerDir := filepath.Join(p.CaseDir, in.ID, ".saker")
 	if err := os.MkdirAll(markerDir, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestNativeSchedulingFailureReplaysObservationAfterRestart(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = p.Store.Close() })
 	srv := api.New(p.Store, nil, root, p.CaseDir)
-	dir := filepath.Join(srv.CommanderDir(), ".tw")
+	dir := filepath.Join(srv.CommanderDir(), ".saker")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +179,7 @@ func TestDirectedNativeCommanderMailUsesPausedTrackedScheduler(t *testing.T) {
 	}
 	srv := api.New(p.Store, nil, root, p.CaseDir)
 	in, _ := p.Store.CreateIntent(model.Intent{Title: "open"})
-	dir := filepath.Join(srv.CommanderDir(), ".tw")
+	dir := filepath.Join(srv.CommanderDir(), ".saker")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatal(err)
 	}

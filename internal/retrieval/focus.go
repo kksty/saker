@@ -47,7 +47,7 @@ const (
 )
 
 // FocusContract is the read contract every consumer of the projection gets,
-// whether it reads the API page or the frozen `.tw/focus.json` written into a
+// whether it reads the API page or the frozen `.saker/focus.json` written into a
 // case. It is data, not a second policy: the fields below only spell out what
 // the existing fields mean, so "hot" cannot be read as "true", a missing
 // reference cannot be read as a probability, and a bounded page cannot be read
@@ -94,7 +94,7 @@ func FocusLayerQuery(intentID, layer string) string {
 // FocusPremisesQuery is the ledger enumeration of the task's complete required
 // premise catalogue: the ancestors of the task in the fact-intent graph, which
 // include every recorded `from_fact_ids` recursively. It is the
-// session-independent alternative to the case-relative `.tw/context.json`
+// session-independent alternative to the case-relative `.saker/context.json`
 // written for a participant's case, so a commander (no case directory) and an
 // operator can still walk the whole premise list. Depth 0 means "all depths".
 func FocusPremisesQuery(intentID string) string {
@@ -478,7 +478,7 @@ func Focus(s *store.Store, q FocusQuery) (FocusPage, error) {
 		WarmQuery:     FocusLayerQuery(q.Intent, FocusWarm),
 		ColdQuery:     FocusLayerQuery(q.Intent, FocusCold),
 		FactQuery:     "/api/facts?intent=" + q.Intent,
-		Premises:      ".tw/context.json",
+		Premises:      ".saker/context.json",
 		PremisesQuery: FocusPremisesQuery(q.Intent),
 		Experience:    "/api/experience?intent=" + q.Intent,
 		ReasonCounts:  plan.reasonCounts,

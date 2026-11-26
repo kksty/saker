@@ -395,8 +395,8 @@ func isHarnessDir(dir string) bool {
 // It is identical on both platforms: the repository is the same, only the shell
 // running the command differs.
 func HarnessCloneHint(root string) string {
-	return "找不到 harness 源码：本仓库不内置 harness/。先单独 clone kksty/cyber-harness 的 tianwu/fixes：" +
-		"\n  git clone --branch tianwu/fixes https://github.com/kksty/cyber-harness.git " + filepath.Join(root, ".build", "harness-src") +
+	return "找不到 harness 源码：本仓库不内置 harness/。先单独 clone kksty/cyber-harness 的 saker/fixes：" +
+		"\n  git clone --branch saker/fixes https://github.com/kksty/cyber-harness.git " + filepath.Join(root, ".build", "harness-src") +
 		"\n或把已有 checkout 用 -harness-dir（Go 参数）、HARNESS_DIR 环境变量或 .build/harness-src 指过来。"
 }
 

@@ -89,7 +89,7 @@ func (s *cliTestServer) setStatus(path string, code int) {
 }
 
 // cliTestEnv is the injected environment: the real session shell exports these
-// three, and SAKER_AUTH is the ready-made Authorization line from .tw/auth.
+// three, and SAKER_AUTH is the ready-made Authorization line from .saker/auth.
 func cliTestEnv(base string) func(string) string {
 	return func(key string) string {
 		switch key {
@@ -781,9 +781,9 @@ func TestCLIOutputByteCaps(t *testing.T) {
 // The session shell exports SAKER_BIN so a model can call the read verbs without
 // guessing where the binary is; the script is regenerated when the path changes
 // and carries no credential.
-func TestCLISessionEnvExportsTwBin(t *testing.T) {
+func TestCLISessionEnvExportsSakerBin(t *testing.T) {
 	content := sessionEnvContent()
-	if strings.Contains(content, twBinPlaceholder) {
+	if strings.Contains(content, sakerBinPlaceholder) {
 		t.Fatalf("session env still carries the placeholder:\n%s", content)
 	}
 	exe, err := os.Executable()

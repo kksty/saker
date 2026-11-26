@@ -137,12 +137,12 @@ func (g *handoffHarnessGateway) ServeHTTP(w http.ResponseWriter, r *http.Request
 		g.mu.Unlock()
 		body := fmt.Sprintf(`{"state":"handoff note from the real harness round","version":%s,"run_id":"%s"}`, version, runID)
 		command := fmt.Sprintf(
-			`printf '%%s' %s > .tw/handoff-note.json && curl -s -X PUT -H "$(cat .tw/auth)" -H "Content-Type: application/json" --data-binary @.tw/handoff-note.json %s`,
+			`printf '%%s' %s > .saker/handoff-note.json && curl -s -X PUT -H "$(cat .saker/auth)" -H "Content-Type: application/json" --data-binary @.saker/handoff-note.json %s`,
 			handoffHarnessShellQuote(body), handoffHarnessShellQuote(g.stateURL))
 		g.record(command)
 		handoffHarnessWriteToolCall(w, req.Stream, "call_note_put", "bash", `{"command":`+handoffHarnessJSONString(command)+`}`)
 	case strings.Contains(call.lastUser, "本轮交接；"):
-		command := `curl -s -H "$(cat .tw/auth)" ` + handoffHarnessShellQuote(g.stateURL)
+		command := `curl -s -H "$(cat .saker/auth)" ` + handoffHarnessShellQuote(g.stateURL)
 		g.record(command)
 		handoffHarnessWriteToolCall(w, req.Stream, "call_note_get", "bash", `{"command":`+handoffHarnessJSONString(command)+`}`)
 	default:

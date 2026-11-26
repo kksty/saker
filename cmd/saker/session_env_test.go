@@ -74,14 +74,14 @@ func TestSessionEnvScriptExportsTheCallersCredential(t *testing.T) {
 		t.Fatal(err)
 	}
 	work := filepath.Join(data, "projects", "p1", "cases", "in_1")
-	if err := os.MkdirAll(filepath.Join(work, ".tw"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(work, ".saker"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	identity := `{"token":"tok-123","project_id":"p1","intent_id":"in_1","run_id":"r1","api_base":"http://127.0.0.1:9000"}`
-	if err := os.WriteFile(filepath.Join(work, ".tw", "identity.json"), []byte(identity), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(work, ".saker", "identity.json"), []byte(identity), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(work, ".tw", "auth"), []byte("Authorization: Bearer tok-123\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(work, ".saker", "auth"), []byte("Authorization: Bearer tok-123\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(work, "raw"), 0o755); err != nil {

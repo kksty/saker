@@ -18,9 +18,9 @@ func TestExtensionTypeURLsMatchTheHarnessFork(t *testing.T) {
 		got  string
 		want string
 	}{
-		{"WorkDir", WorkDirExtensionURL, "type.googleapis.com/tianwu.WorkDir"},
-		{"RunGoal", RunGoalExtensionURL, "type.googleapis.com/tianwu.RunGoal"},
-		{"ToolEnv", ToolEnvExtensionURL, "type.googleapis.com/tianwu.ToolEnv"},
+		{"WorkDir", WorkDirExtensionURL, "type.googleapis.com/saker.WorkDir"},
+		{"RunGoal", RunGoalExtensionURL, "type.googleapis.com/saker.RunGoal"},
+		{"ToolEnv", ToolEnvExtensionURL, "type.googleapis.com/saker.ToolEnv"},
 	} {
 		if tc.got != tc.want {
 			t.Errorf("%s extension URL = %q, want %q: the harness fork matches this string literally and ignores any other value without an error or a log line", tc.name, tc.got, tc.want)

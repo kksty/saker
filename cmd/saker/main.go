@@ -286,10 +286,10 @@ func main() {
 	}
 	// The session shell init exports the caller's own per-session token and base
 	// URLs at shell start, so a model never reads or exports a credential by
-	// hand. Failure is not fatal: .tw/auth remains the fallback.
+	// hand. Failure is not fatal: .saker/auth remains the fallback.
 	sessionEnv, envErr := writeSessionEnv(data)
 	if envErr != nil {
-		log.Printf("会话环境脚本写入失败（模型需手动读 .tw/auth）：%v", envErr)
+		log.Printf("会话环境脚本写入失败（模型需手动读 .saker/auth）：%v", envErr)
 		sessionEnv = ""
 	}
 

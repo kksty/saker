@@ -34,7 +34,7 @@ func TestNativeResultsOnlyBecomeEvidenceWhenExplicitlyCited(t *testing.T) {
 func TestPrivateLoginInputsCannotBeDeclaredAsEvidence(t *testing.T) {
 	root := t.TempDir()
 	work := filepath.Join(root, "in_1")
-	for _, name := range []string{".tw/access/ac_test.json", "../.access/ac_test/material.json", "../.native/data"} {
+	for _, name := range []string{".saker/access/ac_test.json", "../.access/ac_test/material.json", "../.native/data"} {
 		if _, state := resolveEvidence(root, work, name); state != evidenceInvalid {
 			t.Fatalf("private input accepted as evidence: %s", name)
 		}

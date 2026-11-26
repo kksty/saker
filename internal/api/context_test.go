@@ -29,7 +29,7 @@ func TestRunContextReadsCase(t *testing.T) {
 	}
 
 	dir := filepath.Join(root, in.ID)
-	saker := filepath.Join(dir, ".tw")
+	saker := filepath.Join(dir, ".saker")
 	if err := os.MkdirAll(saker, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestRunContextReadsCase(t *testing.T) {
 	for _, f := range got.Files {
 		names[f.Name] = true
 	}
-	if !names["notes.md"] || !names[".tw/prompt.txt"] {
+	if !names["notes.md"] || !names[".saker/prompt.txt"] {
 		t.Fatalf("files = %+v", got.Files)
 	}
 	session := httptest.NewRecorder()

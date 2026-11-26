@@ -1,30 +1,30 @@
 import type { ReactNode } from 'react'
 import { cn } from '@cyber/theme'
+import { Wordmark } from './Wordmark'
 
 /**
- * 左上角品牌锁排: pure 「Saker」艺术字, no icon.
+ * The rail's brand lockup: the drawn wordmark, either shell, both sizes.
  *
- * The wordmark is deliberately typographic: 楷体/衬线字形 + 暖米→珊瑚渐变 +
- * 一道极淡的篆刻投影, with a small vermillion seal dot as the only graphic
- * accent. It is a lockup, not decoration: the name must read at a glance in the
- * 216px rail, and the SAKER caption at 9px is the latin fallback — it used to
- * read as a smudge at 7px beside the larger mark.
+ * It used to be live text — a 楷体/衬线 stack with a warm gradient and a seal dot
+ * — which made the name look like whatever fonts the host had. The mark is now
+ * geometry (see Wordmark.tsx), so the rail, the compact header and the login
+ * page show the same lettering. `cap` is the drawn cap height: the 216px rail
+ * takes the default, the 52px mobile bar takes the smaller one.
  *
- * The icon lives in the browser tab (`public/favicon.svg`): the rail stays
- * typographic, and the mark still owns the one square surface where a wordmark
- * cannot read.
- *
- * 占位钩子：正式 logo 素材由用户提供，到位后传 `logo`（替换左侧文字标记），
- * 或整份替换 `public/favicon.svg`；在此之前不自造图案。
+ * `logo` stays as an escape hatch for a real supplied asset; until one exists
+ * the wordmark is the mark, and `public/favicon.svg` is its S for the tab.
  */
 export function Brand({
   badge,
   logo,
+  cap = 20,
   className,
 }: {
   badge?: ReactNode
-  /** 正式 logo 素材（如 <img src="/logo.svg" alt="Saker" />）；缺省沿用文字标记。 */
+  /** A supplied logo asset; replaces the drawn wordmark when passed. */
   logo?: ReactNode
+  /** Drawn cap height in px. */
+  cap?: number
   className?: string
 }) {
   return (
@@ -34,13 +34,7 @@ export function Brand({
           {logo}
         </div>
       ) : (
-        <div className="flex min-w-0 flex-col justify-center gap-[4px]">
-          <span className="flex items-start gap-[2px]">
-            <span className="saker-brand-cn">Saker</span>
-            <span aria-hidden="true" className="saker-brand-dot" />
-          </span>
-          <span className="saker-brand-latin">SAKER</span>
-        </div>
+        <Wordmark cap={cap} />
       )}
       {badge ? <div className="ml-auto shrink-0">{badge}</div> : null}
     </div>

@@ -10,8 +10,8 @@ import (
 	"github.com/kksty/saker/internal/aopexec"
 )
 
-// A case's AOP session pointer is `<case>/.tw/aop-session.json`; the commander's
-// is `<project>/commander/.tw/aop-session.json` (api.Server.CommanderDir). The
+// A case's AOP session pointer is `<case>/.saker/aop-session.json`; the commander's
+// is `<project>/commander/.saker/aop-session.json` (api.Server.CommanderDir). The
 // pointer is what "this case can continue its conversation" means, and a
 // pointer to a host that is gone makes the next retry resume a session nobody
 // holds — the real failure was "会话属于 18767 不是 49850", i.e. a marker from a
@@ -54,8 +54,8 @@ func SweepStaleSessions(ctx context.Context, dataDir, currentEndpoint string, lo
 	}
 	currentEndpoint = strings.TrimRight(strings.TrimSpace(currentEndpoint), "/")
 	patterns := []string{
-		filepath.Join(dataDir, "projects", "*", "cases", "*", ".tw", "aop-session.json"),
-		filepath.Join(dataDir, "projects", "*", "commander", ".tw", "aop-session.json"),
+		filepath.Join(dataDir, "projects", "*", "cases", "*", ".saker", "aop-session.json"),
+		filepath.Join(dataDir, "projects", "*", "commander", ".saker", "aop-session.json"),
 	}
 	for _, pattern := range patterns {
 		paths, err := filepath.Glob(pattern)
@@ -74,7 +74,7 @@ func SweepStaleSessions(ctx context.Context, dataDir, currentEndpoint string, lo
 }
 
 func sweepMarker(path, currentEndpoint, agent string, out *Swept, logf func(string, ...any)) {
-	// The case directory is two levels up: <case>/.tw/aop-session.json.
+	// The case directory is two levels up: <case>/.saker/aop-session.json.
 	workDir := filepath.Dir(filepath.Dir(path))
 	info, ok := aopexec.ReadSession(workDir)
 	if !ok {

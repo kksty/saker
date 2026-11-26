@@ -10,7 +10,7 @@ import (
 	"github.com/kksty/saker/internal/store"
 )
 
-const runInputFile = ".tw/run-input.json"
+const runInputFile = ".saker/run-input.json"
 
 type runInputManifest struct {
 	RunID    string             `json:"run_id"`
@@ -27,7 +27,7 @@ func publishRunInput(workDir, runID string, db store.DB, scope, intentID string)
 	if runID == "." || !filepath.IsLocal(runID) || filepath.Base(runID) != runID {
 		return fmt.Errorf("invalid run input ID")
 	}
-	root := filepath.Join(workDir, ".tw", "inputs")
+	root := filepath.Join(workDir, ".saker", "inputs")
 	if err := os.MkdirAll(root, 0o700); err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func publishRunInput(workDir, runID string, db store.DB, scope, intentID string)
 		return err
 	}
 	defer os.RemoveAll(stage)
-	rel := path.Join(".tw/inputs", runID)
+	rel := path.Join(".saker/inputs", runID)
 	if err := writeGraphFiles(stage, rel, db, scope, intentID); err != nil {
 		return err
 	}
@@ -60,6 +60,6 @@ func publishRunInput(workDir, runID string, db store.DB, scope, intentID string)
 	manifest.State = "ready"
 	manifest.Graph = path.Join(rel, graphFile)
 	manifest.Focus = path.Join(rel, focusFile)
-	manifest.Context = path.Join(rel, ".tw/context.json")
+	manifest.Context = path.Join(rel, ".saker/context.json")
 	return writeJSONFileAtomic(marker, manifest)
 }

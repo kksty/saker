@@ -438,7 +438,7 @@ func (e *Executor) agentWorkdir(ctx context.Context, c *aop.Client, nodeID strin
 }
 
 // ErrNoSession means the case has no AOP session to continue.
-var ErrNoSession = errors.New("要续话，但这个 case 没有 AOP 会话（.tw/aop-session.json）")
+var ErrNoSession = errors.New("要续话，但这个 case 没有 AOP 会话（.saker/aop-session.json）")
 
 // skillPrompt references explicitly selected files. AOP has no per-turn -s
 // field; discoverable skills use the harness's /skill:name input instead.

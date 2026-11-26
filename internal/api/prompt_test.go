@@ -98,11 +98,11 @@ func TestBuildPromptSections(t *testing.T) {
 		runInputFile,
 		"不要把整份文件读进上下文",
 		"## 交接（必做）",
-		".tw/facts.jsonl",
+		".saker/facts.jsonl",
 		"跑完没结论也要写一条 `note`",
 		// The evidence example must be a path the model can copy: the old
 		// placeholder ("本目录真实文件") said nothing about where to put it, and
-		// the false rule "`.tw/` 里的不算" contradicted the ledger (any real
+		// the false rule "`.saker/` 里的不算" contradicted the ledger (any real
 		// file under the case counts, as long as the declared path matches).
 		`"evidence":["api-users.json"]`,
 		"证据放 case 根目录",
@@ -144,8 +144,8 @@ func TestBuildPromptSections(t *testing.T) {
 	// minimum that must survive a missing skill.
 	for _, unwanted := range []string{
 		"交接契约（必读）",
-		"不要用 `.tw/` 里的文件当证据",
-		"`.tw/`、`.cyber/` 里的不算",
+		"不要用 `.saker/` 里的文件当证据",
+		"`.saker/`、`.cyber/` 里的不算",
 		// The fact doc (commands, raw response) must not ride the brief: it is
 		// read by fact id (docs/17 §3.1).
 		"Apache-Coyote/1.1",
@@ -190,7 +190,7 @@ func TestHandoffAllowsProgressiveDeclarations(t *testing.T) {
 }
 
 // The graph and the handoff declare evidence on one base: the run's own case
-// directory. The old prompt taught the "../" shape for `.tw/graph.json` and then
+// directory. The old prompt taught the "../" shape for `.saker/graph.json` and then
 // required every declared facts path to open "在 case 根下", so models copied
 // the graph form into facts.jsonl and the ledger dropped whole fact lines.
 // Reused cross-case evidence is legal; the boundary is the project cases
@@ -336,7 +336,7 @@ func TestBuildPromptLeavesToolUseToTheHarness(t *testing.T) {
 		"## 纪律",
 		"## 交接（必做）",
 		"证据放 case 根目录",
-		"写进 `.tw/facts.jsonl`",
+		"写进 `.saker/facts.jsonl`",
 		"项目打法库",
 		"是否记录和复用由你判断",
 	} {
@@ -483,7 +483,7 @@ func TestBuildPromptCarriesEvalAndPlaybooks(t *testing.T) {
 		},
 	}
 	p := BuildPrompt(db, db.Intents[0], "", "", "/data/kb", 0, false)
-	for _, want := range []string{"## 验收标准", "可复现的凭据复用", "## 可复用打法", "[确认] ThinkPHP RCE", "curl /index.php", ".tw/kb/entries", "已复制到本轮 case", "### f_note · note"} {
+	for _, want := range []string{"## 验收标准", "可复现的凭据复用", "## 可复用打法", "[确认] ThinkPHP RCE", "curl /index.php", ".saker/kb/entries", "已复制到本轮 case", "### f_note · note"} {
 		if !strings.Contains(p, want) {
 			t.Fatalf("prompt missing %q:\n%s", want, p)
 		}
@@ -754,7 +754,7 @@ func TestBuildPromptRecordsRecoveredWorkerNoteWithoutBody(t *testing.T) {
 		"正文由操作员审阅",
 		// The recycling contract is always there for a worker, note or not.
 		"## 上下文与回收",
-		"`.tw/worker-note.md`",
+		"`.saker/worker-note.md`",
 		// The shared battlefield is readable with the round's own token.
 		"战场态势（只读）",
 	} {

@@ -26,7 +26,7 @@ func TestCollaborationSectionKeepsPeersAndHandoff(t *testing.T) {
 
 	section := s.collaborationSection(self)
 	for _, want := range []string{"## 自主协作", "申请接班", "另一意图", "pt_in_",
-		"cyber://skills/collaborate/SKILL.md", ".tw/identity.json"} {
+		"cyber://skills/collaborate/SKILL.md", ".saker/identity.json"} {
 		if !strings.Contains(section, want) {
 			t.Fatalf("collaboration section missing %q:\n%s", want, section)
 		}

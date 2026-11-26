@@ -13,8 +13,8 @@ import (
 )
 
 // graphFile is the executor's read-only snapshot of the ledger. It lives inside
-// .tw, which never travels in a bundle: it is a working view, not a deliverable.
-const graphFile = ".tw/graph.json"
+// .saker, which never travels in a bundle: it is a working view, not a deliverable.
+const graphFile = ".saker/graph.json"
 
 // writeGraph writes the snapshot and reports whether the prompt may point at
 // it. A failed write is not a failed dispatch — the run still has the brief,
@@ -34,7 +34,7 @@ func writeGraphFiles(workDir, prefix string, db store.DB, scope string, focus ..
 		g = board.BuildTaskGraph(projected, scope, focus[0])
 		// The catalog uses only IDs, versions and states. It must look up
 		// those states in the same ledger that supplied the graph.
-		g.Context.Manifest = path.Join(prefix, ".tw/context.json")
+		g.Context.Manifest = path.Join(prefix, ".saker/context.json")
 		if err := writeTaskManifest(workDir, prefix, db, focus[0]); err != nil {
 			return err
 		}
@@ -144,7 +144,7 @@ func writeTaskManifest(workDir, prefix string, db store.DB, intentID string) err
 			}
 		}
 	}
-	dir := filepath.Join(workDir, ".tw", "context")
+	dir := filepath.Join(workDir, ".saker", "context")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
@@ -162,7 +162,7 @@ func writeTaskManifest(workDir, prefix string, db store.DB, intentID string) err
 		if err = os.WriteFile(filepath.Join(dir, name), raw, 0600); err != nil {
 			return err
 		}
-		pages = append(pages, path.Join(prefix, ".tw/context", name))
+		pages = append(pages, path.Join(prefix, ".saker/context", name))
 	}
 	// A later dispatch can need fewer pages than an earlier one; without this
 	// sweep the directory keeps higher-numbered pages that the new manifest
@@ -183,5 +183,5 @@ func writeTaskManifest(workDir, prefix string, db store.DB, intentID string) err
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(workDir, ".tw", "context.json"), raw, 0600)
+	return os.WriteFile(filepath.Join(workDir, ".saker", "context.json"), raw, 0600)
 }

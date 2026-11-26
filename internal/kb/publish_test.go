@@ -222,7 +222,7 @@ func TestCaseSnapshotUsesPublishedIDOverridesAndRemovesOnlyStaleCacheEntries(t *
 		t.Fatal(err)
 	}
 	caseDir := t.TempDir()
-	dst := filepath.Join(caseDir, ".tw", "kb")
+	dst := filepath.Join(caseDir, ".saker", "kb")
 	if err := l.CopyTo(dst); err != nil {
 		t.Fatal(err)
 	}

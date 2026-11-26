@@ -1,7 +1,7 @@
 package api
 
 // A new dispatch archives the mission text it was actually given under the
-// case's .tw/briefs. Resumes do not rewrite it (there is nothing new to
+// case's .saker/briefs. Resumes do not rewrite it (there is nothing new to
 // archive), retries keep one file per run, the file never becomes evidence, and
 // known credentials are redacted before it lands on disk (task-25).
 
@@ -78,7 +78,7 @@ func TestFreshDispatchArchivesBrief(t *testing.T) {
 	if !ok {
 		t.Fatal("run missing")
 	}
-	if run.BriefPath == "" || !strings.Contains(run.BriefPath, ".tw/briefs/"+runID+".md") {
+	if run.BriefPath == "" || !strings.Contains(run.BriefPath, ".saker/briefs/"+runID+".md") {
 		t.Fatalf("brief path = %q", run.BriefPath)
 	}
 	abs := filepath.Join(p.CaseDir, filepath.FromSlash(run.BriefPath))
@@ -104,10 +104,10 @@ func TestFreshDispatchArchivesBrief(t *testing.T) {
 	if !strings.Contains(runs.Body.String(), `"brief_path"`) || !strings.Contains(runs.Body.String(), runID) {
 		t.Fatalf("/api/runs does not expose brief_path: %s", runs.Body.String())
 	}
-	// The archive is operator material, not evidence: the ingestor skips .tw.
+	// The archive is operator material, not evidence: the ingestor skips .saker.
 	for _, e := range p.Store.Snapshot().Evidence {
-		if strings.Contains(e.URI, ".tw/") {
-			t.Fatalf("ingest harvested a .tw file as evidence: %+v", e)
+		if strings.Contains(e.URI, ".saker/") {
+			t.Fatalf("ingest harvested a .saker file as evidence: %+v", e)
 		}
 	}
 }
@@ -264,11 +264,11 @@ func TestRunBriefPathJSONCompatibility(t *testing.T) {
 	if strings.Contains(string(raw), "brief_path") {
 		t.Fatalf("omitempty did not drop an empty path: %s", raw)
 	}
-	raw, err = json.Marshal(model.Run{ID: "r_new", BriefPath: "in_1/.tw/briefs/r_new.md"})
+	raw, err = json.Marshal(model.Run{ID: "r_new", BriefPath: "in_1/.saker/briefs/r_new.md"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(raw), `"brief_path":"in_1/.tw/briefs/r_new.md"`) {
+	if !strings.Contains(string(raw), `"brief_path":"in_1/.saker/briefs/r_new.md"`) {
 		t.Fatalf("brief_path missing: %s", raw)
 	}
 }

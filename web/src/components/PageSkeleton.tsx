@@ -11,7 +11,7 @@ import { pageGutter } from './Page'
  * It is deliberately still: no entrance fade, no scan beam, no staggered lift.
  * The fallback is only on screen while a chunk downloads, which on this console
  * is a moment, and animating the placeholder made a switch feel slower than it
- * was. The only thing that moves is cyber-ui's own `Skeleton` pulse, the design
+ * was. The only thing that moves is the component library's own `Skeleton` pulse, the design
  * system's loading affordance, and that stops under `prefers-reduced-motion`
  * through the shared stylesheet backstop.
  */

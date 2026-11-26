@@ -33,6 +33,6 @@ func (s *Server) collaborationSection(self model.Intent) string {
 	b.WriteString("- 可用动作：给同伴或指挥官发消息、共享已登记的事实、申请接班。\n")
 	b.WriteString("- 现场交接：可直接使用意图/插话提供的账号登录；扫码、验证码或人工确认时，可随人工请求关联自己的可见浏览器 session，宿主自动跟随本轮；人工完成后继续。多站点按 URL 选择页面，同站点多账号使用独立浏览器上下文。原生结果可按需查询。\n")
 	b.WriteString("- 契约与身份：harness skill `collaborate`（`cyber://skills/collaborate/SKILL.md`），")
-	b.WriteString("本轮身份在 `.tw/identity.json`。\n")
+	b.WriteString("本轮身份在 `.saker/identity.json`。\n")
 	return b.String()
 }

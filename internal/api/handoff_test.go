@@ -26,7 +26,7 @@ func (h *handoffExec) Run(ctx context.Context, req executor.Request, emit func(e
 			return executor.Result{ExitCode: -1}, err
 		}
 	}
-	dir := filepath.Join(req.WorkDir, ".tw")
+	dir := filepath.Join(req.WorkDir, ".saker")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return executor.Result{ExitCode: -1}, err
 	}

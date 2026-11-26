@@ -32,7 +32,7 @@ func (e *handoffWarnExec) Run(_ context.Context, req executor.Request, emit func
 	e.prompts = append(e.prompts, req.Prompt)
 	n := len(e.prompts)
 	e.mu.Unlock()
-	dir := filepath.Join(req.WorkDir, ".tw")
+	dir := filepath.Join(req.WorkDir, ".saker")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return executor.Result{ExitCode: 1}, err
 	}

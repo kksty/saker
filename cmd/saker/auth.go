@@ -532,7 +532,7 @@ func agentRouteHidden(path string) bool {
 	// stop the campaign, not just park a direction and wait to be woken for it.
 	// It is a pause the operator alone can undo (/api/project/pause, resume and
 	// append-goal stay hidden). This gate only admits the path: the handler still
-	// requires a commander attribution (X-Tw-Actor / participant identity) and a
+	// requires a commander attribution (X-Saker-Actor / participant identity) and a
 	// live commander round, and that is a declarative boundary for a trusted
 	// internal session, not a sandbox (D78).
 	if rest == "project/standby" {
@@ -714,14 +714,14 @@ func (a *consoleAuth) wrap(next http.Handler) http.Handler {
 					return
 				}
 				// Writes through the project mux record their author from
-				// X-Tw-Actor, so the commander's attribution is stamped from the
+				// X-Saker-Actor, so the commander's attribution is stamped from the
 				// credential instead of relying on the model to volunteer a header
 				// it can forget — a say without the header used to land as
 				// `operator`. Executors never write here, so they are not stamped.
 				// The header stays a claim about the speaker, not a second
 				// permission (D86); the surface boundary above is unchanged.
 				if scope.commander {
-					r.Header.Set("X-Tw-Actor", collab.CommanderID)
+					r.Header.Set("X-Saker-Actor", collab.CommanderID)
 					// The commander identity is attached only to the writes whose
 					// handler needs the authenticated run: the note receipt, the
 					// goal-definition provenance check, and sending to the operator
@@ -771,7 +771,7 @@ func (a *consoleAuth) wrap(next http.Handler) http.Handler {
 			// generic "please log in" would send the model hunting for a cookie it
 			// cannot have; name the variable it already owns instead.
 			if strings.HasPrefix(strings.ToLower(r.Header.Get("Authorization")), "bearer ") {
-				msg = "Bearer 无效或已过期：用 -H \"$SAKER_AUTH\" 重试（脚本里可用 -H \"$(cat .tw/auth)\"）；操作员请用控制台令牌"
+				msg = "Bearer 无效或已过期：用 -H \"$SAKER_AUTH\" 重试（脚本里可用 -H \"$(cat .saker/auth)\"）；操作员请用控制台令牌"
 			}
 			_, _ = w.Write([]byte(`{"error":"` + msg + `"}`))
 			return
@@ -943,6 +943,10 @@ func resolveConsoleToken(inline, file string) (string, error) {
 	return strings.TrimSpace(os.Getenv("SAKER_CONSOLE_TOKEN")), nil
 }
 
+// loginHTML is the one page the console shell does not draw, so it carries its
+// own copy of the wordmark: the same point/stroke strings as
+// web/src/components/Wordmark.tsx and web/public/favicon.svg. web/tests/
+// brand-mark.test.ts reads this file and fails when the three copies drift.
 const loginHTML = `<!doctype html>
 <html lang="zh-CN" class="dark"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -956,16 +960,9 @@ body{margin:0;height:100vh;display:grid;place-items:center;background:
 radial-gradient(700px 400px at 30% -10%,rgba(255,77,77,.08),transparent),var(--bg);
 color:var(--fg);font:14px/1.65 "Inter","PingFang SC","Microsoft YaHei",system-ui,sans-serif}
 .card{width:340px;border:1px solid var(--border);border-radius:10px;background:var(--card);padding:22px}
-.brand{display:flex;flex-direction:column;gap:6px;margin-bottom:20px}
-.wordmark{display:flex;align-items:flex-start;gap:3px}
-.name{font-family:"Kaiti SC","STKaiti","KaiTi","Noto Serif SC","Songti SC",serif;
-font-size:26px;font-weight:700;line-height:1;letter-spacing:.12em;
-background:linear-gradient(180deg,#fff8f2 0%,#ffd2c2 55%,#ff9b84 100%);
--webkit-background-clip:text;background-clip:text;color:transparent;
-filter:drop-shadow(0 1px 0 rgba(110,8,8,.5))}
-.dot{width:6px;height:6px;margin-top:5px;border-radius:1px;background:var(--accent);
-box-shadow:0 0 8px rgba(255,77,77,.7)}
-.sub{color:var(--muted);font-size:7px;font-weight:600;letter-spacing:.36em;text-transform:uppercase}
+.brand{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.wordmark{color:#eeeae1;display:block}
+.sub{color:var(--muted);font-size:9px;font-weight:600;letter-spacing:.2em;text-transform:uppercase}
 label{display:block;color:var(--muted);font-size:11px;margin-bottom:6px}
 input{width:100%;height:34px;padding:0 10px;border-radius:6px;border:1px solid var(--border);
 background:#0d0d10;color:var(--fg);font:inherit;font-family:ui-monospace,monospace}
@@ -977,8 +974,16 @@ color:#170303;font:inherit;font-weight:700;cursor:pointer}
 </style></head><body>
 <form class="card" method="post" action="/login">
   <div class="brand">
-    <div class="wordmark"><span class="name">Saker</span><span class="dot" aria-hidden="true"></span></div>
-    <div class="sub">Saker</div>
+    <svg class="wordmark" viewBox="-2 -2 118 26" width="129" height="28" role="img" aria-label="Saker">
+      <g fill="currentColor" stroke="currentColor">
+        <g transform="translate(0 0)"><polygon points="0,0 18.6,0 15.7,5.2 0,5.2"/><polygon points="0,0 2.6,0 2.6,13.6 0,13.6"/><polygon points="0,8.4 18.6,8.4 18.6,13.6 0,13.6"/><polygon points="16,8.4 18.6,8.4 18.6,22 16,22"/><polygon points="2.9,16.8 18.6,16.8 18.6,22 0,22"/></g>
+        <g transform="translate(23 0)"><polygon points="6,12.6 17.7,12.6 14.8,17.8 3.1,17.8"/><path d="M10.4 0 L0.8 22" stroke-width="3.6" stroke-linecap="butt"/><path d="M10.4 0 L20 22" stroke-width="3.6" stroke-linecap="butt"/></g>
+        <g transform="translate(48.2 0)"><polygon points="0,0 2.6,0 2.6,22 0,22"/><path d="M19.2 0 L2.4 11.2" stroke-width="4.5" stroke-linecap="butt"/><path d="M6.5 8.2 L19.6 22" stroke-width="4.5" stroke-linecap="butt"/></g>
+        <g transform="translate(72.4 0)"><polygon points="0,0 2.6,0 2.6,22 0,22"/><polygon points="0,0 17.4,0 14.5,5.2 0,5.2"/><polygon points="0,8.4 15.2,8.4 12.3,13.6 0,13.6"/><polygon points="0,16.8 17.4,16.8 14.5,22 0,22"/></g>
+        <g transform="translate(94.2 0)"><polygon points="0,0 2.6,0 2.6,22 0,22"/><polygon points="0,0 19.8,0 16.9,5.2 0,5.2"/><polygon points="17.2,0 19.8,0 19.8,13.6 17.2,13.6"/><polygon points="0,8.4 19.8,8.4 16.9,13.6 0,13.6"/><path d="M11.4 13.6 L19.8 22" stroke-width="4.7" stroke-linecap="butt"/></g>
+      </g>
+    </svg>
+    <div class="sub">授权安全测试控制台</div>
   </div>
   <input type="hidden" name="next" value="{{next}}">
   <label for="token">控制台令牌</label>

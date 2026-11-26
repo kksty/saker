@@ -188,7 +188,7 @@ func TestBrowserBindingRequiresCurrentLeaseAndIgnoresLegacyProfile(t *testing.T)
 	if _, err := s.accessSection(work); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(work, ".tw", "access", entry.ID+".json")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(work, ".saker", "access", entry.ID+".json")); !os.IsNotExist(err) {
 		t.Fatal("browser binding copied without a lease")
 	}
 }

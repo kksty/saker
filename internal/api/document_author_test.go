@@ -104,7 +104,7 @@ func TestDocumentAuthorRefusesUnattributableWriters(t *testing.T) {
 			r = r.WithContext(WithIdentity(r.Context(), *id))
 		}
 		if actor != "" {
-			r.Header.Set("X-Tw-Actor", actor)
+			r.Header.Set("X-Saker-Actor", actor)
 		}
 		return r
 	}

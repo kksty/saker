@@ -14,7 +14,7 @@ import './app.css'
  *   gate on reduced motion.
  * - A native modal dialog must not let its scroll chain to the inert page
  *   behind it (dialog:modal + ::backdrop), per the platform overlay guidance.
- *   cyber-ui's overlays are Radix today, so this is for any native <dialog>
+ *   the component library's overlays are Radix today, so this is for any native <dialog>
  *   added later and costs nothing when none is present.
  */
 const PROGRESSIVE_CSS = `
