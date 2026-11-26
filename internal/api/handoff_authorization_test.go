@@ -142,6 +142,28 @@ func TestHandoffDispatchCarriesAuthorizationVerbatim(t *testing.T) {
 
 }
 
+// A handoff must say whether the archived brief it names can actually be read.
+// A half-written archive (file exists, ledger path not committed) is not
+// "archived"; a failed write is not silently treated as a missing old feature.
+func TestHandoffNamesArchiveState(t *testing.T) {
+	base := handoffAuthorization{
+		Briefing: "范围", SourceRun: "r_old", SourceBrief: ".saker/briefs/r_old.md",
+		SourceArchiveStatus: model.BriefArchivePending,
+	}
+	got := handoffSection(store.DB{}, model.Intent{ID: "in_1"}, model.Handoff{FromRun: "r_old"},
+		base, false)
+	if !strings.Contains(got, "账本路径未写回") {
+		t.Fatalf("a pending archive was presented as readable:\n%s", got)
+	}
+	base.SourceArchiveStatus = model.BriefArchiveWriteFailed
+	base.SourceArchiveError = "磁盘只读"
+	got = handoffSection(store.DB{}, model.Intent{ID: "in_1"}, model.Handoff{FromRun: "r_old"},
+		base, false)
+	if !strings.Contains(got, "写入失败") || !strings.Contains(got, "磁盘只读") {
+		t.Fatalf("a failed archive did not name its reason:\n%s", got)
+	}
+}
+
 // Refusing at the gate is what makes the refusal recoverable: the direction does
 // not move, so the route the refusal names — re-dispatch to produce an archive,
 // then hand off — really exists. A refusal at dispatch time would have left the

@@ -554,6 +554,10 @@ func TestReviewAttemptsSurviveRestartAndKeepOutcomesApart(t *testing.T) {
 	if _, blocked := s2.reviewBlocked(changed); blocked {
 		t.Fatal("new material did not re-admit the assertion")
 	}
+	// Re-admission is not only a predicate: the next pass actually runs the
+	// corrected assertion instead of skipping it on the old attempt.
+	s2.autoVerify(in.ID)
+	waitFor(t, 5*time.Second, func() bool { return probe.runs() > 0 })
 
 	// The independent veto is recorded as its own outcome, not as a broken run.
 	s2.recordReviewAttempt(changed, store.ReviewAttemptRejected, "独立复现不成立", "run_verdict", time.Now(), nil)
