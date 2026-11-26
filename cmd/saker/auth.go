@@ -974,13 +974,13 @@ color:#170303;font:inherit;font-weight:700;cursor:pointer}
 </style></head><body>
 <form class="card" method="post" action="/login">
   <div class="brand">
-    <svg class="wordmark" viewBox="-2 -2 118 26" width="129" height="28" role="img" aria-label="Saker">
+    <svg class="wordmark" viewBox="0 0 367 100" width="210" height="57" role="img" aria-label="Saker">
       <g fill="currentColor" stroke="currentColor">
-        <g transform="translate(0 0)"><polygon points="0,0 18.6,0 15.7,5.2 0,5.2"/><polygon points="0,0 2.6,0 2.6,13.6 0,13.6"/><polygon points="0,8.4 18.6,8.4 18.6,13.6 0,13.6"/><polygon points="16,8.4 18.6,8.4 18.6,22 16,22"/><polygon points="2.9,16.8 18.6,16.8 18.6,22 0,22"/></g>
-        <g transform="translate(23 0)"><polygon points="6,12.6 17.7,12.6 14.8,17.8 3.1,17.8"/><path d="M10.4 0 L0.8 22" stroke-width="3.6" stroke-linecap="butt"/><path d="M10.4 0 L20 22" stroke-width="3.6" stroke-linecap="butt"/></g>
-        <g transform="translate(48.2 0)"><polygon points="0,0 2.6,0 2.6,22 0,22"/><path d="M19.2 0 L2.4 11.2" stroke-width="4.5" stroke-linecap="butt"/><path d="M6.5 8.2 L19.6 22" stroke-width="4.5" stroke-linecap="butt"/></g>
-        <g transform="translate(72.4 0)"><polygon points="0,0 2.6,0 2.6,22 0,22"/><polygon points="0,0 17.4,0 14.5,5.2 0,5.2"/><polygon points="0,8.4 15.2,8.4 12.3,13.6 0,13.6"/><polygon points="0,16.8 17.4,16.8 14.5,22 0,22"/></g>
-        <g transform="translate(94.2 0)"><polygon points="0,0 2.6,0 2.6,22 0,22"/><polygon points="0,0 19.8,0 16.9,5.2 0,5.2"/><polygon points="17.2,0 19.8,0 19.8,13.6 17.2,13.6"/><polygon points="0,8.4 19.8,8.4 16.9,13.6 0,13.6"/><path d="M11.4 13.6 L19.8 22" stroke-width="4.7" stroke-linecap="butt"/></g>
+        <g transform="translate(0 0)"><clipPath id="wm-s"><rect x="0" y="0" width="66" height="100"/></clipPath><g clip-path="url(#wm-s)"><path d="M58 22 C58 11 47 8 33 8 C18 8 8 14 8 26 C8 37 16 43 30 48 C45 53 55 59 55 71 C55 84 44 92 29 92 C14 92 8 86 8 74" fill="none" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="10"/></g></g>
+        <g transform="translate(74 0)"><path d="M0 100 L26 0 L42 0 L68 100 L52 100 L46.24 76 L21.76 76 L16 100 Z M34 25 L25.6 60 L42.4 60 Z" fill-rule="evenodd"/></g>
+        <g transform="translate(153 0)"><clipPath id="wm-k"><rect x="0" y="0" width="68" height="100"/></clipPath><g clip-path="url(#wm-k)"><path d="M8 0 L8 100 M72 0 L16 52 L72 100" fill="none" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="10"/></g></g>
+        <g transform="translate(233 0)"><clipPath id="wm-e"><rect x="0" y="0" width="56" height="100"/></clipPath><g clip-path="url(#wm-e)"><path d="M8 0 L8 100 M0 8 L56 8 M0 50 L48 50 M0 92 L56 92" fill="none" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="10"/></g></g>
+        <g transform="translate(301 0)"><clipPath id="wm-r"><rect x="0" y="0" width="66" height="100"/></clipPath><g clip-path="url(#wm-r)"><path d="M8 0 L8 100 M8 8 L32 8 C52 8 58 17 58 30 C58 44 50 52 32 52 L8 52 M34 56 L66 104" fill="none" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="10"/></g></g>
       </g>
     </svg>
     <div class="sub">授权安全测试控制台</div>

@@ -1,155 +1,135 @@
+import { useId } from 'react'
 import { cn } from '@cyber/theme'
 
 /**
- * The Saker wordmark: art lettering, not a typeset string.
+ * The Saker wordmark: five letters drawn on a 100-unit grid, not a typeset string.
  *
  * It is drawn because the mark has to look the same on a machine with no Kaiti
- * face as on one with three: the previous lockup was live text over a 楷体 stack
- * plus a gradient, so its shape was the operator's font inventory. This one is
- * geometry — reverse contrast (thick horizontals, thin stems), knife-cut free
- * ends — and reads identically at 15px in the 216px rail and at 44px on the
- * login card.
+ * face as on one with three. The previous lockup was live text over a 楷体 stack
+ * plus a gradient, so its shape was the operator's font inventory; this one is
+ * geometry and renders identically in the 216px rail, the 52px compact header
+ * and on the login card.
  *
- * No icon: the name is the mark. The one square surface that cannot hold a
- * wordmark (the browser tab) uses the S alone, drawn at the same weight.
+ * The lettering is monoline technical sans: one 16-unit stroke for every stem,
+ * arm and curve. S is two true curves cut near-vertically at the ends — a
+ * right-angle S reads as the digit 5, which is what the earlier geometric draft
+ * did. A has a flat crown and feet because a mitred apex becomes a needle at
+ * small sizes; K's diagonals meet inside the stem so the mitre is covered; E's
+ * middle arm is 5 units short; R's leg grows from the underside of the bowl.
+ * Each glyph is clipped to its own box, so the letters sit flush on the cap line
+ * and baseline.
  *
- * Geometry table: cap height 22, thick 5.2, thin 2.6, cut 2.9, tracking 4.4.
+ * Below 120px wide the S curves start to blur, so that is the floor for this
+ * drawing; anything smaller needs the S alone or plain text.
+ *
  * `public/favicon.svg` and the login page in cmd/saker/auth.go carry the same
- * point/stroke strings — web/tests/brand-mark.test.ts fails if the three drift.
+ * path strings — web/tests/brand-mark.test.ts fails if the three drift.
  */
 
-export const WORDMARK_CAP = 22
-export const WORDMARK_TRACKING = 4.4
-export const WORDMARK_WIDTH = 114
+/** Glyph box height in art units: every letter is clipped to it. */
+export const WORDMARK_CAP = 100
+/** Total ink width in art units: the last glyph ends at 301 + 66. */
+export const WORDMARK_WIDTH = 367
+/** One stroke weight for the whole mark. */
+export const WORDMARK_STROKE = 16
+/** Legibility floor in CSS pixels, from the artwork's own spec. */
+export const WORDMARK_MIN_WIDTH = 120
 
 export type BrandGlyph = {
   ch: string
+  /** Horizontal position of the glyph box in art units. */
   offset: number
-  polys: string[]
-  strokes: { d: string; w: number }[]
+  /** Glyph box width in art units; also the clip width. */
+  width: number
+  /** Filled outline (A), drawn with the even-odd rule. */
+  fill?: string
+  /** Stroked centreline (S, K, E, R), drawn at WORDMARK_STROKE. */
+  stroke?: string
 }
 
 export const WORDMARK_GLYPHS: BrandGlyph[] = [
   {
     ch: 'S',
     offset: 0,
-    polys: [
-      '0,0 18.6,0 15.7,5.2 0,5.2',
-      '0,0 2.6,0 2.6,13.6 0,13.6',
-      '0,8.4 18.6,8.4 18.6,13.6 0,13.6',
-      '16,8.4 18.6,8.4 18.6,22 16,22',
-      '2.9,16.8 18.6,16.8 18.6,22 0,22',
-    ],
-    strokes: [],
+    width: 66,
+    stroke:
+      'M58 22 C58 11 47 8 33 8 C18 8 8 14 8 26 C8 37 16 43 30 48 C45 53 55 59 55 71 C55 84 44 92 29 92 C14 92 8 86 8 74',
   },
   {
     ch: 'A',
-    offset: 23,
-    polys: ['6,12.6 17.7,12.6 14.8,17.8 3.1,17.8'],
-    strokes: [
-      { d: 'M10.4 0 L0.8 22', w: 3.6 },
-      { d: 'M10.4 0 L20 22', w: 3.6 },
-    ],
+    offset: 74,
+    width: 68,
+    fill: 'M0 100 L26 0 L42 0 L68 100 L52 100 L46.24 76 L21.76 76 L16 100 Z M34 25 L25.6 60 L42.4 60 Z',
   },
   {
     ch: 'K',
-    offset: 48.2,
-    polys: ['0,0 2.6,0 2.6,22 0,22'],
-    strokes: [
-      { d: 'M19.2 0 L2.4 11.2', w: 4.5 },
-      { d: 'M6.5 8.2 L19.6 22', w: 4.5 },
-    ],
+    offset: 153,
+    width: 68,
+    stroke: 'M8 0 L8 100 M72 0 L16 52 L72 100',
   },
   {
     ch: 'E',
-    offset: 72.4,
-    polys: [
-      '0,0 2.6,0 2.6,22 0,22',
-      '0,0 17.4,0 14.5,5.2 0,5.2',
-      '0,8.4 15.2,8.4 12.3,13.6 0,13.6',
-      '0,16.8 17.4,16.8 14.5,22 0,22',
-    ],
-    strokes: [],
+    offset: 233,
+    width: 56,
+    stroke: 'M8 0 L8 100 M0 8 L56 8 M0 50 L48 50 M0 92 L56 92',
   },
   {
     ch: 'R',
-    offset: 94.2,
-    polys: [
-      '0,0 2.6,0 2.6,22 0,22',
-      '0,0 19.8,0 16.9,5.2 0,5.2',
-      '17.2,0 19.8,0 19.8,13.6 17.2,13.6',
-      '0,8.4 19.8,8.4 16.9,13.6 0,13.6',
-    ],
-    strokes: [{ d: 'M11.4 13.6 L19.8 22', w: 4.7 }],
+    offset: 301,
+    width: 66,
+    stroke: 'M8 0 L8 100 M8 8 L32 8 C52 8 58 17 58 30 C58 44 50 52 32 52 L8 52 M34 56 L66 104',
   },
 ]
 
-/** The S alone — the tab icon and any square surface. */
-export const MONOGRAM_GLYPHS: BrandGlyph[] = [
-  { ...WORDMARK_GLYPHS[0], offset: 0 },
-]
-
-/** Padding (in glyph units) around the drawing box so knife cuts are not clipped. */
-const PAD = 2
-
-function Glyphs({ glyphs }: { glyphs: BrandGlyph[] }) {
+function Glyphs({ glyphs, idPrefix }: { glyphs: BrandGlyph[]; idPrefix: string }) {
   return (
     <>
-      {glyphs.map(glyph => (
-        <g key={`${glyph.ch}-${glyph.offset}`} transform={`translate(${glyph.offset} 0)`}>
-          {glyph.polys.map(points => (
-            <polygon key={points} points={points} />
-          ))}
-          {glyph.strokes.map(stroke => (
-            <path key={stroke.d} d={stroke.d} strokeWidth={stroke.w} strokeLinecap="butt" />
-          ))}
-        </g>
-      ))}
+      {glyphs.map(glyph => {
+        const clip = `${idPrefix}-${glyph.ch}`
+        return (
+          <g key={glyph.ch} transform={`translate(${glyph.offset} 0)`}>
+            <clipPath id={clip}>
+              <rect x="0" y="0" width={glyph.width} height={WORDMARK_CAP} />
+            </clipPath>
+            <g clipPath={`url(#${clip})`}>
+              {glyph.fill ? <path d={glyph.fill} fillRule="evenodd" /> : null}
+              {glyph.stroke ? (
+                <path
+                  d={glyph.stroke}
+                  fill="none"
+                  strokeWidth={WORDMARK_STROKE}
+                  strokeLinecap="butt"
+                  strokeLinejoin="miter"
+                  strokeMiterlimit={10}
+                />
+              ) : null}
+            </g>
+          </g>
+        )
+      })}
     </>
   )
 }
 
 /**
- * The full wordmark. `cap` is the drawn cap height in CSS pixels; the width
- * follows at the design ratio (114 / 22).
+ * The full wordmark. `width` is the ink width in CSS pixels; the height follows
+ * at the design ratio (100 / 367). Keep it at or above WORDMARK_MIN_WIDTH.
  */
-export function Wordmark({ cap = 20, className }: { cap?: number; className?: string }) {
-  const scale = cap / WORDMARK_CAP
+export function Wordmark({ width = 148, className }: { width?: number; className?: string }) {
+  const id = useId().replace(/:/g, '')
+  const height = Math.round((width * WORDMARK_CAP) / WORDMARK_WIDTH)
   return (
     <svg
       role="img"
       aria-label="Saker"
-      viewBox={`${-PAD} ${-PAD} ${WORDMARK_WIDTH + PAD * 2} ${WORDMARK_CAP + PAD * 2}`}
-      width={Math.round((WORDMARK_WIDTH + PAD * 2) * scale)}
-      height={Math.round((WORDMARK_CAP + PAD * 2) * scale)}
+      viewBox={`0 0 ${WORDMARK_WIDTH} ${WORDMARK_CAP}`}
+      width={Math.round(width)}
+      height={height}
       className={cn('saker-wordmark shrink-0', className)}
       fill="currentColor"
       stroke="currentColor"
     >
-      <Glyphs glyphs={WORDMARK_GLYPHS} />
-    </svg>
-  )
-}
-
-/** The S alone, for a square surface (the drawer title, a future app tile). */
-export function Monogram({ cap = 18, className }: { cap?: number; className?: string }) {
-  const scale = cap / WORDMARK_CAP
-  const width = WORDMARK_GLYPHS[0].polys.reduce((widest, points) => {
-    const xs = points.split(' ').map(pair => Number(pair.split(',')[0]))
-    return Math.max(widest, ...xs)
-  }, 0)
-  return (
-    <svg
-      role="img"
-      aria-label="Saker"
-      viewBox={`${-PAD} ${-PAD} ${width + PAD * 2} ${WORDMARK_CAP + PAD * 2}`}
-      width={Math.round((width + PAD * 2) * scale)}
-      height={Math.round((WORDMARK_CAP + PAD * 2) * scale)}
-      className={cn('saker-wordmark shrink-0', className)}
-      fill="currentColor"
-      stroke="currentColor"
-    >
-      <Glyphs glyphs={MONOGRAM_GLYPHS} />
+      <Glyphs glyphs={WORDMARK_GLYPHS} idPrefix={id} />
     </svg>
   )
 }

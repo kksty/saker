@@ -4,8 +4,8 @@
 // drift silently: a changed glyph would show up on the rail and not in the tab,
 // and no other suite would notice.
 //
-// This pins the drawing itself (the point/stroke strings the art is made of),
-// not the styling around it: colour, size and the surrounding markup stay free.
+// This pins the drawing itself (the path strings the art is made of), not the
+// styling around it: colour, size and the surrounding markup stay free.
 import { after, before, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -17,57 +17,80 @@ import { createTestServer } from './helpers/vite.ts'
 const webRoot = fileURLToPath(new URL('..', import.meta.url))
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url))
 
-let server: Awaited<ReturnType<typeof createTestServer>>
-let Wordmark: React.ComponentType<{ cap?: number }>
-let Monogram: React.ComponentType<{ cap?: number }>
-let glyphs: { ch: string; polys: string[]; strokes: { d: string; w: number }[] }[]
+type Glyph = { ch: string; offset: number; width: number; fill?: string; stroke?: string }
+
+let Wordmark: React.ComponentType<{ width?: number }>
+let Brand: React.ComponentType<{ width?: number }>
+let glyphs: Glyph[]
+let width: number
+let stroke: number
+let minWidth: number
 
 before(async () => {
-  server = await createTestServer({ root: webRoot })
-  const mod = await server.ssrLoadModule('/src/components/Wordmark.tsx')
-  Wordmark = mod.Wordmark
-  Monogram = mod.Monogram
-  glyphs = mod.WORDMARK_GLYPHS
+  const server = await createTestServer({ root: webRoot })
+  try {
+    const mod = await server.ssrLoadModule('/src/components/Wordmark.tsx')
+    Wordmark = mod.Wordmark
+    glyphs = mod.WORDMARK_GLYPHS
+    width = mod.WORDMARK_WIDTH
+    stroke = mod.WORDMARK_STROKE
+    minWidth = mod.WORDMARK_MIN_WIDTH
+    Brand = (await server.ssrLoadModule('/src/components/Brand.tsx')).Brand
+  } finally {
+    await server.close()
+  }
 })
-
-after(async () => {
-  await server?.close()
-})
-
-const drawing = () => glyphs.flatMap(g => [...g.polys, ...g.strokes.map(s => `${s.d}@${s.w}`)])
 
 test('the wordmark spells SAKER as five drawn glyphs', () => {
   assert.deepEqual(glyphs.map(g => g.ch), ['S', 'A', 'K', 'E', 'R'])
   // Every glyph is geometry, never a text node: the mark must not depend on a
   // font the operator's machine happens to have.
   for (const glyph of glyphs) {
-    assert.ok(glyph.polys.length + glyph.strokes.length > 0, `${glyph.ch} has no drawing`)
+    assert.ok(glyph.fill || glyph.stroke, `${glyph.ch} has no drawing`)
+    assert.ok(glyph.width > 0, `${glyph.ch} has no box`)
   }
+  // The boxes tile left to right and end exactly at the documented ink width.
+  assert.equal(glyphs[0].offset, 0)
+  for (let i = 1; i < glyphs.length; i++) {
+    assert.ok(glyphs[i].offset >= glyphs[i - 1].offset + glyphs[i - 1].width, `${glyphs[i].ch} overlaps`)
+  }
+  const last = glyphs[glyphs.length - 1]
+  assert.equal(last.offset + last.width, width)
 })
 
 test('the rail mark renders as one labelled image with no text fallback', () => {
-  const html = renderToStaticMarkup(React.createElement(Wordmark, { cap: 20 }))
+  const html = renderToStaticMarkup(React.createElement(Wordmark, { width: 148 }))
   assert.match(html, /role="img"/)
   assert.match(html, /aria-label="Saker"/)
-  assert.match(html, /<svg/)
   assert.doesNotMatch(html, />Saker</, 'the name must not also be typeset beside the drawing')
-  assert.equal((html.match(/<polygon/g) ?? []).length, glyphs.reduce((n, g) => n + g.polys.length, 0))
+  for (const glyph of glyphs) {
+    const d = glyph.fill ?? glyph.stroke!
+    assert.ok(html.includes(d), `${glyph.ch} is missing from the render`)
+  }
+  // Each glyph is clipped to its own box so the letters sit flush on the cap
+  // line and baseline; losing a clip lets K's diagonals and R's leg overshoot.
+  assert.equal((html.match(/<clipPath/g) ?? []).length, glyphs.length)
 })
 
-test('the drawn cap height scales the whole lockup', () => {
-  const small = renderToStaticMarkup(React.createElement(Wordmark, { cap: 16 }))
-  const large = renderToStaticMarkup(React.createElement(Wordmark, { cap: 32 }))
-  const height = (html: string) => Number(/height="(\d+)"/.exec(html)?.[1])
-  assert.ok(height(large) > height(small))
-  // Same aspect ratio: the rail and the login card show one mark, not two.
-  const ratio = (html: string) => Number(/width="(\d+)"/.exec(html)?.[1]) / height(html)
-  assert.equal(ratio(small).toFixed(2), ratio(large).toFixed(2))
-})
-
-test('the monogram is the wordmark S, not a second drawing', () => {
-  const html = renderToStaticMarkup(React.createElement(Monogram, { cap: 16 }))
-  assert.match(html, /aria-label="Saker"/)
-  for (const points of glyphs[0].polys) assert.ok(html.includes(points), `monogram is missing ${points}`)
+test('the mark keeps one aspect ratio and respects the 120px floor', () => {
+  const size = (html: string) => ({
+    w: Number(/width="(\d+)"/.exec(html)?.[1]),
+    h: Number(/height="(\d+)"/.exec(html)?.[1]),
+  })
+  const small = size(renderToStaticMarkup(React.createElement(Wordmark, { width: 148 })))
+  const large = size(renderToStaticMarkup(React.createElement(Wordmark, { width: 296 })))
+  assert.ok(large.h > small.h)
+  // Same ratio: the rail and the login card show one mark, not two. Height is
+  // rounded to whole pixels, so compare with that rounding allowance.
+  const ratio = (s: { w: number; h: number }) => s.w / s.h
+  assert.ok(Math.abs(ratio(small) - ratio(large)) < 0.2, `${ratio(small)} vs ${ratio(large)}`)
+  assert.ok(Math.abs(ratio(small) - width / 100) < 0.2)
+  // Below this the S curves blur, per the artwork's own spec; the rail and the
+  // compact header must both stay at or above it.
+  assert.ok(minWidth >= 120)
+  assert.ok(size(renderToStaticMarkup(React.createElement(Wordmark, {}))).w >= minWidth)
+  assert.ok(size(renderToStaticMarkup(React.createElement(Brand, {}))).w >= minWidth)
+  assert.ok(size(renderToStaticMarkup(React.createElement(Brand, { width: minWidth }))).w >= minWidth)
 })
 
 test('public/favicon.svg carries the same S as the rail', () => {
@@ -76,16 +99,15 @@ test('public/favicon.svg carries the same S as the rail', () => {
   // A tab strip can be light or dark, and an icon has no tile of its own: the
   // letter has to pick its own ink in both.
   assert.match(favicon, /prefers-color-scheme:\s*dark/)
-  for (const points of glyphs[0].polys) assert.ok(favicon.includes(points), `favicon is missing ${points}`)
+  assert.ok(favicon.includes(glyphs[0].stroke!), 'favicon is missing the S path')
+  assert.match(favicon, new RegExp(`stroke-width="${stroke}"`))
 })
 
 test('the Go login page carries the whole wordmark', () => {
   const auth = readFileSync(`${repoRoot}cmd/saker/auth.go`, 'utf8')
   for (const glyph of glyphs) {
-    for (const points of glyph.polys) assert.ok(auth.includes(points), `login page is missing ${glyph.ch}: ${points}`)
-    for (const stroke of glyph.strokes) {
-      assert.ok(auth.includes(`d="${stroke.d}"`), `login page is missing ${glyph.ch} stroke ${stroke.d}`)
-    }
+    const d = glyph.fill ?? glyph.stroke!
+    assert.ok(auth.includes(d), `login page is missing ${glyph.ch}`)
   }
   assert.match(auth, /aria-label="Saker"/)
   // The Kaiti/gradient lockup this replaced must not linger: it made the name
