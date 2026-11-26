@@ -20,6 +20,7 @@ import (
 	"github.com/kksty/saker/internal/collab"
 	"github.com/kksty/saker/internal/executor"
 	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/retrieval"
 	"github.com/kksty/saker/internal/store"
 )
 
@@ -372,6 +373,28 @@ func (s *Server) getProposal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"proposal": p})
+}
+
+// relatedProposalIntents lists existing directions that share a recorded premise
+// or entity with this proposal. It is decision support for the commander: the
+// candidates, their acceptance criteria and their run states are read from the
+// ledger; whether to merge/continue/reject/approve is still the commander's
+// judgement, and this route has no side effects.
+func (s *Server) relatedProposalIntents(w http.ResponseWriter, r *http.Request) {
+	if !proposalDecisionAllowed(r) {
+		writeJSON(w, http.StatusForbidden, map[string]any{
+			"error": "只有指挥官或操作员可以查看提议的相关意图",
+			"code":  "proposal_forbidden",
+		})
+		return
+	}
+	id := r.PathValue("id")
+	p, ok := s.Store.GetProposal(id)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "提议不存在：" + id, "code": "proposal_not_found"})
+		return
+	}
+	writeJSON(w, http.StatusOK, retrieval.RelatedIntentsFor(s.Store.Snapshot(), p, 20))
 }
 
 // proposalDecisionReq is the CAS body of every decision route. expected_version

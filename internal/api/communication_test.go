@@ -30,7 +30,8 @@ func liveNoticeFixture(t *testing.T) *agentFixture {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	f.makeLive(t)
+	run := f.makeLive(t)
+	f.tgtID.RunID = run.ID
 	return f
 }
 

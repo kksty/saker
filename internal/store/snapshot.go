@@ -94,6 +94,12 @@ func detachPlaybook(p model.Playbook) model.Playbook {
 		}
 		p.FromFactVersions = v
 	}
+	p.FromFactClaims = copyVersions(p.FromFactClaims)
+	p.Confirmations = append([]model.PlaybookConfirmation(nil), p.Confirmations...)
+	for i := range p.Confirmations {
+		p.Confirmations[i].FromFactIDs = append([]string(nil), p.Confirmations[i].FromFactIDs...)
+		p.Confirmations[i].FromFactClaims = copyVersions(p.Confirmations[i].FromFactClaims)
+	}
 	if p.Pattern != nil {
 		pattern := *p.Pattern
 		pattern.Nodes = append([]model.PatternNode(nil), pattern.Nodes...)
@@ -160,6 +166,10 @@ func detachRun(r model.Run) model.Run {
 	r.Infos = append([]string(nil), r.Infos...)
 	r.Ingest = detachIngestOutcome(r.Ingest)
 	r.WaitDelivery = detachWaitDelivery(r.WaitDelivery)
+	if r.BriefArchive != nil {
+		archive := *r.BriefArchive
+		r.BriefArchive = &archive
+	}
 	if r.DeclarationStart != nil {
 		v := *r.DeclarationStart
 		r.DeclarationStart = &v

@@ -52,6 +52,12 @@ type Memory struct {
 	// queue, and SetReviewCursor persists it through the same meta transaction
 	// without bumping the decider's change counter.
 	ReviewCursors map[string]string `json:"review_cursors,omitempty"`
+	// ReviewAttempts is the durable last attempt per fact, keyed by fact ID and
+	// carrying the assertion version it judged. The automatic queue's cooldown
+	// and blocked state used to live only in process memory, so a restart forgot
+	// why a finding was not moving and retried it immediately. It is queue
+	// bookkeeping, not a verdict: the Review row stays the proof record.
+	ReviewAttempts map[string]ReviewAttempt `json:"review_attempts,omitempty"`
 	// AttentionThrough is a delivery checkpoint for global decision events, not
 	// a fact/read ACK. Local events remain in History after routing past them.
 	AttentionThrough uint64 `json:"attention_through,omitempty"`

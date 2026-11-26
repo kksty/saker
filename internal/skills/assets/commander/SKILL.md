@@ -140,6 +140,7 @@ GNU 参数（如 `--max-filesize`）。
 执行者的提议是控制状态，不是事实，也不是已派发的意图。提议是可选的：执行者自主决定下一步做什么、是否值得提议；没有待批提议时不要向它索要，也不要要求它每轮都必须提议。执行者把当前意图做完、产出事实就够，不要因为没有提议而催办。收到 `kind=proposal` 的消息后（每轮也应主动 `GET /api/proposals?status=proposed` 查看），逐条判断它是否在本轮授权与终点范围内、与在办意图是否重叠：
 
 - 单独一条就能推进、验收清楚：`POST /api/proposals/<id>/approve`，正文带读到的 `expected_version`，可写 `note`。批准只创建一个 pending 意图，**不会自动起 run**；确认无误后 `POST /api/proposals/<id>/dispatch` 才派发，派发成功后账本记录 `run_id`。
+- 决策前先查 `GET /api/proposals/<id>/related`：按共同必要前提或实体引用列出候选意图的 ID、验收标准、状态、运行状态和关联依据；已停放且可重开的原意图也会列出。候选只是判断依据，是否重复、合并、续跑或另立由你决定，不改变批准与派发准入。
 - 不该做、与现有意图重叠或越出授权：`POST /api/proposals/<id>/reject`，正文必须带 `reason`，理由会回给提议者。
 - 409 `proposal_conflict`：手里的版本已过时，重新 GET 该提议并按当前状态处理，不要凭旧版本反复重试。已 `dispatched` 的提议重试派发只返回现状，不会起第二个 run。
 - `rationale` 与 `from_fact_ids` 只是判断输入：按当前账本核对前提准入，别把提议正文当已核验结论。批准前控制面会再校验一次必要前提，失败返回 409 `proposal_premise`，按 readiness 给出的阻塞原因处理（复核未完成就等待，之后重试或驳回）。

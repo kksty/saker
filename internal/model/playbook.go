@@ -30,6 +30,13 @@ func (p Playbook) SourceProblem(facts map[string]Fact) string {
 		if !ok {
 			return fmt.Sprintf("来源事实 %s 不存在", id)
 		}
+		stamped, bound := p.FromFactClaims[id]
+		if !bound {
+			return fmt.Sprintf("来源事实 %s 的确认版本未知，需按当前断言重新确认", id)
+		}
+		if f.ClaimVersion != stamped {
+			return fmt.Sprintf("来源事实 %s 已更新（确认时 v%d，当前 v%d），需按新版本重新确认", id, stamped, f.ClaimVersion)
+		}
 		if f.Status != "verified" {
 			return fmt.Sprintf("来源事实 %s 未核验（status=%s）", id, f.Status)
 		}
@@ -44,6 +51,15 @@ func (p Playbook) SourceProblem(facts map[string]Fact) string {
 		}
 	}
 	return ""
+}
+
+// WithSourceState annotates a copy with the read-side source judgement. The
+// stored Status is the writer's declaration and is never rewritten; SourceChanged
+// says that a stored confirmation no longer rests on the current claims.
+func (p Playbook) WithSourceState(facts map[string]Fact) Playbook {
+	p.SourceChange = p.SourceProblem(facts)
+	p.SourceChanged = p.SourceChange != "" && p.Status == PlaybookConfirmed
+	return p
 }
 
 // Confirmed is the only reading of the confirmation label. Status records what

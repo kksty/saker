@@ -772,6 +772,21 @@ export function Runs({
                       <span className="shrink-0 text-[11px] text-ink-3">
                         {copied === current.brief_path ? '已复制' : '只读路径'}
                       </span>
+                      {current.brief_archive?.sha256 && (
+                        <span className="shrink-0 font-mono text-[10px] text-ink-3" title={current.brief_archive.sha256}>
+                          sha {current.brief_archive.sha256.slice(0, 12)}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {current.brief_archive?.status === 'pending' && (
+                    <div className="saker-break rounded-md border border-warning/25 bg-warning/12 px-2.5 py-1.5 text-[11px] leading-relaxed text-warning" data-testid="brief-archive-pending">
+                      任务书文件可能已经写成，但账本路径没有写回：本次下发无法按引用追溯。不要用后来的任务书措辞补写这份归档。
+                    </div>
+                  )}
+                  {current.brief_archive?.status === 'write_failed' && (
+                    <div className="saker-break rounded-md border border-destructive/25 bg-destructive/12 px-2.5 py-1.5 text-[11px] leading-relaxed text-destructive" data-testid="brief-archive-failed">
+                      任务书归档写入失败：{current.brief_archive.error || '未知原因'}；本次下发无法追溯。
                     </div>
                   )}
                   {/* What this run was dispatched against, frozen: premise claim

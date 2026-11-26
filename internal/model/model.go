@@ -650,13 +650,27 @@ const (
 // Doc is prompt text handed to a later executor. It is never executed, and it
 // is treated as untrusted: the brief says "核对再用".
 type Playbook struct {
-	Archived         bool               `json:"archived,omitempty"`
-	SourceRunID      string             `json:"source_run_id,omitempty"`
-	FromFactVersions map[string]uint64  `json:"from_fact_versions,omitempty"`
-	Pattern          *ExperiencePattern `json:"pattern,omitempty"`
-	RequiredTags     []string           `json:"required_tags,omitempty"`
-	ID               string             `json:"id"`
-	Title            string             `json:"title"`
+	Archived         bool              `json:"archived,omitempty"`
+	SourceRunID      string            `json:"source_run_id,omitempty"`
+	FromFactVersions map[string]uint64 `json:"from_fact_versions,omitempty"`
+	// FromFactClaims binds the confirmation to the assertion versions it was
+	// accepted from. A source fact can keep its id while its claim changes; the
+	// version check is what makes the old confirmation visibly stale instead of
+	// silently re-using a different assertion.
+	FromFactClaims map[string]uint64 `json:"from_fact_claims,omitempty"`
+	// Confirmations is the append-only receipt history: each explicit
+	// confirmation records when, by whom/what run, and which claim versions it
+	// accepted. A later re-confirmation appends; it never rewrites an older one.
+	Confirmations []PlaybookConfirmation `json:"confirmations,omitempty"`
+	// SourceChanged/SourceChange are computed on read. They say that a stored
+	// confirmation no longer rests on the current source claims; the row and its
+	// confirmation history are left exactly as written.
+	SourceChanged bool               `json:"source_changed,omitempty"`
+	SourceChange  string             `json:"source_change,omitempty"`
+	Pattern       *ExperiencePattern `json:"pattern,omitempty"`
+	RequiredTags  []string           `json:"required_tags,omitempty"`
+	ID            string             `json:"id"`
+	Title         string             `json:"title"`
 	// When is one line: what this buys you and when it applies.
 	When string `json:"when"`
 	// Doc is steps/commands/limits, written by whoever ran it.
@@ -676,6 +690,19 @@ type Playbook struct {
 	IntentID    string    `json:"intent_id,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// PlaybookConfirmation is one explicit confirmation of a reusable tactic. It
+// is a receipt, not a verdict: the row's confirmed label is re-derived from the
+// current sources, while this record says which assertion versions were
+// accepted at the time. An empty FromFactClaims means a legacy receipt that did
+// not bind versions.
+type PlaybookConfirmation struct {
+	At             time.Time         `json:"at"`
+	Origin         string            `json:"origin,omitempty"`
+	SourceRunID    string            `json:"source_run_id,omitempty"`
+	FromFactIDs    []string          `json:"from_fact_ids"`
+	FromFactClaims map[string]uint64 `json:"from_fact_claims,omitempty"`
 }
 
 // ExperiencePattern describes recorded relationships to look up. Variable
@@ -720,6 +747,18 @@ const (
 // stable across run generations); the ids are assigned by the control plane, not
 // supplied by the caller. Seq is the per-project read cursor; IdempotencyKey is
 // the caller's retry key and is unique per sender.
+// MessageDelivery is one attempt to hand a message to a receiving run. The list
+// keeps redelivery history separate from the current delivery fields, so a late
+// receipt can be checked against the attempt it belongs to instead of confirming
+// the newest one.
+type MessageDelivery struct {
+	DeliveryID string    `json:"delivery_id,omitempty"`
+	RunID      string    `json:"run_id,omitempty"`
+	Path       string    `json:"path,omitempty"`
+	At         time.Time `json:"at"`
+	Error      string    `json:"error,omitempty"`
+}
+
 type Message struct {
 	GoalInstruction     bool     `json:"goal_instruction,omitempty"`
 	DirectiveRecipients []string `json:"directive_recipients,omitempty"`
@@ -793,6 +832,14 @@ type Message struct {
 	// session's in-memory inbox, while a prompt message is already part of the
 	// session transcript and comes back with a resume.
 	DeliveryPath string `json:"delivery_path,omitempty"`
+	// CurrentDeliveryRunID is the run the in-flight delivery attempt is for.
+	// DeliveredRunID is the last confirmed target and may still point at the
+	// previous attempt until FinishMessageDelivery returns; a receipt is checked
+	// against this field so a late acknowledgement cannot confirm a redelivery.
+	CurrentDeliveryRunID string `json:"current_delivery_run_id,omitempty"`
+	// Deliveries is the append-only attempt history: each redelivery keeps its
+	// run, transport id, path and error, while the fields above stay current.
+	Deliveries []MessageDelivery `json:"deliveries,omitempty"`
 	// Redeliveries counts how many times the control plane put this message
 	// back on the queue after a failed run. >0 makes the injected text carry a
 	// [重投] marker so the model can dedupe by message_id instead of acting
@@ -804,6 +851,10 @@ type Message struct {
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 	AckedAt   *time.Time `json:"acked_at,omitempty"`
+	// AckedDeliveryID/AckedRunID bind the receipt to the attempt it confirmed.
+	// They are set once, with AckedAt, and never rewritten by a duplicate ack.
+	AckedDeliveryID string `json:"acked_delivery_id,omitempty"`
+	AckedRunID      string `json:"acked_run_id,omitempty"`
 }
 
 // Message delivery states. Sending is persisted before transport I/O; a crash
@@ -1085,6 +1136,33 @@ func (d *WaitDelivery) Settled() bool {
 	return d == nil || d.Status == WaitDeliveryReceived
 }
 
+// Brief archive states. They are recorded on the run itself, so an operator can
+// tell an unarchived run from a half-written archive without consulting the log.
+const (
+	// BriefArchivePending means the file may exist but the ledger path was not
+	// committed (the process stopped, or the run-row write failed). This is the
+	// "file written, path not written back" state.
+	BriefArchivePending = "pending"
+	// BriefArchiveArchived means the file was written, hashed and its path
+	// committed to the run in the same update.
+	BriefArchiveArchived = "archived"
+	// BriefArchiveWriteFailed means the archive file itself could not be written.
+	BriefArchiveWriteFailed = "write_failed"
+)
+
+// BriefArchive is the outcome of archiving one run's dispatch text. Path is the
+// stable case-relative reference to what the model was actually given; SHA256 is
+// the digest of the redacted bytes, so a later reader can tell whether the file
+// is still the one this run wrote.
+type BriefArchive struct {
+	Status string    `json:"status"`
+	Path   string    `json:"path,omitempty"`
+	SHA256 string    `json:"sha256,omitempty"`
+	Bytes  int       `json:"bytes,omitempty"`
+	Error  string    `json:"error,omitempty"`
+	At     time.Time `json:"at,omitempty"`
+}
+
 // Run is one executor invocation for one intent.
 type Run struct {
 	NativeSubagentCalls      int       `json:"native_subagent_calls,omitempty"`
@@ -1256,13 +1334,18 @@ type Run struct {
 	ContextWindow int    `json:"context_window,omitempty"`
 	LogPath       string `json:"log_path,omitempty"`
 	// BriefPath is the archived snapshot of the dispatch prompt, relative to the
-	// case root (`<case>/.saker/briefs/<runID>.md`). Every run that dispatches text
-	// to a model writes one — a fresh dispatch, a resume/wake, a steer
+	// case root (`<case>/.saker/briefs/<runID>.md`). Every run that dispatches
+	// text to a model writes one — a fresh dispatch, a resume/wake, a steer
 	// continuation and a handoff run alike — because "what did this run actually
 	// read" is the only evidence a later reader can trust, and a handoff is now
 	// refused when the run it replaces has none. Old rows have none (omitempty).
 	// Known credentials are redacted before the file is written.
 	BriefPath string `json:"brief_path,omitempty"`
+	// BriefArchive records how that archive was written. A nil value is a run
+	// from before this state existed; an explicit state keeps "file written but
+	// the ledger path was not committed" distinguishable from "the file write
+	// failed", instead of both looking like a run with no archive.
+	BriefArchive *BriefArchive `json:"brief_archive,omitempty"`
 	// ContinuedFrom is the run this one continues (a steer), "" for a fresh
 	// dispatch. Two runs on one intent are otherwise indistinguishable from two
 	// independent attempts in the ledger (D42).

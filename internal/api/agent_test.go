@@ -257,7 +257,10 @@ func TestAgentSendValidatesFactsRepliesAndTarget(t *testing.T) {
 
 func TestAgentReadAndAck(t *testing.T) {
 	f := newAgentFixture(t)
-	f.makeLive(t)
+	run := f.makeLive(t)
+	// The identity is issued for the run that is actually live; the fixture's
+	// placeholder id would be a previous-session receipt.
+	f.tgtID.RunID = run.ID
 	rec := f.call(t, f.srcID, http.MethodPost, "/api/messages", sendBody(collab.ParticipantID(f.target.ID), "k", "看下这个"))
 	var sent struct {
 		Message model.Message `json:"message"`
@@ -281,6 +284,20 @@ func TestAgentReadAndAck(t *testing.T) {
 	got, _ := f.p.Store.MessageByID(sent.Message.ID)
 	if got.Status != model.MessageConfirmed || got.AckedAt == nil {
 		t.Fatalf("acked = %+v", got)
+	}
+	firstAt := *got.AckedAt
+	// The same receipt is idempotent: a second call must not move the first
+	// confirmation time or the delivery it was bound to.
+	rec = f.call(t, f.tgtID, http.MethodPost, "/api/messages/"+sent.Message.ID+"/ack", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("repeat ack: %d %s", rec.Code, rec.Body.String())
+	}
+	again, _ := f.p.Store.MessageByID(sent.Message.ID)
+	if again.AckedAt == nil || !again.AckedAt.Equal(firstAt) {
+		t.Fatalf("repeat ack moved the first confirmation time: %v -> %v", firstAt, again.AckedAt)
+	}
+	if again.AckedRunID != f.tgtID.RunID {
+		t.Fatalf("receipt bound to run %q, want %q", again.AckedRunID, f.tgtID.RunID)
 	}
 }
 

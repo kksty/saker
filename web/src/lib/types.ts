@@ -501,6 +501,21 @@ export interface Playbook {
 	archived?: boolean
 	source_run_id?: string
 	from_fact_versions?: Record<string,number>
+	/** Assertion versions the confirmation accepted. A source id whose version
+	 *  moved makes the old confirmation stale instead of silently re-using the
+	 *  new claim. */
+	from_fact_claims?: Record<string,number>
+	/** Append-only confirmation receipts, oldest first. */
+	confirmations?: {
+		at: string
+		origin?: PlaybookOrigin
+		source_run_id?: string
+		from_fact_ids?: string[]
+		from_fact_claims?: Record<string,number>
+	}[]
+	/** Read-side: a stored confirmation no longer rests on the current claims. */
+	source_changed?: boolean
+	source_change?: string
 	pattern?: {nodes: {name:string;type:'fact'|'intent';kind?:string;tags?:string[];entity_var?:string}[];edges:{source:string;target:string;kind:string}[]}
   id: string
   title: string
@@ -787,6 +802,17 @@ export interface WaitDelivery {
   received_at?: string
 }
 
+/** The outcome of archiving one run's dispatch text. */
+export interface BriefArchive {
+  /** pending | archived | write_failed */
+  status: string
+  path?: string
+  sha256?: string
+  bytes?: number
+  error?: string
+  at?: string
+}
+
 export interface Run {
   native_subagent_calls?: number
   native_subagent_active?: number
@@ -829,6 +855,10 @@ export interface Run {
   warnings_dismissed?: boolean
   /** Read-only path of the archived task brief, relative to the case root. */
   brief_path?: string
+  /** How the brief archive was written. Absent on old rows; `pending` is the
+   *  half-written state (file may exist, ledger path did not commit), and
+   *  `write_failed` means the file itself could not be written. */
+  brief_archive?: BriefArchive
   /** The run this one continued (steer/handoff/wake), if any. */
   continued_from?: string
   handoff_from?: string
@@ -1104,6 +1134,14 @@ export interface DirectiveResponse {
   escalation?: { id: string; intent_id?: string }
 }
 
+export interface MessageDelivery {
+  delivery_id?: string
+  run_id?: string
+  path?: string
+  at: string
+  error?: string
+}
+
 export interface Message {
   /** Mechanical fact-change notice: which fact and record version changed. */
   notice_fact_id?: string
@@ -1134,12 +1172,19 @@ export interface Message {
   delivered_run_id?: string
   /** How it reached the peer: the dispatch brief or the live-run IOA bridge. */
   delivery_path?: 'prompt' | 'ioa' | string
+  /** Run of the in-flight delivery attempt; a receipt is checked against it. */
+  current_delivery_run_id?: string
+  /** Append-only delivery rounds, oldest first. The fields above stay current. */
+  deliveries?: MessageDelivery[]
   /** How many times a retry re-injected this unconfirmed message. */
   redeliveries?: number
   error?: string
   created_at: string
   updated_at: string
   acked_at?: string
+  /** The delivery attempt the receipt confirmed; set once, never rewritten. */
+  acked_delivery_id?: string
+  acked_run_id?: string
 }
 
 /** One recipient's queue pressure (GET /api/communication; store.QueueStats).

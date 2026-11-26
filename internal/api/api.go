@@ -4,6 +4,8 @@ package api
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -303,15 +305,9 @@ type Server struct {
 	journals   map[string]*runJournal
 	// verifyBatchMu guards verifyBatch: a project runs at most one batch review
 	// at a time, so a second click cannot double the token bill (D100).
-	verifyBatchMu sync.Mutex
-	verifyBatch   bool
-	// reviewFailMu guards reviewFailed: the automatic review queue's retry
-	// cooldown. An automatic review that ends without a usable verdict leaves the
-	// fact unverified, so without this every wake would spend another model run
-	// on the same known-bad candidate (F11, auto_verify.go).
-	reviewFailMu      sync.Mutex
+	verifyBatchMu     sync.Mutex
+	verifyBatch       bool
 	autoReviewMu      sync.RWMutex
-	reviewFailed      map[string]reviewFailure
 	reviewPumpMu      sync.Mutex
 	reviewPumpRunning bool
 	reviewPumpEpoch   uint64
@@ -594,6 +590,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/proposals", s.createProposal)
 	mux.HandleFunc("GET /api/proposals", s.listProposals)
 	mux.HandleFunc("GET /api/proposals/{id}", s.getProposal)
+	mux.HandleFunc("GET /api/proposals/{id}/related", s.relatedProposalIntents)
 	mux.HandleFunc("POST /api/proposals/{id}/withdraw", s.withdrawProposal)
 	mux.HandleFunc("POST /api/proposals/{id}/approve", s.approveProposal)
 	mux.HandleFunc("POST /api/proposals/{id}/reject", s.rejectProposal)
@@ -2183,27 +2180,44 @@ func (s *Server) readLiveDeclarations(intentID, workDir, sourceRun string, offse
 // material, and it is passed through redactSecrets first: the live prompt may
 // carry a credential in a section the journal already redacts, and an archived
 // copy must not become the one place it survives (task-13 boundary, task-25).
-func (s *Server) archiveBrief(workDir, runID, prompt string) (string, error) {
+func (s *Server) archiveBrief(workDir, runID, prompt string) (rel, digest string, size int, err error) {
+	body := []byte(s.redactSecrets(prompt))
+	sum := sha256.Sum256(body)
+	digest = hex.EncodeToString(sum[:])
 	dir := filepath.Join(workDir, ".saker", "briefs")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", err
+		return "", digest, len(body), err
 	}
 	path := filepath.Join(dir, runID+".md")
-	if err := os.WriteFile(path, []byte(s.redactSecrets(prompt)), 0o600); err != nil {
-		return "", err
+	if err := os.WriteFile(path, body, 0o600); err != nil {
+		return "", digest, len(body), err
 	}
 	// The mode above is the creation request; POSIX must also get it on an
 	// existing file (a retried run id never reuses a path, but a test or a
 	// restored case can). Windows ignores the bits; the ACL there is the
 	// operator's, and the file is inside the case.
 	if err := os.Chmod(path, 0o600); err != nil {
-		return "", err
+		return "", digest, len(body), err
 	}
-	rel, err := filepath.Rel(s.CaseRoot, path)
+	rel, err = filepath.Rel(s.CaseRoot, path)
 	if err != nil {
-		return filepath.ToSlash(path), nil
+		return filepath.ToSlash(path), digest, len(body), nil
 	}
-	return filepath.ToSlash(rel), nil
+	return filepath.ToSlash(rel), digest, len(body), nil
+}
+
+// writeBriefArchivePath is the one ledger write that makes an archive traceable.
+// It is a package variable so the failure path (file written, path update
+// failed) can be exercised in a test; production uses the store directly.
+var writeBriefArchivePath = func(s *Server, runID, rel, digest string, size int) error {
+	_, err := s.Store.UpdateRun(runID, func(r *model.Run) {
+		r.BriefPath = rel
+		r.BriefArchive = &model.BriefArchive{
+			Status: model.BriefArchiveArchived, Path: rel, SHA256: digest,
+			Bytes: size, At: time.Now(),
+		}
+	})
+	return err
 }
 
 func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID string, resume bool, prompt string, keepPrompt bool) {
@@ -2311,6 +2325,10 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 		handoffAuth.SourceRun = in.Handoff.FromRun
 		if src, ok := s.Store.GetRun(in.Handoff.FromRun); ok {
 			handoffAuth.SourceBrief = src.BriefPath
+			if src.BriefArchive != nil {
+				handoffAuth.SourceArchiveStatus = src.BriefArchive.Status
+				handoffAuth.SourceArchiveError = src.BriefArchive.Error
+			}
 		}
 	}
 	waitSection := s.readyWaitSection(in)
@@ -2417,14 +2435,31 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 	// the model received — keeping it out left the resumed run's task text
 	// unrecorded while the session's older copy looked like the answer.
 	if prompt != "" {
-		if rel, err := s.archiveBrief(workDir, runID, prompt); err != nil {
+		// The pending stamp is written before the file: if the process stops (or
+		// the final path write fails) after the bytes landed, the run still says
+		// "archive pending" instead of looking like a run nobody archived. That
+		// is the only way the half-written state stays visible.
+		if _, err := s.Store.UpdateRun(runID, func(r *model.Run) {
+			r.BriefArchive = &model.BriefArchive{Status: model.BriefArchivePending, At: time.Now()}
+		}); err != nil {
+			log.Printf("run %s：记录任务书归档开始失败：%v", runID, err)
+		}
+		rel, digest, size, err := s.archiveBrief(workDir, runID, prompt)
+		if err != nil {
 			log.Printf("run %s：归档任务书失败：%v", runID, err)
-		} else {
-			_, _ = s.Store.UpdateRun(runID, func(r *model.Run) { r.BriefPath = rel })
-			if in.Wait != nil {
-				if err := s.Store.MarkWaitDelivery(runID, model.WaitDeliveryArchived, rel); err != nil {
-					log.Printf("run %s：记录等待结果归档失败：%v", runID, err)
+			_, _ = s.Store.UpdateRun(runID, func(r *model.Run) {
+				r.BriefArchive = &model.BriefArchive{
+					Status: model.BriefArchiveWriteFailed, Error: err.Error(), At: time.Now(),
 				}
+			})
+		} else if err := writeBriefArchivePath(s, runID, rel, digest, size); err != nil {
+			// The file is on disk and its digest is known; only the ledger path
+			// did not commit. Keep the pending state rather than claiming either
+			// success or a write failure.
+			log.Printf("run %s：任务书已写成但账本路径未写回（%s）：%v", runID, rel, err)
+		} else if in.Wait != nil {
+			if err := s.Store.MarkWaitDelivery(runID, model.WaitDeliveryArchived, rel); err != nil {
+				log.Printf("run %s：记录等待结果归档失败：%v", runID, err)
 			}
 		}
 	}
@@ -4158,7 +4193,7 @@ func (s *Server) autoVerifyWithContext(ctx context.Context, intentID string) {
 		return
 	}
 	cursor := start
-	reviewed, busy, cooling, failed := 0, 0, 0, 0
+	reviewed, busy, cooling, blocked, failed := 0, 0, 0, 0, 0
 	for _, f := range facts {
 		// Stop before the first candidate this pass did not reach: the cursor
 		// stays on the last handled candidate, so a resumed pass continues with
@@ -4172,10 +4207,16 @@ func (s *Server) autoVerifyWithContext(ctx context.Context, intentID string) {
 			busy++
 			continue
 		}
+		if a, isBlocked := s.reviewBlocked(f); isBlocked {
+			blocked++
+			log.Printf("自动复核 %s（%s）：%s，等待断言或证据变化（%s）",
+				f.ID, clipRunes(f.Title, 60), a.Outcome, clipRunes(a.Reason, 200))
+			continue
+		}
 		now := time.Now()
 		if wait, ok := s.reviewCoolingDown(f, now); ok {
 			cooling++
-			log.Printf("自动复核 %s（%s）：上次未得到可用结论，冷却中（约 %s 后重试）",
+			log.Printf("自动复核 %s（%s）：上次运行失败，冷却中（约 %s 后重试）",
 				f.ID, clipRunes(f.Title, 60), wait.Round(time.Second))
 			continue
 		}
@@ -4186,29 +4227,38 @@ func (s *Server) autoVerifyWithContext(ctx context.Context, intentID string) {
 				break
 			}
 			failed++
-			s.noteReviewFailure(f, time.Now())
+			retry := time.Now().Add(reviewRetryCooldown)
+			s.recordReviewAttempt(f, store.ReviewAttemptRunFailed, err.Error(), "", time.Now(), &retry)
 			log.Printf("自动复核 %s（%s）失败，进入冷却：%v", f.ID, clipRunes(f.Title, 60), err)
 			continue
 		}
-		if review.Verdict != "pass" && review.Verdict != "reject" {
-			// needs_evidence: the run happened but the fact is still unverified.
-			// Treat it as a failed attempt for retry budgeting, otherwise every
-			// wake would pay for the same unsuccessful review again.
+		switch review.Verdict {
+		case "pass":
+			s.clearReviewFailure(f)
+			reviewed++
+		case "reject":
+			// An independent veto is a verdict, not a broken run: it is shown
+			// separately and is not retried on a timer.
 			failed++
-			s.noteReviewFailure(f, time.Now())
-			log.Printf("自动复核 %s（%s）：结论 %q 未改变事实状态，进入冷却（%s）",
-				f.ID, clipRunes(f.Title, 60), review.Verdict, reviewRetryCooldown)
-			continue
+			s.recordReviewAttempt(f, store.ReviewAttemptRejected, review.Notes, review.VerifierRun, time.Now(), nil)
+			log.Printf("自动复核 %s（%s）：独立复核否决（%s）", f.ID, clipRunes(f.Title, 60), clipRunes(review.Notes, 200))
+			reviewed++
+		default:
+			// needs_evidence: the run happened but the material did not support a
+			// verdict. Retrying the same assertion/evidence set would only pay for
+			// the same answer again; wait for a material change.
+			failed++
+			s.recordReviewAttempt(f, store.ReviewAttemptNeedsEvidence, review.Notes, review.VerifierRun, time.Now(), nil)
+			log.Printf("自动复核 %s（%s）：%q，等待补充材料或更正断言（%s）",
+				f.ID, clipRunes(f.Title, 60), review.Verdict, clipRunes(review.Notes, 200))
 		}
-		s.clearReviewFailure(f)
-		reviewed++
 	}
 	if err := s.Store.SetReviewCursor(intentID, cursor); err != nil {
 		log.Printf("自动复核 %s：记录复核游标失败：%v", intentID, err)
 	}
-	if reviewed+busy+cooling+failed > 0 {
-		log.Printf("自动复核 %s：本批 %d 个候选，%d 个得到结论，%d 个未得结论（冷却），%d 个忙碌跳过，%d 个冷却跳过",
-			intentID, len(facts), reviewed, failed, busy, cooling)
+	if reviewed+busy+cooling+blocked+failed > 0 {
+		log.Printf("自动复核 %s：本批 %d 个候选，%d 个得到结论，%d 个未得结论，%d 个忙碌跳过，%d 个冷却跳过，%d 个等待材料",
+			intentID, len(facts), reviewed, failed, busy, cooling, blocked)
 	}
 	if reviewed > 0 && s.Decider != nil {
 		s.wakeCommanderIfNeeded("review")

@@ -1262,15 +1262,79 @@ func playbookKey(title string) string {
 	return strings.ToLower(strings.TrimSpace(title))
 }
 
-func (s *Store) playbookIndexLocked(title string) int {
-	key := playbookKey(title)
+func (s *Store) playbookIndexLocked(p model.Playbook) int {
+	if p.ID != "" {
+		for i := range s.db.Playbooks {
+			if s.db.Playbooks[i].ID == p.ID {
+				return i
+			}
+		}
+		// An explicit identity that is not in the ledger is a new entry, even
+		// when the title matches an existing one: title is not identity.
+		return -1
+	}
+	key := playbookKey(p.Title)
 	if key == "" {
 		return -1
 	}
+	var matches []int
 	for i := range s.db.Playbooks {
 		if playbookKey(s.db.Playbooks[i].Title) == key {
+			matches = append(matches, i)
+		}
+	}
+	if len(matches) == 0 {
+		return -1
+	}
+	sharesSource := func(i int) bool {
+		cur := s.db.Playbooks[i]
+		if p.SourceRunID != "" && cur.SourceRunID == p.SourceRunID {
+			return true
+		}
+		for _, a := range p.FromFactIDs {
+			for _, b := range cur.FromFactIDs {
+				if a == b {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	// One explicit source lineage: the write continues that row. A different
+	// source with the same title is a different tactic and must not overwrite
+	// the first one's history.
+	if len(p.FromFactIDs) > 0 {
+		for _, i := range matches {
+			if sharesSource(i) {
+				return i
+			}
+		}
+		for _, i := range matches {
+			if len(s.db.Playbooks[i].FromFactIDs) == 0 {
+				// An unsourced candidate has no source history to lose; the first
+				// explicit citation may adopt it.
+				return i
+			}
+		}
+		return -1
+	}
+	// An unsourced write can only continue an unsourced row (or the same source
+	// run). If several independent sourced rows share the title, title is not
+	// identity enough to pick one.
+	for _, i := range matches {
+		if len(s.db.Playbooks[i].FromFactIDs) == 0 {
 			return i
 		}
+	}
+	if p.SourceRunID != "" {
+		for _, i := range matches {
+			if s.db.Playbooks[i].SourceRunID == p.SourceRunID {
+				return i
+			}
+		}
+	}
+	if len(matches) == 1 {
+		return matches[0]
 	}
 	return -1
 }
@@ -1346,16 +1410,18 @@ func (s *Store) UpsertPlaybook(p model.Playbook) (model.Playbook, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now()
-	idx := s.playbookIndexLocked(p.Title)
+	idx := s.playbookIndexLocked(p)
 	if idx < 0 {
-		p.FromFactVersions = map[string]uint64{}
-		for _, id := range p.FromFactIDs {
-			if r, ok := s.records[recordKey("fact", id)]; ok {
-				p.FromFactVersions[id] = r.version
-			}
+		p.FromFactVersions, p.FromFactClaims = map[string]uint64{}, map[string]uint64{}
+		p.Confirmations = nil
+		s.stampPlaybookSourcesLocked(&p, p.FromFactIDs)
+		if p.ID == "" {
+			p.ID = s.uniqueIDLocked("pb")
 		}
-		p.ID = s.uniqueIDLocked("pb")
 		p.CreatedAt, p.UpdatedAt = now, now
+		if p.Status == model.PlaybookConfirmed {
+			s.appendPlaybookConfirmationLocked(&p, now)
+		}
 		s.db.Playbooks = append(s.db.Playbooks, p)
 		return detachPlaybook(p), true, s.flush("playbook")
 	}
@@ -1367,7 +1433,7 @@ func (s *Store) UpsertPlaybook(p model.Playbook) (model.Playbook, bool, error) {
 		// Same write-time declaration as the new-row branch above: the executor
 		// that used the tactic wins and the row is recorded as confirmed. Whether
 		// the sources support that label is decided on read by
-		// model.Playbook.Confirmed; FromFactVersions is provenance, not a gate.
+		// model.Playbook.Confirmed.
 		if p.Pattern != nil {
 			cur.Pattern = p.Pattern
 		}
@@ -1387,6 +1453,8 @@ func (s *Store) UpsertPlaybook(p model.Playbook) (model.Playbook, bool, error) {
 		cur.IntentID = p.IntentID
 		cur.Tags = mergeTags(cur.Tags, p.Tags)
 		cur.FromFactIDs = mergeIDs(cur.FromFactIDs, p.FromFactIDs)
+		s.stampPlaybookSourcesLocked(cur, p.FromFactIDs)
+		s.appendPlaybookConfirmationLocked(cur, now)
 		cur.UpdatedAt = now
 	case cur.Status == model.PlaybookCandidate:
 		if p.Pattern != nil {
@@ -1405,20 +1473,69 @@ func (s *Store) UpsertPlaybook(p model.Playbook) (model.Playbook, bool, error) {
 		cur.Outcome = p.Outcome
 		cur.Tags = mergeTags(cur.Tags, p.Tags)
 		cur.FromFactIDs = mergeIDs(cur.FromFactIDs, p.FromFactIDs)
+		s.stampPlaybookSourcesLocked(cur, p.FromFactIDs)
 		cur.UpdatedAt = now
 	default:
 		// A confirmed or retired entry is not the commander's to edit.
 		return detachPlaybook(*cur), false, nil
 	}
-	if cur.FromFactVersions == nil {
-		cur.FromFactVersions = map[string]uint64{}
+	return detachPlaybook(*cur), true, s.flush("playbook")
+}
+
+// stampPlaybookSourcesLocked records the provenance the write actually cited:
+// the record revision (history) and the assertion claim version (the confirmation
+// binding). Only the ids this write named are restamped; an older confirmation
+// stays tied to the versions it accepted.
+func (s *Store) stampPlaybookSourcesLocked(p *model.Playbook, ids []string) {
+	if p.FromFactVersions == nil {
+		p.FromFactVersions = map[string]uint64{}
 	}
-	for _, id := range p.FromFactIDs {
-		if r, ok := s.records[recordKey("fact", id)]; ok {
-			cur.FromFactVersions[id] = r.version
+	if p.FromFactClaims == nil {
+		p.FromFactClaims = map[string]uint64{}
+	}
+	for _, id := range ids {
+		r, ok := s.records[recordKey("fact", id)]
+		if !ok {
+			continue
+		}
+		p.FromFactVersions[id] = r.version
+		if f, ok := r.value.(model.Fact); ok {
+			p.FromFactClaims[id] = f.ClaimVersion
 		}
 	}
-	return detachPlaybook(*cur), true, s.flush("playbook")
+}
+
+// appendPlaybookConfirmationLocked appends one explicit confirmation receipt.
+// Repeating the same confirmation (same run, sources and claim versions) does not
+// add a duplicate row.
+func (s *Store) appendPlaybookConfirmationLocked(p *model.Playbook, at time.Time) {
+	c := model.PlaybookConfirmation{
+		At: at, Origin: p.Origin, SourceRunID: p.SourceRunID,
+		FromFactIDs:    append([]string(nil), p.FromFactIDs...),
+		FromFactClaims: copyVersions(p.FromFactClaims),
+	}
+	if n := len(p.Confirmations); n > 0 && samePlaybookConfirmation(p.Confirmations[n-1], c) {
+		return
+	}
+	p.Confirmations = append(p.Confirmations, c)
+}
+
+func samePlaybookConfirmation(a, b model.PlaybookConfirmation) bool {
+	if a.SourceRunID != b.SourceRunID || a.Origin != b.Origin ||
+		len(a.FromFactIDs) != len(b.FromFactIDs) || len(a.FromFactClaims) != len(b.FromFactClaims) {
+		return false
+	}
+	for i := range a.FromFactIDs {
+		if a.FromFactIDs[i] != b.FromFactIDs[i] {
+			return false
+		}
+	}
+	for id, v := range a.FromFactClaims {
+		if b.FromFactClaims[id] != v {
+			return false
+		}
+	}
+	return true
 }
 
 // RetirePlaybook drops an entry out of recall without deleting its text. A

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/kksty/saker/internal/evidence"
 	"github.com/kksty/saker/internal/model"
@@ -28,6 +29,15 @@ const (
 
 type premiseReview struct {
 	State string `json:"state"`
+	// Outcome names the durable review attempt behind a failed/cooling state:
+	// run_failed / needs_evidence / rejected. It is empty for states that do not
+	// come from an attempt.
+	Outcome string `json:"outcome,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+	// MissingEvidence lists the originals the fact cites, so "needs evidence"
+	// says what to supplement instead of only that it is waiting.
+	MissingEvidence []string   `json:"missing_evidence,omitempty"`
+	RetryAt         *time.Time `json:"retry_at,omitempty"`
 }
 
 type premiseReadiness struct {
@@ -64,7 +74,6 @@ type intentReadiness struct {
 	// on that host, so the control plane must not block it.
 	SelfReferenceHint string `json:"self_reference_hint,omitempty"`
 }
-
 
 type readinessInputs struct {
 	facts   map[string]model.Fact
@@ -212,6 +221,7 @@ func (s *Server) readinessFromInputs(inputs readinessInputs, in model.Intent, po
 	out.IntegrityChecked = checkedIntegrity
 	return out
 }
+
 // reviewHint summarizes the blocking review states for a session. It stays a
 // derived classification (not the queue or a verifier run) and always states the
 // boundary: the session waits or asks the operator; it cannot trigger a review.

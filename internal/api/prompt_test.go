@@ -474,12 +474,12 @@ func TestBuildPromptCarriesEvalAndPlaybooks(t *testing.T) {
 			{ID: "f_note", Kind: "note", Title: "普通事实", Summary: "不是打法"},
 			// A confirmed playbook needs sources that a verifier proved and that
 			// carry bytes; otherwise the brief labels it a candidate.
-			{ID: "f_src", Kind: "vuln", Title: "已核验来源", Status: "verified", EvidenceIDs: []string{"ev_1"}},
+			{ID: "f_src", Kind: "vuln", Title: "已核验来源", Status: "verified", ClaimVersion: 1, EvidenceIDs: []string{"ev_1"}},
 		},
 		Playbooks: []model.Playbook{
-			{ID: "pb_old", Title: "旧打法", When: "旧", Status: model.PlaybookConfirmed, Origin: model.PlaybookFromExecutor, FromFactIDs: []string{"f_src"}},
+			{ID: "pb_old", Title: "旧打法", When: "旧", Status: model.PlaybookConfirmed, Origin: model.PlaybookFromExecutor, FromFactIDs: []string{"f_src"}, FromFactClaims: map[string]uint64{"f_src": 1}},
 			{ID: "pb_1", Title: "ThinkPHP RCE", When: "5.0.x 可用", Doc: "curl /index.php?s=...",
-				Status: model.PlaybookConfirmed, Origin: model.PlaybookFromExecutor, Outcome: model.PlaybookSuccess, FromFactIDs: []string{"f_src"}},
+				Status: model.PlaybookConfirmed, Origin: model.PlaybookFromExecutor, Outcome: model.PlaybookSuccess, FromFactIDs: []string{"f_src"}, FromFactClaims: map[string]uint64{"f_src": 1}},
 		},
 	}
 	p := BuildPrompt(db, db.Intents[0], "", "", "/data/kb", 0, false)
@@ -527,13 +527,13 @@ func TestPlaybookRecallKeepsRelevantAndOmitsUnrelatedEntries(t *testing.T) {
 func TestUnverifiedDeclarationDoesNotTakeAConfirmedSlot(t *testing.T) {
 	qualified := func(id, title string) model.Playbook {
 		return model.Playbook{ID: id, Title: title, When: "thinkphp 5.0", Status: model.PlaybookConfirmed,
-			FromFactIDs: []string{"f_good"}}
+			FromFactIDs: []string{"f_good"}, FromFactClaims: map[string]uint64{"f_good": 1}}
 	}
 	db := store.DB{
 		Intents: []model.Intent{{ID: "in_x", Title: "打 ThinkPHP", Description: "thinkphp 5.0"}},
 		Facts: []model.Fact{
-			{ID: "f_good", Kind: "vuln", Title: "已核验来源", Status: "verified", EvidenceIDs: []string{"ev_1"}},
-			{ID: "f_bad", Kind: "vuln", Title: "未核验来源"},
+			{ID: "f_good", Kind: "vuln", Title: "已核验来源", Status: "verified", ClaimVersion: 1, EvidenceIDs: []string{"ev_1"}},
+			{ID: "f_bad", Kind: "vuln", Title: "未核验来源", ClaimVersion: 1},
 		},
 		Playbooks: []model.Playbook{
 			qualified("pb_a", "ThinkPHP 打法 A"),

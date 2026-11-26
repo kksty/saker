@@ -265,6 +265,11 @@ type handoffAuthorization struct {
 	SourceRun string
 	// SourceBrief is that run's archived dispatch text, empty when it has none.
 	SourceBrief string
+	// SourceArchiveStatus/Error say whether the path above is trustworthy. A
+	// half-written archive (file exists, ledger path did not commit) must not be
+	// presented as readable just because a path string was found.
+	SourceArchiveStatus string
+	SourceArchiveError  string
 }
 
 func handoffSection(db store.DB, in model.Intent, h model.Handoff, auth handoffAuthorization, showUnverified bool) string {
@@ -288,9 +293,26 @@ func handoffSection(db store.DB, in model.Intent, h model.Handoff, auth handoffA
 	b.WriteString("简报修订时间：" + revision + "。\n")
 	b.WriteString("\n### 原文出处\n")
 	if strings.TrimSpace(auth.SourceBrief) != "" {
-		fmt.Fprintf(&b, "- 被替换的 run：%s；它的下发全文归档：`%s`（按路径可回看当时逐字原文）\n", auth.SourceRun, auth.SourceBrief)
+		fmt.Fprintf(&b, "- 被替换的 run：%s；它的下发全文归档：`%s`（按路径可回看当时逐字原文）", auth.SourceRun, auth.SourceBrief)
+		switch auth.SourceArchiveStatus {
+		case model.BriefArchiveArchived:
+			b.WriteString("；归档状态：已归档\n")
+		case model.BriefArchivePending:
+			b.WriteString("；归档状态：未确认——文件可能已写，但账本路径未写回，不能当作可按引用读取\n")
+		case model.BriefArchiveWriteFailed:
+			fmt.Fprintf(&b, "；归档状态：写入失败（%s），这份原文无法回看\n", auth.SourceArchiveError)
+		default:
+			b.WriteString("；归档状态：旧记录未记录状态\n")
+		}
 	} else {
-		fmt.Fprintf(&b, "- 被替换的 run：%s；它没有下发归档，本节只能代表当前任务书的原文，上一任读到的那一份无法回看\n", auth.SourceRun)
+		switch auth.SourceArchiveStatus {
+		case model.BriefArchiveWriteFailed:
+			fmt.Fprintf(&b, "- 被替换的 run：%s；它没有下发归档：写入失败（%s），上一任读到的原文无法回看\n", auth.SourceRun, auth.SourceArchiveError)
+		case model.BriefArchivePending:
+			fmt.Fprintf(&b, "- 被替换的 run：%s；它没有可引用的下发归档：文件可能已写但账本路径未写回，上一任读到的原文无法按引用回看\n", auth.SourceRun)
+		default:
+			fmt.Fprintf(&b, "- 被替换的 run：%s；它没有下发归档，本节只能代表当前任务书的原文，上一任读到的那一份无法回看\n", auth.SourceRun)
+		}
 	}
 	if h.Note != "" {
 		b.WriteString("\n### 交接说明\n" + h.Note + "\n")
