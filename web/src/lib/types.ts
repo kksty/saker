@@ -1836,7 +1836,7 @@ export interface ModelsCatalog {
 }
 
 /**
- * Read-only projection of `extensions.guardrail` in the operator's cyber.yaml.
+ * Read-only projection of `guardrail` in the operator's cyber.yaml.
  * The console never edits it (the operator writes the section directly), and it
  * never sees a key: only "configured" flags and the routing metadata.
  */
@@ -1852,7 +1852,9 @@ export interface SettingsGuardrailSummary {
   scope?: string[]
   allow_prefixes_count?: number
   jev_configured?: boolean
+  jev_custom_endpoint?: boolean
   llm?: { configured?: boolean; model?: string; base_url?: string }
+  reason?: string
 }
 
 /** Instance-level LLM configuration; the key itself is never returned. */
@@ -1893,6 +1895,7 @@ export interface SettingsView {
   traffic_body_retention_bytes?: number
   /** Read-only judge summary (absent on servers that predate the projection). */
   guardrail?: SettingsGuardrailSummary
+  gateway?: { instances: number; enabled: number; proxy_configured: boolean; reason?: string }
 }
 
 /** Instance-level knobs that live beside the model profile: the auxiliary gate
