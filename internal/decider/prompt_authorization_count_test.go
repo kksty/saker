@@ -62,7 +62,7 @@ func commanderRounds(t *testing.T, f roundFixture) []string {
 	r.ModelName = "test-model"
 	// 110000/128000 puts the second round over the handoff line.
 	r.ContextWindow = 128000
-	r.Scope = f.docs
+	r.Docs = func() string { return f.docs }
 	r.Commander = func(_ context.Context, round string, _ bool) (RoundResult, error) {
 		prompts = append(prompts, round)
 		return RoundResult{Tokens: 1, ContextTokens: 110000}, nil

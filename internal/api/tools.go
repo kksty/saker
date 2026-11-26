@@ -62,7 +62,7 @@ type ArsenalTool struct {
 // the model's PATH (harness cmd/cyber-scan/extensions.go:37-41).
 //
 // A root is a location, not a claim that a tool is usable: "文件存在不等于可用"
-// (agent.md). Whether the host can actually run commands is reported by the
+// (AGENTS.md). Whether the host can actually run commands is reported by the
 // runtime catalogue in the same response, never inferred from this list.
 type toolRoot struct {
 	Path   string `json:"path"`

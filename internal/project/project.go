@@ -167,6 +167,40 @@ type Project struct {
 	// writeMu serialises the manifest rewrite. It is separate from mu because
 	// several callers already hold mu when they persist.
 	writeMu sync.Mutex
+	// lifecycleMu serialises operations that reconfigure the live runtime
+	// (settings update) against the one that ends its life (delete). Both end
+	// up writing this manifest and pushing into the same kit, and without this
+	// lock a settings save can write project.json into a directory the delete
+	// already removed or re-arm the review pump of a runtime it canceled. It
+	// guards existence for the duration of one hub operation, not the fields
+	// that mu guards, so ordinary readers stay unaffected.
+	lifecycleMu sync.Mutex
+}
+
+// LockLifecycle marks this project as in use by a lifecycle-critical hub
+// operation and returns the release. It is per project, so two different
+// projects still update and delete concurrently. A caller that took the
+// project from Manager.Get must re-check that the manager still holds this
+// same pointer after acquiring the lock: a delete may have finished in
+// between, and the project's store is closed by then.
+func (p *Project) LockLifecycle() (unlock func()) {
+	p.lifecycleMu.Lock()
+	return p.lifecycleMu.Unlock
+}
+
+// TryLockLifecycle is LockLifecycle for a caller that must not queue behind a
+// delete. A delete holds the lock while it cancels and settles its runs — a
+// 10-second settle budget covers a run that ignores its cancel — and removes
+// the tree, so a settings save that waited here would leave the console's
+// dialog spinning with no answer; it reports the conflict instead and the
+// operator retries once the delete is over. ok=false means another lifecycle
+// operation is already running on this project. It is the same lock, so two
+// saves now take turns rather than interleaving their manifest writes.
+func (p *Project) TryLockLifecycle() (unlock func(), ok bool) {
+	if !p.lifecycleMu.TryLock() {
+		return nil, false
+	}
+	return p.lifecycleMu.Unlock, true
 }
 
 // ScopeText and DescriptionText are the locked reads. The hub used to read the
@@ -510,8 +544,9 @@ func (m *Manager) SkippedProject(id string) (SkippedProject, bool) {
 }
 
 // Open loads every project directory below root, creating root if needed.
-// A directory without a manifest is adopted: hand-made directories are a
-// legitimate way to restore an engagement.
+// A directory is an engagement only when it carries both ledger.sqlite and
+// project.json; a half-made one (no manifest) is reported in Skipped and left
+// untouched, never repaired by guessing a manifest here.
 //
 // Its ledgers keep no idle handle: removing a project directory does not
 // require closing the store first. Use OpenPooled for a project runtime.
@@ -570,10 +605,22 @@ func load(root, dir string, pooled bool) (*Project, error) {
 	}
 	p := &Project{Dir: d, CaseDir: filepath.Join(d, "cases")}
 	migrated := false
-	if b, err := os.ReadFile(filepath.Join(d, ManifestFile)); err == nil {
-		if err := json.Unmarshal(b, &p.Manifest); err != nil {
-			return nil, fmt.Errorf("parse %s: %w", d, err)
+	// A directory without project.json is not an engagement: it is what a
+	// creation or manifest write that failed halfway leaves behind. Writing a
+	// fresh manifest here (name=id, empty brief) used to turn that wreck into a
+	// healthy-looking empty project, which then hid the real failure. The load
+	// path reports it instead and writes nothing: repairing or removing the
+	// directory is the operator's call.
+	raw, err := os.ReadFile(filepath.Join(d, ManifestFile))
+	switch {
+	case err == nil:
+		if uerr := json.Unmarshal(raw, &p.Manifest); uerr != nil {
+			return nil, fmt.Errorf("parse %s: %w", d, uerr)
 		}
+	case os.IsNotExist(err):
+		return nil, fmt.Errorf("project %s 缺少 %s：目录不完整（创建或写清单失败留下的），不会自动补写；从备份恢复清单或删除该目录", dir, ManifestFile)
+	default:
+		return nil, fmt.Errorf("读取 %s：%w", filepath.Join(d, ManifestFile), err)
 	}
 	// One-way, one-time migration: standard/strict/no policy all mean
 	// verified_only now. The old value is not served as a compatibility mode;
@@ -609,9 +656,7 @@ func load(root, dir string, pooled bool) (*Project, error) {
 		_ = st.Close()
 		return nil, err
 	}
-	if _, err := os.Stat(filepath.Join(d, ManifestFile)); os.IsNotExist(err) {
-		_ = p.write()
-	} else if migrated {
+	if migrated {
 		if err := p.write(); err != nil {
 			_ = st.Close()
 			return nil, fmt.Errorf("migrate %s to verified_only: %w", d, err)
@@ -674,7 +719,7 @@ func (m *Manager) Create(name, scope string) (*Project, error) {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.create(newProjectID(), name, scope)
+	return m.create(m.uniqueID(newProjectID()), name, scope)
 }
 
 // newProjectID is the stable, opaque directory address: "p-" plus six base32
@@ -686,25 +731,59 @@ func newProjectID() string {
 	return "p-" + store.NewCode(6)
 }
 
-// create must be called with the write lock held.
-func (m *Manager) create(base, name, scope string) (*Project, error) {
-	id := m.uniqueID(base)
+// create must be called with the write lock held; id has already been made
+// unique by the caller (Create runs uniqueID).
+func (m *Manager) create(id, name, scope string) (*Project, error) {
+	return m.createWith(id, name, scope, (*Project).write)
+}
+
+// createWith is create with the manifest commit injectable, so a test can make
+// that write fail and assert the cleanup path. Production always passes
+// (*Project).write. It has the same contract as create: the manager's write
+// lock is held and the id is already unique (the tests that call it directly are
+// single-threaded).
+func (m *Manager) createWith(id, name, scope string, writeManifest func(*Project) error) (*Project, error) {
 	d := filepath.Join(m.Root, id)
-	if err := os.MkdirAll(filepath.Join(d, "cases"), 0o755); err != nil {
-		return nil, err
+	// Mkdir, not MkdirAll: uniqueID's last-resort fallback does not re-check the
+	// disk, and adopting a directory another project already owns would open its
+	// ledger and overwrite its manifest. A pre-existing directory is an error,
+	// never something this call may merge into.
+	if err := os.Mkdir(d, 0o755); err != nil {
+		return nil, fmt.Errorf("创建项目目录 %s：%w", d, err)
+	}
+	discard := func(cause error) error {
+		if rmErr := os.RemoveAll(d); rmErr != nil {
+			return errors.Join(cause, fmt.Errorf("清理目录 %s：%w", d, rmErr))
+		}
+		return cause
+	}
+	if err := os.Mkdir(filepath.Join(d, "cases"), 0o755); err != nil {
+		return nil, discard(fmt.Errorf("创建案件目录：%w", err))
 	}
 	p := &Project{
 		Manifest: Manifest{ID: id, Name: name, Scope: strings.TrimSpace(scope), Created: time.Now(), PremisePolicy: PremisePolicyVerifiedOnly},
 		Dir:      d,
 		CaseDir:  filepath.Join(d, "cases"),
 	}
-	st, err := openLedger(filepath.Join(p.Dir, "ledger.sqlite"), m.pooled)
+	st, err := openLedger(p.LedgerPath(), m.pooled)
 	if err != nil {
-		return nil, err
+		return nil, discard(fmt.Errorf("打开项目账本：%w", err))
 	}
 	p.Store = st
-	if err := p.write(); err != nil {
-		return nil, err
+	if err := writeManifest(p); err != nil {
+		// Close before removing: the pooled handle keeps the ledger (and on
+		// Windows the directory) open, and a directory left behind without
+		// project.json is a "skipped project" on every later start. Only the
+		// directory this call created is removed; nothing is repaired here.
+		cause := fmt.Errorf("写项目清单 %s：%w", filepath.Join(d, ManifestFile), err)
+		var closeErr error
+		if cerr := st.Close(); cerr != nil {
+			closeErr = fmt.Errorf("关闭账本：%w", cerr)
+		}
+		if rmErr := os.RemoveAll(d); rmErr != nil {
+			return nil, errors.Join(cause, closeErr, fmt.Errorf("清理目录 %s：%w", d, rmErr))
+		}
+		return nil, errors.Join(cause, closeErr)
 	}
 	m.byID[id] = p
 	m.ids = append(m.ids, id)

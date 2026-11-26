@@ -324,7 +324,7 @@ func TestTruncatedBriefListsPointAtTheirSource(t *testing.T) {
 
 // The battlefield read commands belong to the collaborate skill. The dispatch
 // prompt names the entry points only, so a solo run does not carry a tool manual
-// (agent.md: the executor prompt carries intent, authorization, acceptance and
+// (AGENTS.md: the executor prompt carries intent, authorization, acceptance and
 // the handoff contract — not tool usage).
 func TestBattlefieldReadDetailsLiveInTheSkill(t *testing.T) {
 	p := BuildPrompt(testDB(), testDB().Intents[0], "", "", "", 0, false)

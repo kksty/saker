@@ -40,6 +40,7 @@ import {
   statusLabel,
 } from '@/lib/format'
 import { useConsoleLocation, usePoll } from '@/lib/hooks'
+import type { AsyncState } from '@/lib/hooks'
 import { premiseBlockers, summarizeIntentFacts } from '@/lib/intent-detail'
 import { reviewFailureHint, reviewFailureLabel, type ReviewFailure } from '@/lib/review-failure'
 import { doneDeclaredByShort, doneDeclaredDetail } from '@/lib/settle'
@@ -95,11 +96,16 @@ import type {
  * same. Failure/warning colours only ever appear as small tints and dots.
  */
 export function ProjectState({
+  boardState,
   onNavigate,
   onOpenIntent,
   onOpenRun,
   onOpenFact,
 }: {
+  /** The shell's board poll. The page rendered its own copy of the same poll,
+   *  which sent GET /api/board twice per period; one read now feeds the shell
+   *  chrome and this page, and refresh requests go back through its reload. */
+  boardState: AsyncState<BoardResponse>
   /** Switch the console view (?view=…). */
   onNavigate?: (view: string) => void
   /** Open one direction in the graph. */
@@ -109,7 +115,7 @@ export function ProjectState({
   /** Open one fact on the graph (a goal receipt's cited/changed facts). */
   onOpenFact?: (id: string) => void
 }) {
-  const board = usePoll(api.board, 4000)
+  const board = boardState
   const intents = usePoll(api.intents, 4000)
   const runs = usePoll(api.runs, 4000)
   // Deep link from the run ledger: ?view=state&intent=<id>. The URL is the

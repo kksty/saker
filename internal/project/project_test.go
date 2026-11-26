@@ -365,7 +365,12 @@ func TestCreateDedupesIDs(t *testing.T) {
 	}
 }
 
-func TestOpenAdoptsDirectoryWithoutManifest(t *testing.T) {
+// A directory holding only ledger.sqlite is what a create whose manifest write
+// failed leaves behind. The loader used to write a fresh manifest into it
+// (name=directory, empty brief), which made the wreck look like a healthy empty
+// engagement and hid the failure forever. It is skipped and reported now, and
+// nothing is written into it.
+func TestOpenSkipsDirectoryWithoutManifest(t *testing.T) {
 	root := t.TempDir()
 	d := filepath.Join(root, "restored")
 	if err := os.MkdirAll(d, 0o755); err != nil {
@@ -378,23 +383,60 @@ func TestOpenAdoptsDirectoryWithoutManifest(t *testing.T) {
 	if _, err := st.AddFact(model.Fact{Title: "restored fact"}); err != nil {
 		t.Fatal(err)
 	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	// A healthy project next to it proves the skip is per directory.
+	seed, err := Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if seed.Get("restored") != nil {
+		t.Fatal("a directory without a manifest was adopted on the first open")
+	}
 
 	m, err := Open(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := m.Get("restored")
-	if p == nil {
-		t.Fatal("directory without a manifest was not adopted")
+	if m.Get("restored") != nil {
+		t.Fatal("a directory without project.json was served as a project")
 	}
-	if p.Name != "restored" {
-		t.Fatalf("name = %q, want the directory name", p.Name)
+	skipped, ok := m.SkippedProject("restored")
+	if !ok {
+		t.Fatalf("the half-made directory is not reported in Skipped: %+v", m.Skipped())
 	}
-	if got := len(p.Store.Snapshot().Facts); got != 1 {
-		t.Fatalf("facts = %d, want 1", got)
+	if !strings.Contains(skipped.Err, ManifestFile) {
+		t.Fatalf("skip reason does not name %s: %q", ManifestFile, skipped.Err)
 	}
-	if _, err := os.Stat(filepath.Join(d, ManifestFile)); err != nil {
-		t.Fatalf("adopted project has no manifest: %v", err)
+	if _, err := os.Stat(filepath.Join(d, ManifestFile)); !os.IsNotExist(err) {
+		t.Fatalf("the load path wrote a manifest into the incomplete directory: %v", err)
+	}
+	// The ledger is untouched too: no placeholder rows, and its fact is still
+	// there for a recovery that supplies the manifest.
+	st, err = store.Open(filepath.Join(d, "ledger.sqlite"))
+	if err != nil {
+		t.Fatalf("the skipped ledger is no longer readable: %v", err)
+	}
+	defer st.Close()
+	if got := len(st.Snapshot().Facts); got != 1 {
+		t.Fatalf("facts = %d, want the original 1", got)
+	}
+
+	// A complete project in the same root loads normally.
+	good, err := m.Create("正常项目", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := good.Store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reopened.Get(good.ID) == nil {
+		t.Fatal("the healthy project disappeared next to a skipped directory")
 	}
 }
 

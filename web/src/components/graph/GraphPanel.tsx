@@ -610,8 +610,10 @@ export function GraphPanel({
     return () => window.clearTimeout(timer)
   }, [live, graph.loading, graph.reload, hasNewChanges])
 
+  // The shell's refresh already reloads the snapshot whenever the map is on
+  // screen (GraphPanel only renders then), so this must not reload it a second
+  // time: one click, one snapshot request.
   function refresh() {
-    graph.reload()
     onRefresh()
   }
 

@@ -236,6 +236,18 @@ const runRow = (id: string, intent_id: string, started: string, over: Record<str
   ...over,
 })
 
+// The shell owns the board and inbox polls now: a page that polled the same
+// endpoint itself sent two requests per period, so these stand in for the
+// shell-owned state the pages receive as props.
+const shellBoard = (data: any = boardFixture()) => ({
+  data, loading: false, refreshing: false, error: undefined, updatedAt: Date.now(),
+  reload() {}, setData() {},
+})
+const shellInbox = (data: any = { total: 0 }) => ({
+  data, loading: false, refreshing: false, error: undefined, updatedAt: Date.now(),
+  reload() {}, setData() {},
+})
+
 test('ProjectState roster keeps live (newest updated) before queued (oldest created) and attempts keep chronological order', async () => {
   const intents = [
     intentRow('live_new', 'running', '2026-11-10T01:00:00Z', '2026-11-10T03:00:00Z'),
@@ -252,7 +264,6 @@ test('ProjectState roster keeps live (newest updated) before queued (oldest crea
   ]
   const intentBefore = ids(intents)
   const runBefore = ids(runs)
-  api.board = async () => boardFixture()
   api.intents = async () => intents
   api.runs = async () => runs
   api.intentReadiness = async () => null
@@ -271,7 +282,7 @@ test('ProjectState roster keeps live (newest updated) before queued (oldest crea
     ],
     facts_total: 1,
   })
-  await mount(React.createElement(ConfirmProvider, null, React.createElement(ProjectState, {})))
+  await mount(React.createElement(ConfirmProvider, null, React.createElement(ProjectState, { boardState: shellBoard() })))
   const roster = renderer!.root.findByProps({ 'data-testid': 'exec-roster' })
   const rows = roster
     .findAll((node: any) => typeof node.type === 'string' && typeof node.props?.['data-testid'] === 'string' && node.props['data-testid'].startsWith('intent-tab-'))
@@ -308,14 +319,13 @@ test('a settled direction says who declared it, in the roster and in the detail'
     done_at: '2026-11-10T06:00:00Z',
   })
   const runs = [runRow('r_9f2', 'settled_one', '2026-11-10T05:00:00Z', { status: 'failed' })]
-  api.board = async () => boardFixture()
   api.intents = async () => [settled]
   api.runs = async () => runs
   api.intentReadiness = async () => null
   api.runContext = async () => null
   api.events = async () => []
   api.intent = async () => ({ intent: settled, facts: [], facts_total: 0 })
-  await mount(React.createElement(ConfirmProvider, null, React.createElement(ProjectState, {})))
+  await mount(React.createElement(ConfirmProvider, null, React.createElement(ProjectState, { boardState: shellBoard() })))
   assert.match(pageText(), /指挥官判定/, 'the roster line must not read as a run-produced 完成')
   const row = renderer!.root.findByProps({ 'data-testid': 'intent-tab-settled_one' })
   await act(async () => { row.props.onClick?.({}) })
@@ -349,14 +359,13 @@ test('a canceled run says its category once and gives the operator words the ful
     exit_reason:
       '止损：操作员指令：白盒优先（本来就是想复现）。先停黑盒摸索，等白盒给出各级 file:line 判定',
   })]
-  api.board = async () => boardFixture()
   api.intents = async () => [stopped]
   api.runs = async () => runs
   api.intentReadiness = async () => null
   api.runContext = async () => null
   api.events = async () => []
   api.intent = async () => ({ intent: stopped, facts: [], facts_total: 0 })
-  await mount(React.createElement(ConfirmProvider, null, React.createElement(ProjectState, {})))
+  await mount(React.createElement(ConfirmProvider, null, React.createElement(ProjectState, { boardState: shellBoard() })))
   const row = renderer!.root.findByProps({ 'data-testid': 'intent-tab-stopped_one' })
   await act(async () => { row.props.onClick?.({}) })
   await settle()
@@ -377,7 +386,6 @@ test('Overview distinguishes parked, held, failed, and prerequisite blockers', a
   api.goals = async () => []
   api.runs = async () => []
   api.nodes = async () => ({ nodes: [], project_default: '' })
-  api.operatorInbox = async () => ({ total: 0 })
   api.usageBreakdown = async () => null
   const rows = [
     { id: 'wait', title: 'Awaiting verdict', status: 'pending', ready: false,
@@ -390,6 +398,7 @@ test('Overview distinguishes parked, held, failed, and prerequisite blockers', a
   await mount(React.createElement(ConfirmProvider, null, React.createElement(Overview, {
     current: 'alpha',
     projects: [],
+    inbox: shellInbox(),
     board: boardFixture({
       intents: { ...boardFixture().intents, total: rows.length, pending: 2, held: 1, parked: 1 },
       frontier: [{ id: 'legacy', title: 'Legacy fallback', ready: true }],
@@ -430,11 +439,11 @@ test('Overview renders open goals and recent runs in the migrated order without 
   api.playbooksPage = async () => ({ playbooks: books, count: books.length })
   api.decisions = async () => []
   api.state = async () => ({ state: '' })
-  api.operatorInbox = async () => ({ total: 0 })
   api.intents = async () => []
   await mount(React.createElement(ConfirmProvider, null, React.createElement(Overview, {
     current: 'alpha',
     projects: [],
+    inbox: shellInbox(),
     board: boardFixture(),
     onRefresh() {},
   })))
@@ -457,11 +466,11 @@ test('失败运行 is a chip in the status row, not a 26px metric tile', async (
   api.playbooksPage = async () => ({ playbooks: [], count: 0 })
   api.decisions = async () => []
   api.state = async () => ({ state: '' })
-  api.operatorInbox = async () => ({ total: 0 })
   api.intents = async () => []
   await mount(React.createElement(ConfirmProvider, null, React.createElement(Overview, {
     current: 'alpha',
     projects: [],
+    inbox: shellInbox(),
     board: boardFixture({
       runs: { total: 341, running: 0, done: 332, failed: 9, canceled: 0 },
       intents: { total: 57, pending: 7, running: 0, done: 43, waiting: 0, held: 1, parked: 6 },

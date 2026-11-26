@@ -460,7 +460,7 @@ func (s *Server) newRunStallDetector() *modelStallDetector {
 // does not claim a direction was (D108).
 //
 // It does not touch project state and does not judge the task: it says "no
-// progress", never "the task failed" (docs/17 §3.6, agent.md §1).
+// progress", never "the task failed" (docs/17 §3.6, AGENTS.md §1).
 func (s *Server) noteModelStall(runID string) {
 	if runID == "" {
 		return
@@ -2512,7 +2512,7 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 		// Record the cause here instead of guessing it later from the reason
 		// text: the structured cause is what the fleet/console reads, and
 		// substring matching on Chinese prose was both fragile and exactly the
-		// "recognise a word, patch the symptom" shape agent.md forbids.
+		// "recognise a word, patch the symptom" shape AGENTS.md forbids.
 		s.setCancelCause(runID, model.CancelCauseWatchdog)
 		// A timeout must not resubmit itself: with --timeout shorter than the
 		// work, cancel -> pending -> dispatchPending would loop forever. Hold it
@@ -5339,7 +5339,7 @@ func (s *Server) runEvents(w http.ResponseWriter, r *http.Request) {
 // both the console's `GET /api/runs/{id}/events` and the agent's
 // `GET /agent/<project>/api/runs/{id}/events/tail?lines=N`: two copies of "read
 // the end of a file" would drift on the same data the whole observability layer
-// depends on (agent.md:26).
+// depends on (AGENTS.md:26).
 //
 // The caller owns id validation: `isPlainID` is the path-traversal guard, and
 // the run's project scope comes from the Store instance, not from this helper.

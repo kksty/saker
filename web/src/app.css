@@ -540,14 +540,15 @@
     scrollbar-gutter: stable;
   }
 
-  /* Brand mark (Brand.tsx). The wordmark is drawn geometry, not text: the CSS
-   * only picks the ink. It follows the rail's foreground so the same file works
-   * in both shells and on the login page, and stays a legible shape for
-   * assistive tech through its aria-label.
+  /* Brand (Brand.tsx). The wordmark is drawn geometry, not text: the CSS only
+   * picks the ink. It follows the rail's foreground so the same file works in
+   * both shells and on the login page, and stays a legible shape for assistive
+   * tech through its aria-label.
    *
-   * Colour is deliberately neutral rather than the vermillion accent: the mark
-   * sits beside every primary action in the console, and a second red mass
-   * there competes with the CTA and the active-marker. */
+   * Colour is deliberately neutral rather than the vermillion accent: the
+   * wordmark sits beside every primary action in the console, and a second red
+   * mass there competes with the CTA and the active-marker. The accent lives in
+   * the tab icon (public/favicon.svg), which has the tab strip to itself. */
   .saker-wordmark {
     color: var(--ink-1);
     overflow: visible;

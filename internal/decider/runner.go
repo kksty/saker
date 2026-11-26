@@ -31,9 +31,16 @@ type Runner struct {
 	// reported context size into the 85% handoff line; 0 disables the pressure
 	// section (the harness still compacts, the prompt just cannot say when).
 	ContextWindow int
-	Scope         string
-	Debounce      time.Duration
-	Heartbeat     time.Duration
+	// Docs is the project documents text a round carries before the board (起点,
+	// 约束 and the open goal). It is read at the start of every round, not
+	// copied at construction: the same read the executor brief uses
+	// (api.Server.CommanderDocs / projectDocuments), so an operator editing a
+	// document reaches the next commander round without a restart or a settings
+	// save. A cached copy is exactly how the two roles used to disagree — the
+	// commander planned on the old brief while executors ran under the new one.
+	Docs      func() string
+	Debounce  time.Duration
+	Heartbeat time.Duration
 	// RoundTimeout caps one commander round's wall clock. A round is a
 	// decision: while it runs, every wake it would answer is queued behind it
 	// (the loop calls Commander synchronously), so a round that never ends
@@ -203,15 +210,6 @@ func (r *Runner) SetModelName(name string) {
 	}
 	r.mu.Lock()
 	r.ModelName = name
-	r.mu.Unlock()
-}
-
-func (r *Runner) SetScope(scope string) {
-	if r == nil {
-		return
-	}
-	r.mu.Lock()
-	r.Scope = scope
 	r.mu.Unlock()
 }
 
@@ -1240,8 +1238,15 @@ func (r *Runner) Run(ctx context.Context, wake string, force bool) *Decision {
 		// after the handoff": its rotation preamble is the memory contract.
 		rc.Handoff = false
 	}
-	scope := r.Scope
+	docs := r.Docs
 	r.mu.Unlock()
+	// Read outside r.mu: the provider takes the store's lock, and holding the
+	// runner's while calling into it would create a lock order that no reader of
+	// the runner expects.
+	scope := ""
+	if docs != nil {
+		scope = docs()
+	}
 	r.setActivity("commander", "指挥官会话运行中")
 	start := time.Now()
 	// The round is the unit the wake loop serves: bound it so a session that

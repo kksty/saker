@@ -19,8 +19,7 @@ const drainPollInterval = 50 * time.Millisecond
 
 // drainNoticeTimeout bounds one cleanup-notice delivery. The notice is a
 // courtesy inside an already-bounded window: a transport that stops answering
-// must not consume the window (and, on the delete path, must not block the
-// delete forever).
+// must not consume the window.
 const drainNoticeTimeout = 10 * time.Second
 
 // drainReason is the structured reason recorded on every run a stop cancels. It
@@ -29,15 +28,11 @@ const drainNoticeTimeout = 10 * time.Second
 // stop_reason is left to the settlement path.
 const drainReason = "停机收尾：有界证据窗口结束，取消运行（保留原始 stop_reason，未重放外部动作）"
 
-// DrainDeleteReason is the delete-path wording. A project delete is an
-// administrative stop, not a deployment restart; keeping the two distinct is
-// what lets Phase 1 classify the two cancels differently.
-const DrainDeleteReason = "删除项目：有界证据窗口结束，取消运行（保留原始 stop_reason，未重放外部动作）"
-
 // BeginDrain seals this project's admission for a bounded stop without
 // canceling the live runs. Process shutdown uses it before DrainRunning so no
-// new round, child or review can start during the evidence window; a project
-// delete already closes the same door with SetDeleting.
+// new round, child or review can start during the evidence window. A project
+// delete seals the same gate with SetDeleting, then cancels immediately instead
+// of opening that window.
 //
 // It is the sealing half of BeginShutdown (which is BeginDrain + CancelAll);
 // both write the same transient lifetime flag and pause the decider.
@@ -69,9 +64,9 @@ func (s *Server) BeginDrain() {
 //     (commander/report/verifier) have no intent evidence handoff, so they only
 //     get the window.
 //  3. Cancel: whatever is still running when the window ends — or when ctx is
-//     canceled — is stopped with the caller's cause/reason. DrainRunning uses
-//     restart; a project delete uses project_stop. The run's stop_reason is
-//     never synthesized here: the harness/executor settlement path owns it.
+//     canceled — is stopped with the caller's cause/reason. The run's
+//     stop_reason is never synthesized here: the harness/executor settlement
+//     path owns it.
 //  4. Caller: it is a stop primitive, not a payment. The caller must already
 //     have sealed admission (BeginDrain / SetDeleting) and should follow with
 //     WaitIdle so canceled runs settle before hosts are torn down.
@@ -87,14 +82,10 @@ func (s *Server) BeginDrain() {
 // Nothing external is replayed: the drain only writes the ledger and the run
 // journal, and it never promotes a guess (finished, found, not found) to fact.
 func (s *Server) DrainRunning(ctx context.Context, timeout time.Duration) (int, error) {
-	return s.DrainRunningWithCause(ctx, timeout, model.CancelCauseRestart, drainReason)
-}
-
-// DrainRunningWithCause is DrainRunning with the ledger cause/reason chosen by
-// the caller. A deployment stop is "restart"; deleting a project is
-// "project_stop". The two share the same bounded evidence window, but Phase 1
-// must not report a delete as a process shutdown.
-func (s *Server) DrainRunningWithCause(ctx context.Context, timeout time.Duration, cause, reason string) (int, error) {
+	// A process stop is the only drain caller: the live runs are stopped with
+	// the restart cause. A project delete does not come through here; it cancels
+	// immediately (Server.CancelAllWithCause) instead of opening this window.
+	cause, reason := model.CancelCauseRestart, drainReason
 	if ctx == nil {
 		ctx = context.Background()
 	}

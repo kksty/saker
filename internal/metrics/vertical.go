@@ -10,7 +10,7 @@ package metrics
 // passes a Snapshot. That keeps the unit tests off the real data directory and
 // makes "source data zero writes" a property of the caller, testable in isolation.
 //
-// Ground rules (agent.md):
+// Ground rules (AGENTS.md):
 //   - structured fields only: run purpose/status/window, ledger note writes and
 //     notebook versions, message delivery rows, verifier timing fields, and the
 //     explicit operator-scope sidecar. No title/summary/tag keyword rules, no
@@ -863,7 +863,7 @@ func metricEnvironmentMisjudgement(s Snapshot) Metric {
 		Unit:  "ratio",
 		Definition: "环境误判比例 = 结构化标记为环境类的 note 数 / status=verified 的结论数。" +
 			"只允许由结构化字段或显式状态派生：当前 model.Fact 没有“环境类”字段——kind 只有 host/service/cred/vuln/loot/artifact/note，note 是通用线索而非环境分类；tags 是模型自填检索标签，不是显式状态；" +
-			"按 title/summary/doc 的关键词分类会引入平台关键词规则，违反 agent.md。因此现有数据无法结构化区分，输出 unavailable(no_structured_signal)，不用关键词猜测。",
+			"按 title/summary/doc 的关键词分类会引入平台关键词规则，违反 AGENTS.md。因此现有数据无法结构化区分，输出 unavailable(no_structured_signal)，不用关键词猜测。",
 	}
 	notes := 0
 	verified := 0

@@ -1,6 +1,6 @@
 # 贡献指南
 
-欢迎提交问题、文档修正与代码贡献。参与前请阅读 [安全策略](SECURITY.md)、[核心架构](docs/01-architecture.md)与[设计取向](agent.md)。
+欢迎提交问题、文档修正与代码贡献。参与前请阅读 [安全策略](SECURITY.md)、[核心架构](docs/01-architecture.md)与[设计取向](AGENTS.md)。
 
 ## 授权与内容来源
 

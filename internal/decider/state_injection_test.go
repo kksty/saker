@@ -45,7 +45,7 @@ func TestRoundPromptInjectsFullStateAfterCompaction(t *testing.T) {
 	}
 }
 
-// A note is memory, not an instruction (agent.md §3, audit F12.5): the full-note
+// A note is memory, not an instruction (AGENTS.md §3, audit F12.5): the full-note
 // preambles must say the current effective instructions and fact record versions
 // win, and must not order the model to "execute" the note or treat its next step
 // as the current command. This pins all four memory-loss branches, not just one.

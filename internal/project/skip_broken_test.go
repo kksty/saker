@@ -93,6 +93,13 @@ func TestOpenSkipsAnUnreadableLedger(t *testing.T) {
 	if err := os.MkdirAll(bad, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	// The ledger exists but is unreadable. The manifest is present so this fixture
+	// isolates the ledger failure: a directory missing its manifest is reported
+	// as such (and that is the incomplete-create shape, tested elsewhere).
+	if err := os.WriteFile(filepath.Join(bad, ManifestFile),
+		[]byte(`{"id":"p_badledger","name":"bad","premise_policy":"verified_only"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	// An empty file is the ledger open's explicit refusal (not a fresh ledger).
 	if err := os.WriteFile(filepath.Join(bad, "ledger.sqlite"), nil, 0o600); err != nil {
 		t.Fatal(err)

@@ -389,7 +389,7 @@ func (s *Service) TrackPurposeRun(runID string, cancel context.CancelFunc) func(
 }
 
 // TrackCloseoutRun admits one explicitly requested commander round while paused.
-// It remains in purposeRuns so pause/delete/shutdown still cancel and drain it.
+// It remains in purposeRuns so pause, delete and shutdown still cancel it.
 func (s *Service) TrackCloseoutRun(runID string, cancel context.CancelFunc) func() string {
 	return s.trackPurposeRun(runID, cancel, true)
 }

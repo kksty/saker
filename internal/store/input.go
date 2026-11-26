@@ -9,7 +9,7 @@ import (
 
 // DispatchGate is how one dispatch treats necessary premises.
 //
-// The premise gate forks on the effective review mode, which is what agent.md
+// The premise gate forks on the effective review mode, which is what AGENTS.md
 // says and what the operator actually chose:
 //   - reviews open: a necessary premise must carry a verdict at its current
 //     claim version (verified_only is the admission mode too), so an unverified

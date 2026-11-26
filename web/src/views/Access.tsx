@@ -21,13 +21,14 @@ import { Page, Panel } from '@/components/Page'
 import { BrowserOccupancy } from '@/components/BrowserOccupancy'
 import { api } from '@/lib/api'
 import { useConsoleLocation, usePoll } from '@/lib/hooks'
+import type { AsyncState } from '@/lib/hooks'
 import { createRequestGate } from '@/lib/requests'
 import { canOperateBrowser } from '@/lib/access'
 import { fmtTime } from '@/lib/format'
 import { navigate } from '@/lib/navigation'
 import { findAuthorization } from '@/lib/record-links'
 import { authorizationOverlap, authorizationOverlapNote } from '@/lib/authorization-overlap'
-import type { AccessEntry, OperatorRequest } from '@/lib/types'
+import type { AccessEntry, OperatorInbox, OperatorRequest } from '@/lib/types'
 
 const LABEL = { browser: '浏览器现场', state: '登录状态文件', request: '已认证请求' }
 const message = (e: unknown) => e instanceof Error ? e.message : String(e)
@@ -46,7 +47,12 @@ const USE_BROWSER = '__browser'
  * Every destructive action (delete a material) goes through the shared confirm
  * dialog with the destructive style.
  */
-export function Access() {
+export function Access({ inbox }: {
+  /** The shell's inbox poll. It used to be a second read of the same endpoint at
+   *  its own cadence (8s while a record was open, else 15s); one source now feeds
+   *  the rail badge, the overview card and this page's focused/history records. */
+  inbox: AsyncState<OperatorInbox>
+}) {
   const list = usePoll(api.access, 4000)
   const waiting = usePoll(api.operatorRequests, 4000)
   // Deep link from the inbox: ?view=access&id=<request>. The authorization
@@ -54,10 +60,9 @@ export function Access() {
   // current degrades to "not found" instead of showing the first row.
   const location = useConsoleLocation()
   const focusedID = location.searchParams.get('id') ?? ''
-  // One inbox read serves three things here: the ?id= record, the pending rows,
-  // and the recently closed requests whose status and resolution disagree. The
-  // slow poll is for the history; opening a record tightens it.
-  const inbox = usePoll(api.operatorInbox, focusedID ? 8000 : 15000)
+  // The inbox read is the shell's (passed in), not a page-owned poll. It serves
+  // the ?id= record and the recently closed requests whose status and
+  // resolution disagree; the pending requests list below has its own poll.
   const focusedRequest = findAuthorization(inbox.data, focusedID)
   const focusedOverlap = focusedRequest ? authorizationOverlap(focusedRequest) : undefined
   // Closed requests the ledger records inconsistently (dismissed while the work
@@ -96,7 +101,11 @@ export function Access() {
   const [receipt, setReceipt] = useState('')
   const form = useRef<HTMLDivElement>(null)
   const confirm = useConfirm()
-  const refresh = () => { list.reload(); waiting.reload() }
+  // A manual refresh has to cover the shell-owned inbox too: this page reads the
+  // focused record and the overlap list from it, so a create/complete action
+  // would otherwise leave the record it just changed stale until the next shell
+  // period.
+  const refresh = () => { list.reload(); waiting.reload(); inbox.reload() }
   useEffect(() => () => fileReads.invalidate(), [fileReads])
   function changeMode(next: Mode) {
     fileReads.invalidate(); setReading(false); setMaterial(''); setMode(next); setError('')

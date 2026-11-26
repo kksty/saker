@@ -463,9 +463,12 @@ func ImportProject(zipPath, dataDir string) (ProjectManifest, error) {
 	}
 
 	// Rewrite the manifest into the only state a fresh receiver may start in:
-	// paused, with a machine-readable cause. The exported project.json remains
-	// the authority for scope, description, defaults and policy, but a transfer
-	// must not silently resume someone else's engagement.
+	// paused, with a machine-readable cause. The exported project.json travels
+	// as an opaque byte copy of the sender's manifest; for scope and description
+	// the receiver reads the ledger's documents first and only falls back to the
+	// manifest fields (project.Project.ScopeText), so the rewrite below does not
+	// make the file an authority it is not. A transfer must not silently resume
+	// someone else's engagement.
 	doc["paused"] = json.RawMessage("true")
 	doc["pause_kind"] = json.RawMessage(`"manual_pause"`)
 	if rawID, err := json.Marshal(id); err == nil {

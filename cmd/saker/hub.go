@@ -556,7 +556,10 @@ func (h *hub) attachState(p *project.Project, paused bool, pauseReason string) *
 	// context. There is no switch to turn it off.
 	if !h.cfg.NoDecider {
 		r := decider.NewRunner(p.Store, srv.State, p.DecisionsPath())
-		r.Scope = srv.CommanderDocs()
+		// The documents are read live by every round (see decider.Runner.Docs):
+		// a brief/constraint/goal edit reaches the next round without a restart,
+		// and the commander reads the same source as the executor brief.
+		r.Docs = srv.CommanderDocs
 		r.ModelName = h.modelName()
 		r.ContextWindow = srv.ModelContext()
 		if name, window := srv.CommanderModelInfo(); name != "" {
@@ -1639,6 +1642,34 @@ func (h *hub) commanderRoundTimeout(p *project.Project) time.Duration {
 	return h.cfg.RoundTimeout
 }
 
+// createProjectRequest is the POST /api/projects body. It is a named type so
+// the creation commit can be exercised without going through the HTTP handler.
+type createProjectRequest struct {
+	Name  string `json:"name"`
+	Scope string `json:"scope"`
+	// Description is the operator's prose: boundaries, forbidden
+	// actions, platform rules, how to treat target output. The program
+	// carries it into every brief and never parses it (D59).
+	Description string `json:"description"`
+	// A project is created together with the operator-defined endpoint
+	// goal: Scope is the 起点 (brief), Goal is the 终点 (statement).
+	// An engagement without a statement has nothing to judge "done"
+	// against.
+	Goal string `json:"goal"`
+	// QuantifiedTarget is the legacy quantified criterion from older
+	// consoles; the current console sends only 起点 + 终点. Kept so
+	// programmatic callers keep working.
+	QuantifiedTarget string `json:"quantified_target"`
+	// The three dispatch/verification options a new project can carry.
+	// They exist so an operator sets them once, at creation, instead of
+	// creating, pausing, opening settings and resuming. Omitted fields
+	// write nothing: the project keeps the instance defaults exactly as
+	// a project created before these fields existed.
+	ReviewsDisabled *bool           `json:"reviews_disabled"`
+	MaxRuns         json.RawMessage `json:"max_runs"`
+	RoundTimeout    *string         `json:"round_timeout"`
+}
+
 func (h *hub) serveProjects(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -1669,31 +1700,7 @@ func (h *hub) serveProjects(w http.ResponseWriter, r *http.Request) {
 			"reviews_disabled_default": h.instanceReviewsDisabled(),
 		})
 	case http.MethodPost:
-		var req struct {
-			Name  string `json:"name"`
-			Scope string `json:"scope"`
-			// Description is the operator's prose: boundaries, forbidden
-			// actions, platform rules, how to treat target output. The program
-			// carries it into every brief and never parses it (D59).
-			Description string `json:"description"`
-			// A project is created together with the operator-defined endpoint
-			// goal: Scope is the 起点 (brief), Goal is the 终点 (statement).
-			// An engagement without a statement has nothing to judge "done"
-			// against.
-			Goal string `json:"goal"`
-			// QuantifiedTarget is the legacy quantified criterion from older
-			// consoles; the current console sends only 起点 + 终点. Kept so
-			// programmatic callers keep working.
-			QuantifiedTarget string `json:"quantified_target"`
-			// The three dispatch/verification options a new project can carry.
-			// They exist so an operator sets them once, at creation, instead of
-			// creating, pausing, opening settings and resuming. Omitted fields
-			// write nothing: the project keeps the instance defaults exactly as
-			// a project created before these fields existed.
-			ReviewsDisabled *bool           `json:"reviews_disabled"`
-			MaxRuns         json.RawMessage `json:"max_runs"`
-			RoundTimeout    *string         `json:"round_timeout"`
-		}
+		var req createProjectRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求体不是 JSON"})
 			return
@@ -1725,46 +1732,32 @@ func (h *hub) serveProjects(w http.ResponseWriter, r *http.Request) {
 		}
 		p, err := h.mgr.Create(name, req.Scope)
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			// The only input this call can reject is the name, and an empty one is
+			// filled above — so a failure here is a disk write (directory, ledger or
+			// manifest), not the operator's request. Say so instead of 400.
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"error": "项目未创建：" + err.Error(),
+				"code":  "project_create_failed",
+			})
 			return
 		}
-		// New engagements are always proof-first: the standard mode is legacy
-		// read-only for projects created before this rule and can only migrate
-		// to verified_only.
-		if _, err := p.SetPremisePolicy(project.PremisePolicyVerifiedOnly); err != nil {
-			log.Printf("project %s: 设置 verified_only 失败：%v", p.ID, err)
-		}
-		if desc := strings.TrimSpace(req.Description); desc != "" {
-			if err := h.mgr.SetDescription(p.ID, desc); err != nil {
-				log.Printf("project %s: 写描述失败：%v", p.ID, err)
-			}
-		}
-		// Options are persisted before the runtime exists: attach reads the
-		// review switch into the server and the round wall clock into the
-		// decider, and the first commander round must already run under them.
-		// Input was validated above, so a failure here is a disk write, and
-		// saying so beats reporting a clean 500 for a project that now exists.
-		if err := h.applyCreateOptions(p, req.ReviewsDisabled, limit, req.RoundTimeout); err != nil {
-			log.Printf("project %s: 创建选项写入失败：%v", p.ID, err)
+		// Creation is one unit: the project documents (premise policy, the
+		// operator's prose), the dispatch options and the endpoint goal are all
+		// committed before the project is attached or reported. A 201 project
+		// without its goal would look healthy while having nothing to judge
+		// "done" against, so a failed commit rolls the whole creation back and
+		// says nothing was created.
+		if err := h.commitCreatedProject(p, func() error {
+			return h.applyCreateCommit(p, req, limit)
+		}); err != nil {
+			log.Printf("project %s: 创建内容写入失败，已回滚：%v", p.ID, err)
 			writeJSON(w, http.StatusInternalServerError, map[string]any{
-				"error":      "项目已创建，但创建选项没有写入（" + err.Error() + "）：到项目设置里重设后再启动",
-				"code":       "project_option_write_failed",
-				"project_id": p.ID,
+				"error": "项目未创建：创建内容写入失败（" + err.Error() + "），已回滚",
+				"code":  "project_create_failed",
 			})
 			return
 		}
 		h.attach(p)
-		if goal := strings.TrimSpace(req.Goal); goal != "" {
-			if _, err := p.Store.AddGoal(model.Goal{
-				Statement:        goal,
-				QuantifiedTarget: strings.TrimSpace(req.QuantifiedTarget),
-				// The endpoint written at project creation is the operator's: the
-				// console's history must not show the first goal as unattributed.
-				UpdatedBy: collab.OperatorID,
-			}); err != nil {
-				log.Printf("project %s: 建目标失败：%v", p.ID, err)
-			}
-		}
 		log.Printf("project: 新建 %s（%s）", p.ID, p.Name)
 		writeJSON(w, http.StatusCreated, h.info(p))
 	default:
@@ -1792,6 +1785,64 @@ func (h *hub) applyCreateOptions(p *project.Project, reviewsDisabled *bool, maxR
 	if roundTimeout != nil {
 		if err := h.mgr.SetRoundTimeout(p.ID, *roundTimeout); err != nil {
 			return fmt.Errorf("round_timeout: %w", err)
+		}
+	}
+	return nil
+}
+
+// commitCreatedProject runs the creation payload and, on failure, undoes the
+// manager's create. A project must not stay observable without its endpoint: a
+// 201 project whose goal write failed has nothing to judge "done" against,
+// and a directory without project.json would come back as a skipped project on
+// every later start. It runs before attach, so there is no kit to cancel; the
+// ledger is closed before the tree is removed because a pooled handle keeps
+// the files (and on Windows the directory) open.
+func (h *hub) commitCreatedProject(p *project.Project, commit func() error) error {
+	if err := commit(); err != nil {
+		// Remove it from the manager first so a poller cannot observe a project
+		// whose directory is being torn down.
+		h.mgr.Remove(p.ID)
+		var cleanup []error
+		if cerr := p.Store.Close(); cerr != nil {
+			cleanup = append(cleanup, fmt.Errorf("关闭账本：%w", cerr))
+		}
+		if rerr := os.RemoveAll(p.Dir); rerr != nil {
+			cleanup = append(cleanup, fmt.Errorf("删除目录 %s：%w", p.Dir, rerr))
+		}
+		return errors.Join(append([]error{err}, cleanup...)...)
+	}
+	return nil
+}
+
+// applyCreateCommit writes everything a new project is created with besides the
+// manager's own manifest: the single admission mode, the operator's prose, the
+// dispatch options and the endpoint goal. Any failure is returned so the whole
+// creation can be rolled back instead of reporting a project the operator did
+// not get. Input was validated before Create, so a failure here is a write.
+func (h *hub) applyCreateCommit(p *project.Project, req createProjectRequest, maxRuns *int) error {
+	// New engagements are always proof-first: the standard mode is legacy
+	// read-only for projects created before this rule and can only migrate
+	// to verified_only.
+	if _, err := p.SetPremisePolicy(project.PremisePolicyVerifiedOnly); err != nil {
+		return fmt.Errorf("premise_policy: %w", err)
+	}
+	if desc := strings.TrimSpace(req.Description); desc != "" {
+		if err := h.mgr.SetDescription(p.ID, desc); err != nil {
+			return fmt.Errorf("description: %w", err)
+		}
+	}
+	if err := h.applyCreateOptions(p, req.ReviewsDisabled, maxRuns, req.RoundTimeout); err != nil {
+		return err
+	}
+	if goal := strings.TrimSpace(req.Goal); goal != "" {
+		if _, err := p.Store.AddGoal(model.Goal{
+			Statement:        goal,
+			QuantifiedTarget: strings.TrimSpace(req.QuantifiedTarget),
+			// The endpoint written at project creation is the operator's: the
+			// console's history must not show the first goal as unattributed.
+			UpdatedBy: collab.OperatorID,
+		}); err != nil {
+			return fmt.Errorf("goal: %w", err)
 		}
 	}
 	return nil
@@ -2157,6 +2208,35 @@ func (h *hub) updateProject(w http.ResponseWriter, r *http.Request, id string) {
 		})
 		return
 	}
+	// A settings save and a delete end at the same manifest and the same kit:
+	// without this lock the save can write project.json into a directory the
+	// delete already removed, or re-arm the review pump of a runtime it already
+	// canceled. It is per project, so two different projects still save
+	// concurrently. TryLock, not Lock: a delete holds the project for its whole
+	// run (cancelling its runs, waiting for them to settle, removing the tree),
+	// and a save that queued behind it would leave the settings dialog spinning
+	// with no answer. A caller that loses the lock is told the project is busy
+	// instead. Validation above is pure (no state read); every write below and
+	// the final snapshot happen under the lock.
+	// Manager.Get released its own lock, so re-check that this is still the
+	// manager's project: a delete may have finished in between, and h.info
+	// dereferences p.Store immediately.
+	unlock, locked := p.TryLockLifecycle()
+	if !locked {
+		writeJSON(w, http.StatusConflict, map[string]any{
+			"error": "项目正在执行另一个操作（保存或删除），稍后重试",
+			"code":  "project_busy",
+		})
+		return
+	}
+	defer unlock()
+	if h.mgr.Get(id) != p {
+		writeJSON(w, http.StatusNotFound, map[string]any{
+			"error": "项目不存在（已被删除）",
+			"code":  "project_deleted",
+		})
+		return
+	}
 	if len(req.MaxRuns) > 0 {
 		if err := h.mgr.SetMaxRuns(id, limit); err != nil {
 			writeJSON(w, http.StatusNotFound, map[string]any{"error": err.Error()})
@@ -2211,7 +2291,8 @@ func (h *hub) updateProject(w http.ResponseWriter, r *http.Request, id string) {
 		// neither reconfigured nor re-armed and no commander wake is owed. A
 		// settings edit that cannot affect either policy must not pretend to.
 		if k.dec != nil {
-			k.dec.SetScope(k.srv.CommanderDocs())
+			// The documents are not re-pushed here: the decider reads them from
+			// the same server every round, so there is no cached copy to refresh.
 			if name, window := k.srv.CommanderModelInfo(); name != "" {
 				k.dec.SetModelName(name)
 				k.dec.SetContextWindow(window)
@@ -2221,7 +2302,20 @@ func (h *hub) updateProject(w http.ResponseWriter, r *http.Request, id string) {
 			k.dec.SetRoundTimeout(h.commanderRoundTimeout(k.proj))
 		}
 	}
-	out := h.info(h.mgr.Get(id))
+	// p was re-verified under the lifecycle lock, so a concurrent delete cannot
+	// have removed it and this re-read can only return p. The nil check is still
+	// explicit: h.info dereferences p.Store on its first line, and a nil must
+	// never reach it (it used to panic the whole connection instead of
+	// answering).
+	cur := h.mgr.Get(id)
+	if cur == nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{
+			"error": "项目不存在（已被删除）",
+			"code":  "project_deleted",
+		})
+		return
+	}
+	out := h.info(cur)
 	out.ReviewsCanceled = reviewsCanceled
 	writeJSON(w, http.StatusOK, out)
 }
@@ -2254,10 +2348,27 @@ func reopenDeletedLedger(p *project.Project) (*store.Store, error) {
 	return store.OpenSQLitePooled(p.LedgerPath())
 }
 
+// deleteCancelReason is the structured reason recorded on every run a project
+// delete cancels. It says what the control plane did (canceled now, no evidence
+// window) and what it did not do (replay an external action). The harness's own
+// stop_reason is left to the settlement path.
+const deleteCancelReason = "删除项目：取消运行（保留原始 stop_reason，未重放外部动作）"
+
+// deleteCancelSettleTimeout bounds how long a delete waits for already-canceled
+// runs to settle. Cancellation normally settles in milliseconds; this budget
+// only matters for a run that ignores it (a stuck child process), which must not
+// let the tree be removed while something is still writing into it.
+const deleteCancelSettleTimeout = 10 * time.Second
+
 // deleteProject removes the engagement: everything below projects/<id>/ goes,
 // the process stops touching it first, and the vulnerability library keeps what
 // it mirrored (D34). There is no recycle bin on purpose; the confirm parameter
 // is the only guard, and it asks for the id you are about to destroy.
+//
+// A delete is a cancellation, not a graceful stop: the operator asked for the
+// engagement to be gone, so live runs are canceled immediately instead of being
+// given an evidence window. A canceled run keeps its original stop_reason and no
+// external action is replayed.
 func (h *hub) deleteProject(w http.ResponseWriter, r *http.Request, id string) {
 	if r.URL.Query().Get("confirm") != id {
 		writeJSON(w, http.StatusBadRequest, map[string]any{
@@ -2280,27 +2391,30 @@ func (h *hub) deleteProject(w http.ResponseWriter, r *http.Request, id string) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "没有这个项目：" + id})
 		return
 	}
+	// A settings save writes the same manifest and pushes into the same kit.
+	// Hold the project's lifecycle lock for the whole delete so the two cannot
+	// interleave: without it the save can write project.json into a directory
+	// this call already removed or re-arm the review pump it just canceled.
+	// Different projects still delete concurrently, because the lock is per
+	// project; transferMu stays the cross-project queue for export/import.
+	unlock := p.LockLifecycle()
+	defer unlock()
 
 	// Stop writing before removing: a live run's finish() would recreate files
-	// in a directory this call is about to delete. Close the dispatch gate
-	// first (SetDeleting seals admission for the whole window), then give the
-	// live runs one bounded evidence window before canceling them with the
-	// restart cause. Only stop the decider/watchdog once nothing is left; a
-	// timeout must leave the project working instead of permanently half-stopped
-	// (the old order canceled the kit before checking).
+	// in a directory this call is about to delete. Close the dispatch gate first
+	// (SetDeleting seals admission for the whole window), then cancel what is
+	// running now. There is no evidence window: a process shutdown waits for
+	// executors to write down what they already have, but a delete does not owe
+	// the engagement another turn.
 	if k := h.kit(id); k != nil {
 		k.srv.SetDeleting(true)
-		// A delete is a stop, so it gets the same bounded evidence window a
-		// process shutdown does: executors write down what they already have
-		// before the cancel, instead of burning a turn for nothing. The cause is
-		// project_stop, not restart: this is an administrative delete.
-		if n, err := k.srv.DrainRunningWithCause(context.Background(), shutdownDrainTimeout,
-			model.CancelCauseProjectStop, api.DrainDeleteReason); err != nil {
-			log.Printf("project: %s 收尾窗口被中断：%v", id, err)
-		} else if n > 0 {
-			log.Printf("project: %s 有 %d 个运行在收尾后被取消", id, n)
+		if n := k.srv.CancelAllWithCause(model.CancelCauseProjectStop, deleteCancelReason); n > 0 {
+			log.Printf("project: %s 删除取消了 %d 个运行", id, n)
 		}
-		if !k.srv.WaitIdle(15 * time.Second) {
+		if !k.srv.WaitIdle(deleteCancelSettleTimeout) {
+			// Not a waiting window: the runs were already canceled above. Only a
+			// run that ignores the cancel gets here, and the project stays usable
+			// (gate reopened) so the operator can retry instead of losing it.
 			k.srv.SetDeleting(false)
 			writeJSON(w, http.StatusConflict, map[string]any{
 				"error": "还有运行没收尾，稍后重试",
@@ -2322,7 +2436,8 @@ func (h *hub) deleteProject(w http.ResponseWriter, r *http.Request, id string) {
 	// Release the ledger handle before walking the tree. The store keeps one
 	// idle connection (internal/store/sqlite.go), and Windows refuses to remove
 	// a directory whose ledger/WAL files are still open. Everything above has
-	// already sealed admission and drained the runs, so no writer is left.
+	// already sealed admission and settled the canceled runs, so no writer is
+	// left.
 	if err := p.Store.Close(); err != nil {
 		log.Printf("project: %s 关闭账本失败：%v", id, err)
 	}
@@ -2369,9 +2484,10 @@ func (h *hub) deleteProject(w http.ResponseWriter, r *http.Request, id string) {
 	})
 }
 
-// shutdownDrainTimeout is the longest a process stop or a project delete waits
-// for evidence wrap-up. It matches the api drain window ceiling (90s), so a stop
-// stays bounded even if a caller passes something larger.
+// shutdownDrainTimeout is the longest a process stop waits for evidence
+// wrap-up. It matches the api drain window ceiling (90s), so a stop stays
+// bounded even if a caller passes something larger. A project delete does not
+// use it: a delete cancels its runs immediately.
 const shutdownDrainTimeout = 90 * time.Second
 
 // shutdownCleanupGrace is the budget the console gives the whole cleanup

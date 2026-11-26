@@ -66,11 +66,11 @@ import type { RuntimeTab } from '@/views/ExecutionEnv'
 import type { RunTab } from '@/views/RunCenter'
 import type { StateTab } from '@/views/StateCenter'
 import { api, gotoProject } from '@/lib/api'
-import type { FreshnessState } from '@/lib/freshness'
 import { projectCloseoutGoal, projectPauseState } from '@/lib/project-controls'
 import { inboxBadge } from '@/lib/inbox-summary'
 import { useGraphSnapshot } from '@/lib/graph-data'
 import { useConsoleLocation, usePoll } from '@/lib/hooks'
+import type { AsyncState } from '@/lib/hooks'
 import { decodeLocationPart, locationPath, navigate } from '@/lib/navigation'
 import { pageTitle } from '@/lib/page-title'
 import { createPrefetchRegistry } from '@/lib/prefetch'
@@ -334,8 +334,9 @@ interface Props {
   current: string
   projects: ProjectInfo[]
   board?: BoardResponse
-  /** How the shell's board poll is doing: the rail shows it as a freshness line. */
-  boardState?: FreshnessState
+  /** The shell's board poll. Pages render it and refresh through reload(); no
+   *  panel polls /api/board on its own (that sent two requests per period). */
+  boardState: AsyncState<BoardResponse>
   loadError?: string
   onRefresh: () => void
 }
@@ -353,8 +354,9 @@ export function GraphView({ current, projects, board, boardState, onRefresh, loa
   // GraphPanel and stop when the panel unmounts.
   const graphActive = view === 'graph'
   // The rail badge is the backend inbox summary, not a count of one category:
-  // the same read (GET /api/operator-inbox) feeds the overview card and the
-  // detail list, so the three numbers cannot drift apart. When any category is
+  // this one read (GET /api/operator-inbox) is the shell's only inbox poll and
+  // feeds the badge, the overview card and the access page, so the numbers
+  // cannot drift apart and one period is one request. When any category is
   // unknown — tool approval never asked, or the host unreachable — no exact
   // number is printed: 未查询 / 不可用 are answers too, and a badge reading 0
   // because nobody asked is a lie the operator acts on.
@@ -598,12 +600,14 @@ export function GraphView({ current, projects, board, boardState, onRefresh, loa
   }
 
   function refresh() {
-    // Board/projects are the shell's shared chrome, so they always reload. The
-    // ledger is only pulled when the map is on screen: reopening 图谱 revalidates
-    // it immediately, so refreshing another panel does not download it twice.
+    // Board/projects and the inbox are the shell's shared chrome, so they always
+    // reload. The ledger is only pulled when the map is on screen: reopening 图谱
+    // revalidates it immediately, so refreshing another panel does not download
+    // it twice.
     if (graphActive) {
       graph.reload()
     }
+    inbox.reload()
     onRefresh()
   }
 
@@ -660,6 +664,7 @@ export function GraphView({ current, projects, board, boardState, onRefresh, loa
         current={current}
         projects={projects}
         board={board}
+        inbox={inbox}
         onRefresh={refresh}
         onNavigate={selectView}
         onOpenNode={openGraphNode}
@@ -683,6 +688,7 @@ export function GraphView({ current, projects, board, boardState, onRefresh, loa
         tab={tab as StateTab}
         onTab={selectTab}
         onNavigate={selectView}
+        boardState={boardState}
         // ProjectState's 图谱 entry opens the direction on the map (docs/34
         // §1.2 contract: "ProjectState: 图谱"), unlike RunCenter's 状态 entry.
         onOpenIntent={(id) => openGraphNode(`s:${id}`)}
@@ -704,11 +710,11 @@ export function GraphView({ current, projects, board, boardState, onRefresh, loa
         onOpenRun={openRun}
       />
     ) : view === 'messages' ? (
-      <Messages />
+      <Messages boardState={boardState} />
     ) : view === 'docs' ? (
       <Documents />
     ) : view === 'access' ? (
-      <Access />
+      <Access inbox={inbox} />
     ) : view === 'commander' ? (
       <CommanderView tab={tab as CommanderTab} onTab={selectTab} board={board} />
     ) : view === 'playbooks' ? (
@@ -905,7 +911,7 @@ export function GraphView({ current, projects, board, boardState, onRefresh, loa
         }
         footer={
           <div className="space-y-1.5">
-            {boardState && <FreshnessPill state={boardState} intervalMs={5000} label="项目数据" />}
+            <FreshnessPill state={boardState} intervalMs={5000} label="项目数据" />
             <Button
               size="sm"
               variant="ghost"

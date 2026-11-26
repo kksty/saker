@@ -1,11 +1,13 @@
-// The Saker wordmark lives in three renderers: the React component, the tab icon
-// (public/favicon.svg) and the login page, which is Go HTML with its own copy in
-// cmd/saker/auth.go. Nothing at build time ties them together, so the copies can
-// drift silently: a changed glyph would show up on the rail and not in the tab,
-// and no other suite would notice.
+// The Saker brand is one wordmark, drawn in two renderers: the React component
+// and the login page, which is Go HTML with its own copy in cmd/saker/auth.go.
+// Nothing at build time ties the copies together, so they can drift silently:
+// the rail and the login card would disagree and no other suite would notice.
 //
-// This pins the drawing itself (the path strings the art is made of), not the
-// styling around it: colour, size and the surrounding markup stay free.
+// The tab icon is deliberately empty (no link in either page), so this file also
+// pins that neither renderer re-adds one.
+//
+// This pins the drawing itself (the path strings and numbers the art is made
+// of), not the styling around it: the surrounding markup stays free.
 import { after, before, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -18,6 +20,11 @@ const webRoot = fileURLToPath(new URL('..', import.meta.url))
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url))
 
 type Glyph = { ch: string; offset: number; width: number; fill?: string; stroke?: string }
+
+// The login card draws the wordmark at 132px of ink (36px tall) inside its
+// 340px card; the rail draws it at 120 and the compact header at 104.
+const LOGIN_WORDMARK_WIDTH = 132
+const LOGIN_WORDMARK_HEIGHT = 36
 
 let Wordmark: React.ComponentType<{ width?: number }>
 let Brand: React.ComponentType<{ width?: number }>
@@ -58,8 +65,8 @@ test('the wordmark spells SAKER as five drawn glyphs', () => {
   assert.equal(last.offset + last.width, width)
 })
 
-test('the rail mark renders as one labelled image with no text fallback', () => {
-  const html = renderToStaticMarkup(React.createElement(Wordmark, { width: 148 }))
+test('the brand renders as one labelled image with no text fallback', () => {
+  const html = renderToStaticMarkup(React.createElement(Wordmark, { width: 120 }))
   assert.match(html, /role="img"/)
   assert.match(html, /aria-label="Saker"/)
   assert.doesNotMatch(html, />Saker</, 'the name must not also be typeset beside the drawing')
@@ -72,12 +79,12 @@ test('the rail mark renders as one labelled image with no text fallback', () => 
   assert.equal((html.match(/<clipPath/g) ?? []).length, glyphs.length)
 })
 
-test('the mark keeps one aspect ratio and respects the 120px floor', () => {
+test('the wordmark keeps one aspect ratio and respects the 96px floor', () => {
   const size = (html: string) => ({
     w: Number(/width="(\d+)"/.exec(html)?.[1]),
     h: Number(/height="(\d+)"/.exec(html)?.[1]),
   })
-  const small = size(renderToStaticMarkup(React.createElement(Wordmark, { width: 148 })))
+  const small = size(renderToStaticMarkup(React.createElement(Wordmark, { width: 120 })))
   const large = size(renderToStaticMarkup(React.createElement(Wordmark, { width: 296 })))
   assert.ok(large.h > small.h)
   // Same ratio: the rail and the login card show one mark, not two. Height is
@@ -85,31 +92,47 @@ test('the mark keeps one aspect ratio and respects the 120px floor', () => {
   const ratio = (s: { w: number; h: number }) => s.w / s.h
   assert.ok(Math.abs(ratio(small) - ratio(large)) < 0.2, `${ratio(small)} vs ${ratio(large)}`)
   assert.ok(Math.abs(ratio(small) - width / 100) < 0.2)
-  // Below this the S curves blur, per the artwork's own spec; the rail and the
-  // compact header must both stay at or above it.
-  assert.ok(minWidth >= 120)
-  assert.ok(size(renderToStaticMarkup(React.createElement(Wordmark, {}))).w >= minWidth)
-  assert.ok(size(renderToStaticMarkup(React.createElement(Brand, {}))).w >= minWidth)
+  // Below this the S curves blur, per the artwork's own spec; the rail, the
+  // compact header and the login card must all stay at or above it.
+  assert.equal(minWidth, 96)
+  const defaultInk = size(renderToStaticMarkup(React.createElement(Wordmark, {}))).w
+  assert.equal(defaultInk, 120)
+  assert.ok(defaultInk >= minWidth)
+  const brandInk = size(renderToStaticMarkup(React.createElement(Brand, {}))).w
+  assert.equal(brandInk, 120)
+  assert.ok(brandInk >= minWidth)
+  // One drawing only: the corner shows the name, not a name beside a mark.
+  const brandHTML = renderToStaticMarkup(React.createElement(Brand, {}))
+  assert.equal((brandHTML.match(/<svg/g) ?? []).length, 1, 'the brand must be the wordmark alone')
+  // The rail's brand is never aria-hidden: it is the one thing that announces
+  // the console's name on the page.
+  assert.match(brandHTML, /role="img"/)
+  assert.match(brandHTML, /aria-label="Saker"/)
   assert.ok(size(renderToStaticMarkup(React.createElement(Brand, { width: minWidth }))).w >= minWidth)
 })
 
-test('public/favicon.svg carries the same S as the rail', () => {
-  const favicon = readFileSync(`${webRoot}public/favicon.svg`, 'utf8')
-  assert.match(favicon, /<svg[^>]*role="img"[^>]*aria-label="Saker"/)
-  // A tab strip can be light or dark, and an icon has no tile of its own: the
-  // letter has to pick its own ink in both.
-  assert.match(favicon, /prefers-color-scheme:\s*dark/)
-  assert.ok(favicon.includes(glyphs[0].stroke!), 'favicon is missing the S path')
-  assert.match(favicon, new RegExp(`stroke-width="${stroke}"`))
+test('the tab icon is left empty in both HTML entry points', () => {
+  // No favicon means the browser shows its own default page tab. A custom icon
+  // was tried and dropped; the important part is that neither entry point
+  // points at a file that no longer exists (a broken <link> still costs a 404
+  // on every page load).
+  for (const file of [`${webRoot}index.html`, `${repoRoot}cmd/saker/auth.go`]) {
+    const html = readFileSync(file, 'utf8')
+    assert.doesNotMatch(html, /rel="icon"/, `${file} still links a tab icon`)
+    assert.doesNotMatch(html, /favicon/, `${file} still references a favicon file`)
+  }
 })
 
-test('the Go login page carries the whole wordmark', () => {
+test('the Go login page carries the whole wordmark and no mark beside it', () => {
   const auth = readFileSync(`${repoRoot}cmd/saker/auth.go`, 'utf8')
   for (const glyph of glyphs) {
     const d = glyph.fill ?? glyph.stroke!
     assert.ok(auth.includes(d), `login page is missing ${glyph.ch}`)
   }
+  assert.ok(auth.includes(`width="${LOGIN_WORDMARK_WIDTH}" height="${LOGIN_WORDMARK_HEIGHT}"`))
   assert.match(auth, /aria-label="Saker"/)
+  // The login card shows the name alone, like the rail: no icon beside it.
+  assert.doesNotMatch(auth, /\.lockup\{/, 'the lockup wrapper was only there to pair the wordmark with a mark')
   // The Kaiti/gradient lockup this replaced must not linger: it made the name
   // look like the host's font inventory.
   assert.doesNotMatch(auth, /Kaiti SC/)

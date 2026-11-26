@@ -75,7 +75,7 @@ export function DeleteProjectDialog({ project, onClose, onDeleted }: {
             <div role="progressbar" aria-label="项目删除进度" aria-valuetext="正在处理，等待服务器确认" className="h-1.5 overflow-hidden rounded-full bg-surface-2">
               <div className="saker-progress-indeterminate h-full w-1/3 rounded-full bg-primary" />
             </div>
-            <p className="text-[12px] leading-relaxed text-ink-3">运行收尾可能需要一些时间，完成后会自动更新。请保持此窗口打开。</p>
+            <p className="text-[12px] leading-relaxed text-ink-3">正在取消运行并删除项目，完成后自动更新。请保持此窗口打开。</p>
           </div>
         ) : (
           <p className="text-[12px] leading-relaxed text-ink-3">已镜像到漏洞库的条目与全局安装的共享工具会保留；项目工作区内的工具随项目一起删除。</p>

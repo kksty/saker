@@ -583,7 +583,7 @@ func writeHandoffWarnings(b *strings.Builder, db store.DB, in model.Intent) {
 // and failed directions (history, not a verdict) and directions that are
 // currently running (avoid duplicate work). It deliberately does not inject the
 // operator-defined endpoint goal: the commander decides cross-direction
-// tradeoffs, and a worker's task target is its own intent and Eval (agent.md §3,
+// tradeoffs, and a worker's task target is its own intent and Eval (AGENTS.md §3,
 // audit F12). Handing a worker the whole goal list would give it a second,
 // implicit task set — and goal creation/rewrite belongs to the operator alone.
 func writeBrief(b *strings.Builder, db store.DB, in model.Intent) {

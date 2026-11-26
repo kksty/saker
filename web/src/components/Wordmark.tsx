@@ -19,11 +19,11 @@ import { cn } from '@cyber/theme'
  * Each glyph is clipped to its own box, so the letters sit flush on the cap line
  * and baseline.
  *
- * Below 120px wide the S curves start to blur, so that is the floor for this
- * drawing; anything smaller needs the S alone or plain text.
+ * Below 96px wide the S curves start to blur, so that is the floor for this
+ * drawing; the rail draws it at 120 and the compact header at 104.
  *
- * `public/favicon.svg` and the login page in cmd/saker/auth.go carry the same
- * path strings — web/tests/brand-mark.test.ts fails if the three drift.
+ * The login page in cmd/saker/auth.go carries the same path strings —
+ * web/tests/brand-mark.test.ts fails if the two drift.
  */
 
 /** Glyph box height in art units: every letter is clipped to it. */
@@ -33,7 +33,7 @@ export const WORDMARK_WIDTH = 367
 /** One stroke weight for the whole mark. */
 export const WORDMARK_STROKE = 16
 /** Legibility floor in CSS pixels, from the artwork's own spec. */
-export const WORDMARK_MIN_WIDTH = 120
+export const WORDMARK_MIN_WIDTH = 96
 
 export type BrandGlyph = {
   ch: string
@@ -115,7 +115,7 @@ function Glyphs({ glyphs, idPrefix }: { glyphs: BrandGlyph[]; idPrefix: string }
  * The full wordmark. `width` is the ink width in CSS pixels; the height follows
  * at the design ratio (100 / 367). Keep it at or above WORDMARK_MIN_WIDTH.
  */
-export function Wordmark({ width = 148, className }: { width?: number; className?: string }) {
+export function Wordmark({ width = 120, className }: { width?: number; className?: string }) {
   const id = useId().replace(/:/g, '')
   const height = Math.round((width * WORDMARK_CAP) / WORDMARK_WIDTH)
   return (

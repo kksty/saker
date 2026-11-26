@@ -9,7 +9,7 @@ import (
 	"github.com/kksty/saker/internal/collab"
 )
 
-// The three project documents are operator-owned (agent.md L41). The route lives
+// The three project documents are operator-owned (AGENTS.md L41). The route lives
 // on the operator mux, but this pins the handler's own check: a participant
 // identity or a commander-actor claim must not be able to write, and the store
 // must not record the rejected write under the operator's name.

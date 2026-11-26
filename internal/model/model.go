@@ -98,8 +98,9 @@ const (
 	CancelCauseWatchdog = "watchdog"
 	CancelCauseOperator = "operator"
 	// CancelCauseProjectStop is an administrative project stop (delete) rather
-	// than a deployment restart: the run's evidence window gets the same bounded
-	// drain, but the ledger/metrics must not report it as a process shutdown.
+	// than a deployment restart: the delete cancels live runs immediately, with
+	// no evidence window, and the ledger/metrics must not report it as a process
+	// shutdown.
 	CancelCauseProjectStop = "project_stop"
 	// CancelCauseWorkerKill is a participant stopping a worker it created (or a
 	// descendant of its own direction): the direction is over, but the ledger

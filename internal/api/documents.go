@@ -139,7 +139,7 @@ func documentAuthor(r *http.Request) string {
 // version cannot overwrite a newer edit — including an edit made through the
 // goal editor.
 func (s *Server) saveDocument(w http.ResponseWriter, r *http.Request) {
-	// The three project documents belong to the operator (agent.md L41). The route
+	// The three project documents belong to the operator (AGENTS.md L41). The route
 	// is mounted only on the operator mux today, but the check is explicit here so
 	// a future mount change cannot turn "any participant" into an operator edit:
 	// the store writes updated_by=collab.OperatorID unconditionally, so without

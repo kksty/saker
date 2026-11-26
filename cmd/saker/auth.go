@@ -944,15 +944,15 @@ func resolveConsoleToken(inline, file string) (string, error) {
 }
 
 // loginHTML is the one page the console shell does not draw, so it carries its
-// own copy of the wordmark: the same point/stroke strings as
-// web/src/components/Wordmark.tsx and web/public/favicon.svg. web/tests/
-// brand-mark.test.ts reads this file and fails when the three copies drift.
+// own copy of the brand: the same wordmark paths as
+// web/src/components/Wordmark.tsx, at the drawn size the card uses. The card
+// shows the name alone, and the tab icon is deliberately left empty.
+// web/tests/brand-mark.test.ts reads this file and fails when the copies drift.
 const loginHTML = `<!doctype html>
 <html lang="zh-CN" class="dark"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0a0a0b">
 <title>Saker · 登录</title>
-<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <style>
 :root{--bg:#0a0a0b;--card:#121215;--border:#26262b;--fg:#e9e9ee;--muted:#8b8b93;--accent:#ff4d4d}
 *{box-sizing:border-box}
@@ -974,7 +974,7 @@ color:#170303;font:inherit;font-weight:700;cursor:pointer}
 </style></head><body>
 <form class="card" method="post" action="/login">
   <div class="brand">
-    <svg class="wordmark" viewBox="0 0 367 100" width="210" height="57" role="img" aria-label="Saker">
+    <svg class="wordmark" viewBox="0 0 367 100" width="132" height="36" role="img" aria-label="Saker">
       <g fill="currentColor" stroke="currentColor">
         <g transform="translate(0 0)"><clipPath id="wm-s"><rect x="0" y="0" width="66" height="100"/></clipPath><g clip-path="url(#wm-s)"><path d="M58 22 C58 11 47 8 33 8 C18 8 8 14 8 26 C8 37 16 43 30 48 C45 53 55 59 55 71 C55 84 44 92 29 92 C14 92 8 86 8 74" fill="none" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="10"/></g></g>
         <g transform="translate(74 0)"><path d="M0 100 L26 0 L42 0 L68 100 L52 100 L46.24 76 L21.76 76 L16 100 Z M34 25 L25.6 60 L42.4 60 Z" fill-rule="evenodd"/></g>

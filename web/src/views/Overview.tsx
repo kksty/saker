@@ -83,6 +83,7 @@ export function Overview({
   current,
   projects,
   board,
+  inbox,
   onRefresh,
   onNavigate,
   onOpenNode,
@@ -96,6 +97,10 @@ export function Overview({
   current: string
   projects: ProjectInfo[]
   board?: BoardResponse
+  /** The shell's inbox poll: the badge, this card and the access page share one
+   *  read. The page used to poll the same endpoint itself, so every period sent
+   *  two requests and the two numbers could disagree for a moment. */
+  inbox: AsyncState<OperatorInbox>
   onRefresh: () => void
   onNavigate?: (view: string) => void
   /** Cross-page link (docs/34 §4): select a graph node (`f:`/`s:`) on the graph
@@ -119,7 +124,6 @@ export function Overview({
   const goals = usePoll(api.goals, 15000)
   const runs = usePoll(api.runs, 10000)
   const nodes = usePoll(api.nodes, 30000)
-  const inbox = usePoll(api.operatorInbox, 6000)
   // One quiet all-in total in the header. The per-bucket split is not needed to
   // decide the next action; the run detail carries the usage of its own run.
   const usage = usePoll(api.usageBreakdown, 15000)
@@ -194,8 +198,9 @@ export function Overview({
     goals.reload()
     runs.reload()
     nodes.reload()
-    inbox.reload()
     usage.reload()
+    // The inbox is the shell's read now: onRefresh reloads it together with the
+    // board, so reloading it here as well would send two requests.
     onRefresh()
   }
 
