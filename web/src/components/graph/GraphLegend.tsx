@@ -5,23 +5,7 @@
 // 图例自动跟着改，不会再出现「图例说青色、画布画绿色」的漂移。
 import { ChevronDown } from 'lucide-react'
 import { useSessionState } from '@/lib/session-state'
-import {
-  ACTIVE_MATCH_RING,
-  BOUNDARY_COLORS,
-  CANVAS,
-  EDGE_COLORS,
-  FACT_COLORS,
-  GOAL_COLORS,
-  HELPER_MARKER_COLOR,
-  HOVER_RING,
-  INTENT_COLORS,
-  KEYBOARD_FOCUS_RING,
-  MATCH_RING,
-  ORIGIN_MARKER_COLOR,
-  PROJECT_COLOR,
-  REVIEW_RING,
-  SELECTION_RING,
-} from '@/graph/render'
+import { DEFAULT_GRAPH_PALETTE, type GraphPalette } from '@/graph/palette'
 
 const FACT_KINDS = ['vuln', 'cred', 'host', 'service', 'loot', 'artifact', 'note'] as const
 
@@ -67,12 +51,12 @@ function Line({ color, style }: { color: string; style: 'solid' | 'dashed' | 'do
 /** A produced edge is not one colour: it follows the direction's status. A
  *  gradient swatch says that in the legend without pretending the line is
  *  always green or always grey. */
-function StatusLine() {
+function StatusLine({ intents }: { intents: GraphPalette['intents'] }) {
   return (
     <span
       className="h-0.5 w-4 shrink-0 rounded-full"
       style={{
-        background: `linear-gradient(90deg, ${INTENT_COLORS.pending}, ${INTENT_COLORS.running}, ${INTENT_COLORS.reviewing}, ${INTENT_COLORS.done})`,
+        background: `linear-gradient(90deg, ${intents.pending}, ${intents.running}, ${intents.reviewing}, ${intents.done})`,
       }}
       aria-hidden="true"
     />
@@ -103,14 +87,14 @@ function DoubleRing({ color }: { color: string }) {
 }
 
 /** 已否定/已撤回的事实：保留事实本身的颜色，但画一到叉。 */
-function CrossedDot({ color }: { color: string }) {
+function CrossedDot({ color, crossColor }: { color: string; crossColor: string }) {
   return (
     <span
       className="relative flex h-3 w-3 shrink-0 items-center justify-center rounded-full"
       style={{ background: color }}
       aria-hidden="true"
     >
-      <span className="text-[9px] font-bold leading-none" style={{ color: CANVAS.background }}>
+      <span className="text-[9px] font-bold leading-none" style={{ color: crossColor }}>
         ×
       </span>
     </span>
@@ -118,11 +102,11 @@ function CrossedDot({ color }: { color: string }) {
 }
 
 /** 发起者第二通道：形状，不是颜色。与 render.ts 的 originMarker 对应；执行者来源只在旧数据里出现，图例只列当前可产生的两种。 */
-function OriginGlyph({ shape }: { shape: 'diamond' | 'double-ring' }) {
+function OriginGlyph({ shape, color }: { shape: 'diamond' | 'double-ring'; color: string }) {
   if (shape === 'diamond') {
     return (
       <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center" aria-hidden="true">
-        <span className="h-2 w-2 rotate-45" style={{ background: ORIGIN_MARKER_COLOR }} />
+        <span className="h-2 w-2 rotate-45" style={{ background: color }} />
       </span>
     )
   }
@@ -130,11 +114,11 @@ function OriginGlyph({ shape }: { shape: 'diamond' | 'double-ring' }) {
     <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center" aria-hidden="true">
       <span
         className="flex h-3.5 w-3.5 items-center justify-center rounded-full border"
-        style={{ borderColor: ORIGIN_MARKER_COLOR }}
+        style={{ borderColor: color }}
       >
         <span
           className="h-1.5 w-1.5 rounded-full border"
-          style={{ borderColor: ORIGIN_MARKER_COLOR }}
+          style={{ borderColor: color }}
         />
       </span>
     </span>
@@ -142,17 +126,17 @@ function OriginGlyph({ shape }: { shape: 'diamond' | 'double-ring' }) {
 }
 
 /** 助手卫星点：最多 3 颗 + “助×N”。 */
-function HelperGlyph() {
+function HelperGlyph({ color }: { color: string }) {
   return (
     <span className="relative flex h-4 w-6 shrink-0 items-center" aria-hidden="true">
       {[0, 1, 2].map((i) => (
         <span
           key={i}
           className="h-1 w-1 shrink-0 rounded-full"
-          style={{ background: HELPER_MARKER_COLOR, marginLeft: i === 0 ? 0 : 2 }}
+          style={{ background: color, marginLeft: i === 0 ? 0 : 2 }}
         />
       ))}
-      <span className="ml-0.5 text-[9px] leading-none" style={{ color: HELPER_MARKER_COLOR }}>
+      <span className="ml-0.5 text-[9px] leading-none" style={{ color }}>
         助×3
       </span>
     </span>
@@ -179,7 +163,8 @@ function Hint({ children }: { children: React.ReactNode }) {
   return <div className="mt-1.5 text-[11px] leading-relaxed text-ink-3">{children}</div>
 }
 
-export function GraphLegend({ className }: { className?: string }) {
+export function GraphLegend({ className, palette = DEFAULT_GRAPH_PALETTE }: { className?: string; palette?: GraphPalette }) {
+  const { colors, boundaries, edges, facts, goals, intents, rings } = palette
   const [open, setOpen] = useSessionState('graph.legendOpen', false)
 
   return (
@@ -216,18 +201,18 @@ export function GraphLegend({ className }: { className?: string }) {
           <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
             {FACT_KINDS.map((name) => (
               <Row key={name}>
-                <Dot color={FACT_COLORS[name] ?? CANVAS.ink3} />
+                <Dot color={facts[name] ?? colors.ink3} />
                 {name}
               </Row>
             ))}
             <Row title="账本里出现图例之外的 fact.kind 时按中性灰绘制，不丢弃；筛选条只列上面七种常用类型">
-              <Dot color={CANVAS.ink3} />
+              <Dot color={colors.ink3} />
               其他类型
             </Row>
             <Row title="项目简报是图的起点">
               <span
                 className="h-2 w-3.5 shrink-0 rounded-sm border"
-                style={{ borderColor: PROJECT_COLOR }}
+                style={{ borderColor: colors.ink3 }}
                 aria-hidden="true"
               />
               项目/范围
@@ -235,13 +220,13 @@ export function GraphLegend({ className }: { className?: string }) {
             <Row title="目标不单独上图：达成后作为终点接到承载证据的事实上，带 ✓ 角标与缓慢呼吸光环；未达成时只在左下「终点」卡显示">
               <span
                 className="h-2 w-3.5 shrink-0 rounded-sm border"
-                style={{ borderColor: GOAL_COLORS.met }}
+                style={{ borderColor: goals.met }}
                 aria-hidden="true"
               />
               目标（达成后）
             </Row>
             <Row title="事实本身仍在账本里，但状态是 rejected（已否定）或 withdrawn（已撤回）：画布保留事实色，再画一个 ×。与「引用边界」的虚环不是同一件事">
-              <CrossedDot color={CANVAS.ink2} />
+              <CrossedDot color={colors.ink2} crossColor={colors.background} />
               否定/撤回
             </Row>
           </div>
@@ -252,14 +237,14 @@ export function GraphLegend({ className }: { className?: string }) {
               <Row key={key} title={hint}>
                 <span
                   className="h-2 w-3.5 shrink-0 rounded-sm border"
-                  style={{ borderColor: INTENT_COLORS[key] ?? CANVAS.ink3 }}
+                  style={{ borderColor: intents[key] ?? colors.ink3 }}
                   aria-hidden="true"
                 />
                 {name}
               </Row>
             ))}
             <Row title="还没有产出任何事实的意图：画布只画一个虚环（颜色仍跟随意图状态），产出事实后虚环消失">
-              <Ring color={CANVAS.ink3} dashed />
+              <Ring color={colors.ink3} dashed />
               未产出（虚环）
             </Row>
           </div>
@@ -271,11 +256,11 @@ export function GraphLegend({ className }: { className?: string }) {
           <GroupTitle>发起者（第二通道 · 形状）</GroupTitle>
           <div className="space-y-0.5">
             <Row title="created_by_participant_id = commander：指挥官发起，执行者执行">
-              <OriginGlyph shape="diamond" />
+              <OriginGlyph shape="diamond" color={palette.originMarker} />
               指挥官（实心菱形）
             </Row>
             <Row title="created_by_participant_id = operator：操作员直接发起">
-              <OriginGlyph shape="double-ring" />
+              <OriginGlyph shape="double-ring" color={palette.originMarker} />
               操作员（双环）
             </Row>
             <Row title="旧数据或无法分类的参与者：不画标记，避免把猜测写成发起者">
@@ -294,7 +279,7 @@ export function GraphLegend({ className }: { className?: string }) {
             <Row title="选中节点后，画布用 1、2、3…… 标出主干顺序">
               <span
                 className="saker-nums flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border text-[9px] font-semibold"
-                style={{ borderColor: CANVAS.info, color: CANVAS.ink }}
+                style={{ borderColor: colors.info, color: colors.ink }}
                 aria-hidden="true"
               >
                 1
@@ -302,15 +287,15 @@ export function GraphLegend({ className }: { className?: string }) {
               画布上的主干顺序
             </Row>
             <Row title="主干之间的边加粗：整条链按顺序读下来，跨节点的线就是顺序本身">
-              <span className="h-0.5 w-4 shrink-0 rounded" style={{ background: CANVAS.ink2 }} aria-hidden="true" />
+              <span className="h-0.5 w-4 shrink-0 rounded" style={{ background: colors.ink2 }} aria-hidden="true" />
               主干边（加粗）
             </Row>
             <Row title="一跳旁支：同一个事实还被哪些意图消费、这些意图又产出了什么；留在图上，但比主干暗一档">
-              <Dot color={CANVAS.ink3} />
+              <Dot color={colors.ink3} />
               旁支（次亮）
             </Row>
             <Row title="链路之外的节点只是压暗，不隐藏：全量闭包始终在图上">
-              <Dot color={CANVAS.hairline} />
+              <Dot color={colors.hairline} />
               其余（压暗但可见）
             </Row>
           </div>
@@ -321,40 +306,40 @@ export function GraphLegend({ className }: { className?: string }) {
           <GroupTitle>关系（边）</GroupTitle>
           <div className="space-y-0.5">
             <Row title="意图边（步骤 → 产出的每个事实）：颜色跟随意图状态；它表示这次工作产出了什么，不是前提">
-              <StatusLine />
+              <StatusLine intents={intents} />
               产出（颜色跟随意图状态）
             </Row>
             <Row title="from_fact_ids：意图派发的硬门槛；蓝色实线是唯一「硬门槛」色。前提不可派发时会改成点线红（阻挡）">
-              <Line color={EDGE_COLORS.premise} style="solid" />
+              <Line color={edges.premise} style="solid" />
               必要前提
             </Row>
             <Row title="不可复核/未核验/缺失的前提都会挡住派发（与准入同源规则）；点线红，复核通过后恢复蓝色实线">
-              <Line color={EDGE_COLORS.premiseBlocked} style="dotted" />
+              <Line color={edges.premiseBlocked} style="dotted" />
               前提不满足（阻挡）
             </Row>
             <Row title="context_fact_ids：阅读选择，不是派发门槛；绿色虚线">
-              <Line color={EDGE_COLORS.reference} style="dashed" />
+              <Line color={edges.reference} style="dashed" />
               引用（绿色虚线）
             </Row>
             <Row title="pinned_fact_ids：明确固定要读的上下文，绿色实线双线；仍是阅读选择，不是门槛">
-              <Line color={EDGE_COLORS.pin} style="double" />
+              <Line color={edges.pin} style="double" />
               固定（绿色实线双线）
             </Row>
             <Row title="事实支持已达成目标所依据的证据（账本 supports 边）；金色细点线">
-              <Line color={EDGE_COLORS.supports} style="dotted" />
+              <Line color={edges.supports} style="dotted" />
               支持目标
             </Row>
             <Row title="旧卡片的盖章只记录了证据 id 时，由承载该证据的事实连到目标；朴素金色实线，与上面的依据边区分">
-              <Line color={EDGE_COLORS.goal} style="solid" />
+              <Line color={edges.goal} style="solid" />
               目标证据（旧盖章）
             </Row>
 
             <Row title="项目简报到初始意图：图的起点，不是事实关系；灰色细线">
-              <Line color={EDGE_COLORS.brief} style="solid" />
+              <Line color={edges.brief} style="solid" />
               项目范围
             </Row>
             <Row title="service 事实落到同名 host 事实上的分组线（宿主机归属）；灰色点线，不算因果">
-              <Line color={EDGE_COLORS.host} style="dotted" />
+              <Line color={edges.host} style="dotted" />
               宿主机分组
             </Row>
           </div>
@@ -366,33 +351,33 @@ export function GraphLegend({ className }: { className?: string }) {
           <GroupTitle>画布状态（环，不改节点色）</GroupTitle>
           <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
             <Row title="点击选中的节点：白色实环；右侧详情面板解释内容">
-              <Ring color={SELECTION_RING} width={2} />
+              <Ring color={rings.selection} width={2} />
               选中（白环）
             </Row>
             <Row title="指针停在节点或边上：灰色细环，仅作预览；点击才固定">
-              <Ring color={HOVER_RING} />
+              <Ring color={rings.hover} />
               悬停（灰环）
             </Row>
             <Row title="画布方向键选中的节点：天蓝色环，可与选中/悬停同时出现">
-              <Ring color={KEYBOARD_FOCUS_RING} width={2} />
+              <Ring color={rings.keyboard} width={2} />
               键盘焦点（蓝环）
             </Row>
             <Row title="搜索命中的节点：红色细环。命中不会被选中态的压暗藏起来">
-              <Ring color={MATCH_RING} />
+              <Ring color={rings.match} />
               搜索命中（红环）
             </Row>
             <Row title="搜索结果列表当前的这一项：实红环 + 淡红外环；↑↓ 只移动它，Enter 才定位">
-              <DoubleRing color={ACTIVE_MATCH_RING} />
+              <DoubleRing color={rings.activeMatch} />
               当前搜索（双环）
             </Row>
             <Row title="事实的 claim_version 高于最新一次复核的版本：琥珀色虚线外环表示现在复核的是旧断言">
-              <Ring color={REVIEW_RING} dashed />
+              <Ring color={rings.review} dashed />
               旧断言复核
             </Row>
             <Row title="该意图的 run 记录了非致命告警，悬停看详情">
               <span
                 className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
-                style={{ background: CANVAS.warning, color: CANVAS.background }}
+                style={{ background: colors.warning, color: colors.background }}
                 aria-hidden="true"
               >
                 !
@@ -400,7 +385,7 @@ export function GraphLegend({ className }: { className?: string }) {
               警告数
             </Row>
             <Row title="步骤 pill 右上角：最多 3 颗卫星点 + “助×N”。原生 subagent 是父回合内的临时助手（active>0 时慢脉冲），不单独开 run、不计独立 usage、不产生事实；结论仍由本意图声明">
-              <HelperGlyph />
+              <HelperGlyph color={palette.helperMarker} />
               助手（临时）
             </Row>
           </div>
@@ -413,19 +398,19 @@ export function GraphLegend({ className }: { className?: string }) {
           <GroupTitle>引用边界（虚环）</GroupTitle>
           <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
             <Row title="引用指向的记录不在当前快照（账本里仍然存在）。这不是孤立事实，也不是缺失；点开加载它的邻域">
-              <Ring color={BOUNDARY_COLORS.not_loaded} dashed />
+              <Ring color={boundaries.not_loaded} dashed />
               未载入（可展开）
             </Row>
             <Row title="引用指向的 id 在账本里也不存在：点开不会变出内容">
-              <Ring color={BOUNDARY_COLORS.missing} dashed />
+              <Ring color={boundaries.missing} dashed />
               引用缺失
             </Row>
             <Row title="引用的事实被明确否定：仍然存在于账本，但不应作为当前依据">
-              <Ring color={BOUNDARY_COLORS.rejected} dashed />
+              <Ring color={boundaries.rejected} dashed />
               已否定引用
             </Row>
             <Row title="引用的事实已被作者或操作员撤回：记录与证据仍在账本里，但不作为结论或前提">
-              <Ring color={BOUNDARY_COLORS.withdrawn} dashed />
+              <Ring color={boundaries.withdrawn} dashed />
               已撤回引用
             </Row>
           </div>

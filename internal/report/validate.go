@@ -78,6 +78,26 @@ func Validate(dir string, db store.DB, staleAfter time.Duration) []Check {
 	}
 	add("fact_exists", len(stray) == 0, "图谱里没有或不可报告："+strings.Join(stray, "；"))
 
+	// 4b. Every row binds the assertion version it described. Without it a
+	// citation is only a fact id, and a later correction would look covered by
+	// an old report. The copy must match the ledger row the writer saw; a
+	// version-unknown row is a writing error in a new report (old reports are
+	// not re-validated on read, and the precheck treats their rows as unknown).
+	var badVersion []string
+	for _, f := range findings {
+		fact, ok := byID[f.Fact]
+		if !ok {
+			continue // fact_exists already reports a row that resolves to nothing
+		}
+		switch {
+		case f.FactClaimVersion == 0:
+			badVersion = append(badVersion, f.Fact+" 缺少 fact_claim_version")
+		case f.FactClaimVersion != fact.ClaimVersion:
+			badVersion = append(badVersion, fmt.Sprintf("%s 报告 v%d / 账本 v%d", f.Fact, f.FactClaimVersion, fact.ClaimVersion))
+		}
+	}
+	add("finding_claim_versions", len(badVersion) == 0, strings.Join(badVersion, "；"))
+
 	// 5. Verdicts come from the two-state enum (D41).
 	var badVerdict []string
 	for _, f := range findings {
@@ -350,6 +370,7 @@ func BuildPrompt(findings int, scope string) string {
 
 	b.WriteString("## 硬约束\n")
 	b.WriteString("- 只写 " + Snapshot + " 里的事实；`candidate` 在「4. 待复核结论」要写明它最新 review 的 verdict 与没通过的原因（取 review.notes 的判断，不抄证据细节）。\n")
+	b.WriteString("- `fact_claim_version` 必须从 " + Snapshot + " 里这条事实的 `claim_version` 原样抄进 " + Findings + "；它是报告引用绑定的断言版本，不得省略、自拟或用当前版本补写。\n")
 	b.WriteString("- 被 rejected 的结论不写 findings 行，否定原因写进「5.2 止于何处」。\n")
 	b.WriteString("- `confirmed` 只能给图谱里 status=verified 的事实，其余写 `candidate`。\n")
 	b.WriteString("- `confirmed` 的 location / preconditions / impact / trace / evidence 一处不能空。\n")

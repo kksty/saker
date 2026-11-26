@@ -195,7 +195,7 @@ func (s *Server) ReconcileAfterRestart(ctx context.Context) (int, error) {
 			live = append(live, r)
 		}
 	}
-	n := s.Lifecycle.ReconcileAfterRestart()
+	n, err := s.Lifecycle.ReconcileAfterRestart()
 	if s.Metrics != nil {
 		for _, before := range live {
 			cur, ok := s.Store.GetRun(before.ID)
@@ -205,5 +205,5 @@ func (s *Server) ReconcileAfterRestart(ctx context.Context) (int, error) {
 			s.Metrics.Cancel(before.ID, model.CancelCauseRestart, cur.ExitReason, before.StopReason)
 		}
 	}
-	return n, nil
+	return n, err
 }

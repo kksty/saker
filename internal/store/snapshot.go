@@ -1,6 +1,10 @@
 package store
 
-import "github.com/kksty/saker/internal/model"
+import (
+	"maps"
+
+	"github.com/kksty/saker/internal/model"
+)
 
 func detachGoal(g model.Goal) model.Goal {
 	if g.ClosedAt != nil {
@@ -47,6 +51,40 @@ func markGoalReceipt(g model.Goal, facts []model.Fact) model.Goal {
 	return g
 }
 
+// markIntentDoneReceipt computes whether a declared completion still rests on
+// the claims the settler accepted. It mirrors markGoalReceipt: the stored
+// receipt (note, ids, claim versions and statuses) is never rewritten, so the
+// original judgement stays auditable after the underlying fact moves.
+func markIntentDoneReceipt(in model.Intent, facts []model.Fact) model.Intent {
+	in.DoneReceiptStale, in.DoneReceiptChanged = false, nil
+	if !in.DoneDeclared() || len(in.DoneFactClaims) == 0 {
+		return in
+	}
+	byID := make(map[string]model.Fact, len(facts))
+	for i := range facts {
+		byID[facts[i].ID] = facts[i]
+	}
+	for _, id := range in.DoneFactIDs {
+		stamped, ok := in.DoneFactClaims[id]
+		if !ok {
+			continue
+		}
+		f, exists := byID[id]
+		if !exists || f.ClaimVersion != stamped || f.Unusable() {
+			in.DoneReceiptChanged = append(in.DoneReceiptChanged, id)
+			continue
+		}
+		// The assertion did not change, but the verdict that backed the receipt
+		// did (e.g. a re-review asked for evidence). A display edit never reaches
+		// this branch: title and other labels are outside the claim hash.
+		if was := in.DoneFactStatuses[id]; was == "verified" && f.Status != "verified" {
+			in.DoneReceiptChanged = append(in.DoneReceiptChanged, id)
+		}
+	}
+	in.DoneReceiptStale = len(in.DoneReceiptChanged) > 0
+	return in
+}
+
 func detachPlaybook(p model.Playbook) model.Playbook {
 	p.Tags = append([]string(nil), p.Tags...)
 	if p.RequiredTags != nil {
@@ -59,6 +97,12 @@ func detachPlaybook(p model.Playbook) model.Playbook {
 			v[k] = n
 		}
 		p.FromFactVersions = v
+	}
+	p.FromFactClaims = copyVersions(p.FromFactClaims)
+	p.Confirmations = append([]model.PlaybookConfirmation(nil), p.Confirmations...)
+	for i := range p.Confirmations {
+		p.Confirmations[i].FromFactIDs = append([]string(nil), p.Confirmations[i].FromFactIDs...)
+		p.Confirmations[i].FromFactClaims = copyVersions(p.Confirmations[i].FromFactClaims)
 	}
 	if p.Pattern != nil {
 		pattern := *p.Pattern
@@ -88,6 +132,11 @@ func detachFact(f model.Fact) model.Fact {
 	return f
 }
 func detachRun(r model.Run) model.Run {
+	r.OpenToolCalls = maps.Clone(r.OpenToolCalls)
+	if r.RedispatchDisposition != nil {
+		disposition := *r.RedispatchDisposition
+		r.RedispatchDisposition = &disposition
+	}
 	r.NoteWrites = append([]model.NoteRef(nil), r.NoteWrites...)
 	if r.NoteRead != nil {
 		v := *r.NoteRead
@@ -124,6 +173,12 @@ func detachRun(r model.Run) model.Run {
 	}
 	r.Warnings = append([]string(nil), r.Warnings...)
 	r.Infos = append([]string(nil), r.Infos...)
+	r.Ingest = detachIngestOutcome(r.Ingest)
+	r.WaitDelivery = detachWaitDelivery(r.WaitDelivery)
+	if r.BriefArchive != nil {
+		archive := *r.BriefArchive
+		r.BriefArchive = &archive
+	}
 	if r.DeclarationStart != nil {
 		v := *r.DeclarationStart
 		r.DeclarationStart = &v
@@ -141,6 +196,43 @@ func detachRun(r model.Run) model.Run {
 		r.LastTurnStartedAt = &v
 	}
 	return r
+}
+
+// detachIngestOutcome and detachWaitDelivery give run snapshots their own
+// aggregate state: UpdateRun edits the live row in place, and a caller may
+// marshal a run while settlement appends a pending declaration.
+func detachIngestOutcome(in *model.IngestOutcome) *model.IngestOutcome {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	out.Pending = append([]model.PendingDeclaration(nil), in.Pending...)
+	for i := range out.Pending {
+		out.Pending[i].Reasons = append([]string(nil), in.Pending[i].Reasons...)
+	}
+	out.Reasons = append([]string(nil), in.Reasons...)
+	return &out
+}
+
+func detachWaitDelivery(d *model.WaitDelivery) *model.WaitDelivery {
+	if d == nil {
+		return nil
+	}
+	out := *d
+	out.Wait = detachWait(d.Wait)
+	if d.ReadyAt != nil {
+		v := *d.ReadyAt
+		out.ReadyAt = &v
+	}
+	if d.ArchivedAt != nil {
+		v := *d.ArchivedAt
+		out.ArchivedAt = &v
+	}
+	if d.ReceivedAt != nil {
+		v := *d.ReceivedAt
+		out.ReceivedAt = &v
+	}
+	return &out
 }
 
 func copyVersions(v map[string]uint64) map[string]uint64 {
@@ -169,6 +261,15 @@ func detachIntent(in model.Intent) model.Intent {
 		}
 		in.ParkedPremiseClaims = claims
 	}
+	in.DoneFactClaims = copyVersions(in.DoneFactClaims)
+	if in.DoneFactStatuses != nil {
+		statuses := make(map[string]string, len(in.DoneFactStatuses))
+		for id, status := range in.DoneFactStatuses {
+			statuses[id] = status
+		}
+		in.DoneFactStatuses = statuses
+	}
+	in.DoneReceiptChanged = append([]string(nil), in.DoneReceiptChanged...)
 	if in.ParkedAt != nil {
 		at := *in.ParkedAt
 		in.ParkedAt = &at

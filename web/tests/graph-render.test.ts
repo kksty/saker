@@ -36,6 +36,7 @@ import {
 } from '../src/graph/render.ts'
 import type { Box, EdgeCurve } from '../src/graph/render.ts'
 import type { GraphEdge, GraphNode } from '../src/graph/model.ts'
+import { readGraphPalette } from '../src/graph/palette.ts'
 
 function fact(id: string, x = 0, y = 0): GraphNode {
   return {
@@ -525,6 +526,24 @@ test('pre-run and waiting intent edges are dashed, not solid', () => {
   // Terminal states keep a solid produced edge.
   assert.equal(edgeStyle(relation({ kind: 'intent', status: 'done' })).dashed, false)
   assert.equal(edgeStyle(relation({ kind: 'intent', status: 'review_failed' })).dashed, false)
+})
+
+test('graph colors adopt semantic theme tokens without changing relation encoding', () => {
+  // Dark-only node fills and lane bands dominated the light canvas and its labels.
+  const tokens: Record<string, string> = {
+    '--background': '#f4f5f7', '--card': '#ffffff', '--ink-3': '#6a7280',
+    '--primary': '#c92a2a', '--info': '#1f5fbf', '--success': '#147a41',
+  }
+  const palette = readGraphPalette({ getPropertyValue: (name) => tokens[name] ?? '' })
+  assert.equal(palette.colors.background, '#f4f5f7')
+  assert.equal(palette.colors.surface, '#ffffff')
+  assert.match(palette.band, /#6a7280 5%/)
+  assert.equal(nodeColor({ ...fact('f:example'), kind: 'vuln' }, palette), '#c92a2a')
+  assert.equal(edgeStyle(relation({ kind: 'intent', status: 'done' }), palette).color, '#147a41')
+  const premise = edgeStyle(relation({ kind: 'premise' }), palette)
+  assert.match(premise.color, /#1f5fbf/)
+  assert.equal(premise.dashed, false)
+  assert.equal(edgeStyle(relation({ kind: 'premise', blocked: true }), palette).dashed, true)
 })
 
 test('no accidental duplicate colour inside one channel', () => {

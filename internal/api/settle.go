@@ -88,6 +88,8 @@ func (s *Server) settleIntent(w http.ResponseWriter, r *http.Request) {
 		facts[f.ID] = f
 	}
 	verified := 0
+	doneClaims := make(map[string]uint64, len(factIDs))
+	doneStatuses := make(map[string]string, len(factIDs))
 	for _, fid := range factIDs {
 		f, found := facts[fid]
 		if !found {
@@ -101,6 +103,8 @@ func (s *Server) settleIntent(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
+		doneClaims[fid] = f.ClaimVersion
+		doneStatuses[fid] = f.Status
 		if f.Status == "verified" {
 			verified++
 		}
@@ -130,6 +134,11 @@ func (s *Server) settleIntent(w http.ResponseWriter, r *http.Request) {
 		i.DoneFactIDs = factIDs
 		i.DoneRunIDs = runIDs
 		i.DoneAt = &at
+		i.DoneFactClaims = doneClaims
+		i.DoneFactStatuses = doneStatuses
+		i.DoneUnverified = unverified
+		i.DoneReceiptStale = false
+		i.DoneReceiptChanged = nil
 		i.Wait = nil
 		i.Notes = append(i.Notes, model.IntentNote{
 			At: at, Kind: model.IntentNoteSettle, Text: note, RefFact: firstRef(factIDs),

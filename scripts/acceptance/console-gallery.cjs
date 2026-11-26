@@ -6,6 +6,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '../..');
+const assetTypes = { '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
 const web = process.argv.includes('--web')
   ? path.resolve(root, process.argv[process.argv.indexOf('--web') + 1])
   : path.join(root, 'internal/web/static');
@@ -762,7 +763,7 @@ function api(url) {
           const file = path.resolve(web, url.pathname.slice('/static/'.length));
           assert.ok(file.startsWith(web + path.sep));
           body = fs.readFileSync(file);
-          type = file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : 'application/octet-stream';
+          type = assetTypes[path.extname(file)] ?? 'application/octet-stream';
         } else if (url.pathname.includes('/api/')) {
           // One write is answered synthetically, and only when --append-goal is
           // set: the dialog's outcome line is rendered from the server's answer,
@@ -946,11 +947,42 @@ function api(url) {
           const viewport = document.querySelector('.saker-run-stream [data-radix-scroll-area-viewport]');
           return viewport && viewport.clientWidth > 0 && viewport.scrollWidth <= viewport.clientWidth;
         })()`), 'run events fit their scroll pane');
+        // Event prose used to follow an inline strip of raw metadata at the same weight.
+        assert.ok(await evaluate(`(() => {
+          const row = document.querySelector('[aria-label="运行事件组"] article button');
+          const summary = row.querySelector('.line-clamp-2');
+          const rawKind = row.querySelector('.font-mono');
+          return summary.getBoundingClientRect().top < rawKind.getBoundingClientRect().top
+            && parseFloat(getComputedStyle(summary).fontSize) > parseFloat(getComputedStyle(rawKind).fontSize);
+        })()`), 'event summary precedes and outweighs the raw event kind');
       }
       if (id === 'state') await checkDisclosure('意图列表', 'main > .\\@container', 768);
+      if (id === 'overview') {
+        // Three metrics in two columns left a blank tile and pushed down the inbox.
+        assert.equal(await evaluate(`getComputedStyle(document.querySelector('[aria-label="关键指标"] .saker-metric-grid')).gridTemplateColumns.split(' ').length`), 3);
+      }
       if (id === 'graph-map') {
-        await checkDisclosure('筛选与检索', '.saker-graph-stage', 640);
-        assert.ok(await evaluate(`document.querySelector('.saker-graph-filter').getBoundingClientRect().right <= document.querySelector('.saker-graph-toolbar').getBoundingClientRect().left`), 'graph search and view controls do not overlap');
+        assert.ok(await evaluate(`(() => {
+          const search = document.querySelector('.saker-graph-filter').getBoundingClientRect();
+          const tools = document.querySelector('.saker-graph-toolbar').getBoundingClientRect();
+          return search.right <= tools.left || search.top >= tools.bottom;
+        })()`), 'graph search and view controls do not overlap');
+        if (width < 704) {
+          // Collapsing the two bottom overlays gives the small map back its height.
+          assert.deepEqual(await evaluate(`(() => {
+            const menu = document.querySelector('button[aria-label="更多图谱操作"]');
+            const toggle = document.querySelector('.saker-graph-minimap button');
+            const commander = document.querySelector('[title="展开指挥官状态"]');
+            return [menu.getClientRects().length, toggle.getAttribute('aria-expanded'), commander?.getAttribute('aria-expanded'), !!document.querySelector('[data-testid="graph-minimap"]')];
+          })()`), [1, 'false', 'false', false]);
+          await evaluate(`document.querySelector('.saker-graph-minimap button').click()`);
+          assert.ok(await evaluate(`Boolean(document.querySelector('[data-testid="graph-minimap"]'))`), 'minimap can still be opened');
+          await evaluate(`document.querySelector('.saker-graph-minimap button[aria-expanded]').click()`);
+          assert.ok(await evaluate(`!document.querySelector('[data-testid="graph-minimap"]')`), 'minimap can be closed again');
+          await evaluate(`document.querySelector('[aria-label="更多图谱操作"]').dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}))`);
+          assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('[role="menuitem"]'), item => item.textContent.trim())`), ['导出全图', '刷新']);
+          await evaluate(`document.querySelector('[role="menuitem"]').dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}))`);
+        }
       }
       if (searchArg && id === 'graph') {
         // React controls the input: set through the native setter, then dispatch
@@ -1024,6 +1056,19 @@ function api(url) {
       if (themeArg) {
         await evaluate(`document.documentElement.classList.${themeArg === 'dark' ? 'add' : 'remove'}('dark')`);
         await pause(200);
+      }
+      if (id === 'graph-map') {
+        // Sample outside the lanes, where the canvas should have the same base
+        // as the rest of the page, including after a light theme switch.
+        assert.ok(await evaluate(`(() => {
+          const canvas = document.querySelector('[data-testid="graph-canvas"]');
+          const ctx = canvas.getContext('2d');
+          const actual = ctx.getImageData(1, 2, 1, 1).data;
+          const sample = document.createElement('canvas').getContext('2d');
+          sample.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--background').trim();
+          sample.fillRect(0, 0, 1, 1);
+          return actual.every((channel, i) => channel === sample.getImageData(0, 0, 1, 1).data[i]);
+        })()`), 'graph canvas base follows the current theme');
       }
       if (id === 'workers') assert.ok(await evaluate('!document.body.innerText.includes("造人") && !document.body.innerText.includes("造一个人")'));
       const overflow = await evaluate(`(() => {

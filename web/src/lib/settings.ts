@@ -308,7 +308,7 @@ export function searchKeyStatus(view: Pick<SettingsView, 'search_has_key' | 'sea
   return count > 0 ? `已保存 ${count} 个 Tavily key（值不回显）` : '已保存 Tavily key（值不回显）'
 }
 
-// ---- 守门策略（extensions.guardrail，只读投影） ----
+// ---- 守门策略（guardrail，只读投影） ----
 //
 // The judge itself is configured by the operator in cyber.yaml; the settings
 // page only reports what is in effect. Two facts must never be dressed up:
@@ -332,8 +332,8 @@ export function guardrailPolicyFlags(guardrail?: SettingsGuardrailSummary): Guar
   const enabled = Boolean(guardrail?.configured) && provider !== '' && provider !== 'none'
   return {
     enabled,
-    failOpen: guardrail?.on_error === 'allow',
-    shadow: Boolean(guardrail?.shadow),
+    failOpen: enabled && guardrail?.on_error === 'allow',
+    shadow: enabled && Boolean(guardrail?.shadow),
     label: enabled ? '守门已启用' : '守门未启用',
   }
 }

@@ -38,8 +38,11 @@ function stateText(node: GraphNode): string {
   if (node.stopped) return INTENT_STOPPED_LABEL
   // A declared close is still `done`, but the list must not read it as a run
   // result: name who settled it inline.
-  const declared = node.meta?.intent?.done_declared_by
-  if (declared && node.status === 'done') return `${statusLabel(node.status)} · ${doneDeclaredByShort(declared)}`
+  const intent = node.meta?.intent
+  const declared = intent?.done_declared_by
+  if (declared && node.status === 'done') {
+    return `${statusLabel(node.status)} · ${doneDeclaredByShort(declared)}${intent?.done_receipt_stale ? ' · 依据已变' : ''}`
+  }
   return statusLabel(node.status)
 }
 

@@ -550,8 +550,9 @@ function UnitRow({
       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-ink-3">
         <span className="shrink-0 font-mono saker-nums">{shortID(intent.id)}</span>
         {intent.status === 'done' && intent.done_declared_by && (
-          <span className="shrink-0" title={doneDeclaredDetail(intent)}>
+          <span className={intent.done_receipt_stale ? 'shrink-0 text-warning' : 'shrink-0'} title={doneDeclaredDetail(intent)}>
             {doneDeclaredByShort(intent.done_declared_by)}
+            {intent.done_receipt_stale ? ' · 依据已变' : ''}
           </span>
         )}
         {live && pulse ? (

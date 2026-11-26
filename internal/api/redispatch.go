@@ -1,10 +1,12 @@
 package api
 
 import (
+	"errors"
 	"log"
 	"time"
 
 	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/store"
 )
 
 // maxRedispatches bounds how many times one direction may be restarted after an
@@ -67,11 +69,12 @@ func (s *Server) redispatchesUsed(intentID, exceptRunID string) int {
 // resume instead: the project-stop path cancels every run with cause=restart, and
 // restarting them from inside that loop would fight the shutdown.
 func (s *Server) redispatchAfterCancel(runID, intentID string) {
-	if s.paused.Load() || s.closing.Load() || s.deleting.Load() {
-		return
-	}
 	run, ok := s.Store.GetRun(runID)
 	if !ok || run.Status != model.RunCanceled || run.CancelCause != model.CancelCauseWatchdog {
+		return
+	}
+	if s.paused.Load() || s.closing.Load() || s.deleting.Load() {
+		s.noteRedispatch(runID, intentID, 0, run.CancelCause, "skipped", "项目已暂停或正在关闭", "")
 		return
 	}
 	s.redispatchOne(runID, intentID, run.CancelCause)
@@ -105,11 +108,29 @@ func (s *Server) redispatchInterrupted() {
 // would be wrong, and the budget is checked before the run is started.
 func (s *Server) redispatchOne(runID, intentID, cause string) {
 	in, ok := s.Store.GetIntent(intentID)
-	if !ok || in.Status != model.StatusPending || in.Hold || in.Aborted || in.Wait != nil {
+	skip := ""
+	switch {
+	case !ok:
+		skip = "意图不存在"
+	case in.Hold:
+		skip = "意图挂起"
+		if in.HoldReason != "" {
+			skip += "：" + in.HoldReason
+		}
+	case in.Aborted:
+		skip = "意图已停止"
+	case in.Wait != nil:
+		skip = "意图仍有等待条件"
+	case in.Status != model.StatusPending:
+		skip = "当前意图状态为 " + in.Status
+	}
+	if skip != "" {
+		s.noteRedispatch(runID, intentID, 0, cause, "skipped", skip, "")
 		return
 	}
 	if in.RunID != "" {
 		if live, ok := s.Store.GetRun(in.RunID); ok && live.Status == model.RunRunning {
+			s.noteRedispatch(runID, intentID, 0, cause, "skipped", "意图已有在途运行 "+live.ID, "")
 			return
 		}
 	}
@@ -118,27 +139,39 @@ func (s *Server) redispatchOne(runID, intentID, cause string) {
 	// Restart-canceled runs are not counted at all (see interrupted).
 	used := s.redispatchesUsed(intentID, runID)
 	if used >= maxRedispatches {
-		s.noteRedispatch(runID, intentID, used+1, cause, "超过重派上限，留给指挥官决定")
+		s.noteRedispatch(runID, intentID, used+1, cause, "skipped", "超过重派上限，留给指挥官决定", "")
 		return
 	}
-	if _, err := s.StartRun(intentID); err != nil {
+	successor, err := s.startRunAfterInterruption(intentID, runID)
+	if errors.Is(err, store.ErrAutoRedispatchSkipped) {
+		s.noteRedispatch(runID, intentID, used+1, cause, "skipped", err.Error(), "")
+		return
+	}
+	if err != nil {
 		log.Printf("重派 %s（第 %d 次）：%v", intentID, used+1, err)
-		s.noteRedispatch(runID, intentID, used+1, cause, "启动失败："+err.Error())
+		s.noteRedispatch(runID, intentID, used+1, cause, "failed", err.Error(), "")
 		return
 	}
-	s.noteRedispatch(runID, intentID, used+1, cause, "")
+	s.noteRedispatch(runID, intentID, used+1, cause, "started", "", successor)
 }
 
-// noteRedispatch writes the decision to the cancelled run's journal. The run is
-// over, so the line is appended on disk: it is the only place a review can see
-// why the same direction ran again.
-func (s *Server) noteRedispatch(runID, intentID string, attempt int, cause, skip string) {
+// noteRedispatch mirrors the outcome to the old run's journal and retains a
+// reason when no successor was admitted.
+func (s *Server) noteRedispatch(runID, intentID string, attempt int, cause, state, reason, successor string) {
 	line := map[string]any{
 		"kind": "run_redispatch", "at": time.Now(), "run_id": runID, "intent_id": intentID,
-		"attempt": attempt, "cause": cause, "max": maxRedispatches,
+		"attempt": attempt, "cause": cause, "max": maxRedispatches, "state": state,
 	}
-	if skip != "" {
-		line["skipped"] = skip
+	if successor != "" {
+		line["successor_run_id"] = successor
+	} else {
+		reason = s.redactSecrets(reason)
+		line["reason"] = reason
+		if _, err := s.Store.UpdateRun(runID, func(r *model.Run) {
+			r.RedispatchDisposition = &model.RedispatchDisposition{State: state, Reason: reason}
+		}); err != nil {
+			log.Printf("run %s: 保存重派结果失败：%v", runID, err)
+		}
 	}
 	if err := s.appendJournalOnDisk(runID, line); err != nil {
 		log.Printf("run %s: 记录重派失败：%v", runID, err)

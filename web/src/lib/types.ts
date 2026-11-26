@@ -385,6 +385,17 @@ export interface Intent {
   /** Runs cited as proof of the declared completion. */
   done_run_ids?: string[]
   done_at?: string
+  /** Claim version and review status each cited fact had when the direction was
+   *  declared done. The stored receipt is never moved by a later edit. */
+  done_fact_claims?: Record<string, number>
+  done_fact_statuses?: Record<string, string>
+  /** The settlement-time verdict: the cited facts were not all verified. */
+  done_unverified?: boolean
+  /** Read-side observation: a cited claim was corrected, withdrawn or rejected
+   *  after the receipt was written. The original note stays; the console asks for
+   *  re-confirmation instead of rewriting history. */
+  done_receipt_stale?: boolean
+  done_receipt_changed?: string[]
   created_at: string
   updated_at: string
 }
@@ -490,6 +501,21 @@ export interface Playbook {
 	archived?: boolean
 	source_run_id?: string
 	from_fact_versions?: Record<string,number>
+	/** Assertion versions the confirmation accepted. A source id whose version
+	 *  moved makes the old confirmation stale instead of silently re-using the
+	 *  new claim. */
+	from_fact_claims?: Record<string,number>
+	/** Append-only confirmation receipts, oldest first. */
+	confirmations?: {
+		at: string
+		origin?: PlaybookOrigin
+		source_run_id?: string
+		from_fact_ids?: string[]
+		from_fact_claims?: Record<string,number>
+	}[]
+	/** Read-side: a stored confirmation no longer rests on the current claims. */
+	source_changed?: boolean
+	source_change?: string
 	pattern?: {nodes: {name:string;type:'fact'|'intent';kind?:string;tags?:string[];entity_var?:string}[];edges:{source:string;target:string;kind:string}[]}
   id: string
   title: string
@@ -734,6 +760,59 @@ export interface Notebook {
   run_id?: string
 }
 
+/** One handoff line whose ledger write did not commit (Run.ingest.pending). */
+export interface PendingDeclaration {
+  declaration_id?: string
+  source_ref?: string
+  kind?: string
+  title?: string
+  /** Byte span in `.saker/facts.jsonl`, e.g. `.saker/facts.jsonl#bytes=120-180`. */
+  location?: string
+  reasons?: string[]
+}
+
+/** Structured result of one run's handoff settlement (`settled|partial|unavailable`). */
+export interface RunIngest {
+  status: 'settled' | 'partial' | 'unavailable' | string
+  declared: number
+  facts: number
+  playbooks: number
+  persisted_facts: number
+  persisted_evidence: number
+  persisted_playbooks: number
+  cursor_before: number
+  cursor_after: number
+  /** False while any pending declaration keeps the consumption cursor back. */
+  committed: boolean
+  truncated?: boolean
+  bad?: number
+  pending?: PendingDeclaration[]
+  /** Batch-level failures that cannot be attributed to one declaration. */
+  reasons?: string[]
+  recorded_at?: string
+}
+
+/** Where a satisfied wait's results stand in the delivery chain. */
+export interface WaitDelivery {
+  status: 'ready' | 'archived' | 'received' | string
+  wait?: IntentWait
+  brief_path?: string
+  ready_at?: string
+  archived_at?: string
+  received_at?: string
+}
+
+/** The outcome of archiving one run's dispatch text. */
+export interface BriefArchive {
+  /** pending | archived | write_failed */
+  status: string
+  path?: string
+  sha256?: string
+  bytes?: number
+  error?: string
+  at?: string
+}
+
 export interface Run {
   native_subagent_calls?: number
   native_subagent_active?: number
@@ -776,6 +855,10 @@ export interface Run {
   warnings_dismissed?: boolean
   /** Read-only path of the archived task brief, relative to the case root. */
   brief_path?: string
+  /** How the brief archive was written. Absent on old rows; `pending` is the
+   *  half-written state (file may exist, ledger path did not commit), and
+   *  `write_failed` means the file itself could not be written. */
+  brief_archive?: BriefArchive
   /** The run this one continued (steer/handoff/wake), if any. */
   continued_from?: string
   handoff_from?: string
@@ -798,6 +881,11 @@ export interface Run {
   auto_resume_attempt?: number
   events: number
   declared_facts: number
+  /** Structured settlement of this run's handoff. Absent on old rows. */
+  ingest?: RunIngest
+  /** A satisfied wait this run was started to carry; it is redelivered after an
+   *  interrupted dispatch until the executor has confirmed receiving it. */
+  wait_delivery?: WaitDelivery
   stop_reason?: string
   tokens?: number
   log_path?: string
@@ -1046,6 +1134,14 @@ export interface DirectiveResponse {
   escalation?: { id: string; intent_id?: string }
 }
 
+export interface MessageDelivery {
+  delivery_id?: string
+  run_id?: string
+  path?: string
+  at: string
+  error?: string
+}
+
 export interface Message {
   /** Mechanical fact-change notice: which fact and record version changed. */
   notice_fact_id?: string
@@ -1076,12 +1172,19 @@ export interface Message {
   delivered_run_id?: string
   /** How it reached the peer: the dispatch brief or the live-run IOA bridge. */
   delivery_path?: 'prompt' | 'ioa' | string
+  /** Run of the in-flight delivery attempt; a receipt is checked against it. */
+  current_delivery_run_id?: string
+  /** Append-only delivery rounds, oldest first. The fields above stay current. */
+  deliveries?: MessageDelivery[]
   /** How many times a retry re-injected this unconfirmed message. */
   redeliveries?: number
   error?: string
   created_at: string
   updated_at: string
   acked_at?: string
+  /** The delivery attempt the receipt confirmed; set once, never rewritten. */
+  acked_delivery_id?: string
+  acked_run_id?: string
 }
 
 /** One recipient's queue pressure (GET /api/communication; store.QueueStats).
@@ -1231,6 +1334,20 @@ export interface RunPulse {
   last_text?: string
 }
 
+/** One durable automatic-review attempt as the overview shows it. */
+export interface ReviewAttemptDetail {
+  fact: string
+  title?: string
+  claim_version: number
+  /** run_failed | needs_evidence | rejected */
+  outcome: string
+  reason?: string
+  /** Originals the fact cites: what a needs_evidence verdict is waiting for. */
+  missing_evidence?: string[]
+  retry_at?: string
+  run_id?: string
+}
+
 export interface BoardView {
   generated_at: string
   case?: string
@@ -1282,6 +1399,20 @@ export interface BoardView {
   coverage?: CoverageItem[]
   /** Directions the operator/commander explicitly stopped. */
   held_intents?: BoardItem[]
+  /** Recent runs whose handoff settlement did not commit (bounded). */
+  ingest_pending?: IngestPendingItem[]
+}
+
+/** One incomplete handoff settlement as the board/commander sees it. */
+export interface IngestPendingItem {
+  run: string
+  intent_id?: string
+  at: string
+  status: string
+  persisted: number
+  declared: number
+  pending?: PendingDeclaration[]
+  reasons?: string[]
 }
 
 export interface CoverageItem {
@@ -1337,7 +1468,7 @@ export interface PortGroup {
 export interface DeciderStatus {
   context_tokens?: number
   context_window?: number
-  context_percent?: number
+  context_percent?: number | null
   compacted?: boolean
   handoff_missing?: number
   handoff_released?: boolean
@@ -1389,7 +1520,20 @@ export interface DeciderActivity {
 
 export interface BoardResponse extends BoardView {
   operator_frontier?: OperatorFrontierItem[]
-  reviews?: { automatic: boolean; paused: boolean; disabled?: boolean; pending: number; processing: number; cooling: number }
+  /** Automatic review queue state. Pending is the queued set only; cooling and
+   *  blocked are waiting on their own conditions, and rejected is an independent
+   *  verdict, not a queue failure. */
+  reviews?: {
+    automatic: boolean
+    paused: boolean
+    disabled?: boolean
+    pending: number
+    processing: number
+    cooling: number
+    blocked?: number
+    rejected?: number
+    details?: ReviewAttemptDetail[]
+  }
   usage?: TokenTotals
   decider: DeciderStatus
   project_paused?: boolean
@@ -1402,7 +1546,24 @@ export interface BoardResponse extends BoardView {
   guard?: {
     interval_seconds: number
     idle_timeout_seconds?: number
-    last_tick_at?: string
+    started_at?: string
+    completed_at?: string
+    in_progress: boolean
+    guard_canceled: number
+    auto_redispatched: number
+    activity?: {
+      intent_id: string
+      host_online?: boolean
+      turn_ended?: boolean
+      open_tools?: number
+      facts: number
+    }[]
+    recent?: {
+      run_id: string
+      successor_run_id?: string
+      reason?: string
+      disposition?: { state: 'skipped' | 'failed'; reason: string }
+    }[]
   }
 
   /** Re-dispatch beyond a direction's first attempt (retry/wake/steer/handoff). */
@@ -1451,7 +1612,7 @@ export interface ProjectNote {
 }
 
 export interface ProjectActions {
-  state: { paused: boolean; kind: string; reason?: string }
+  state: { paused: boolean; kind: string; reason?: string; restart_recovery_error?: string }
   facts: ProjectActionFacts
   actions: ProjectAction[]
   notes?: ProjectNote[]
@@ -1488,7 +1649,7 @@ export interface DecisionTool {
 export interface Decision {
   context_tokens?: number
   context_window?: number
-  context_percent?: number
+  context_percent?: number | null
   compacted?: boolean
   handoff?: boolean
   handoff_missing?: number
@@ -1620,6 +1781,9 @@ export interface ReportMeta {
  */
 export interface ReportFinding {
   fact: string
+  /** The assertion version the row described; absent on reports written before
+   *  citations carried a version (unknown, never assumed current). */
+  fact_claim_version?: number
   verdict: string
   title: string
   severity?: string
@@ -1637,11 +1801,21 @@ export interface VerifyPendingResult {
   skipped: number
 }
 
-/** One verified conclusion no delivered report cites yet (`unreported.items`). */
+/** One delivered report's citation of a fact. `claim_version` absent means the
+ *  report predates versioned citations and cannot vouch for the current claim. */
+export interface ReportCitationRef {
+  report: string
+  claim_version?: number
+}
+
+/** One verified conclusion no delivered report cites at its current claim
+ *  version (`unreported.items`). `previous` keeps the reports that cite an older
+ *  (or unknown) version, so "v2 not covered" is not shown as "never mentioned". */
 export interface ReportUnreportedFact {
   /** The fact id. The API names this key `fact`, not `id`. */
   fact: string
   title: string
+  previous?: ReportCitationRef[]
 }
 
 /**
@@ -1660,6 +1834,26 @@ export interface ReportUnreported {
   note?: string
   unreadable?: string[]
   uncounted?: string[]
+  /** Delivered reports whose citations carry no assertion version. Their rows
+   *  cannot count as coverage of the current claim. */
+  unknown_version_reports?: string[]
+}
+
+export interface ReportEvidenceIssue {
+  evidence?: string
+  uri?: string
+  fact_ids?: string[]
+  /** missing | digest_mismatch | unreadable | no_ledger_row */
+  kind: string
+  detail?: string
+}
+
+/** The on-demand completeness answer (`?evidence=1`). `checked` separates a
+ *  clean scan from a server that did not answer the field. */
+export interface ReportEvidencePrecheck {
+  checked: boolean
+  missing?: ReportEvidenceIssue[]
+  conflicts?: ReportEvidenceIssue[]
 }
 
 /** GET /p/<p>/api/reports/precheck, read before a report run starts.
@@ -1678,6 +1872,8 @@ export interface ReportPrecheck {
   withdrawn?: number
   running: boolean
   unreported?: ReportUnreported
+  /** Present only on the generation-time request (`?evidence=1`). */
+  evidence?: ReportEvidencePrecheck
 }
 
 /**
@@ -1836,7 +2032,7 @@ export interface ModelsCatalog {
 }
 
 /**
- * Read-only projection of `extensions.guardrail` in the operator's cyber.yaml.
+ * Read-only projection of `guardrail` in the operator's cyber.yaml.
  * The console never edits it (the operator writes the section directly), and it
  * never sees a key: only "configured" flags and the routing metadata.
  */
@@ -1852,7 +2048,9 @@ export interface SettingsGuardrailSummary {
   scope?: string[]
   allow_prefixes_count?: number
   jev_configured?: boolean
+  jev_custom_endpoint?: boolean
   llm?: { configured?: boolean; model?: string; base_url?: string }
+  reason?: string
 }
 
 /** Instance-level LLM configuration; the key itself is never returned. */
@@ -1893,6 +2091,7 @@ export interface SettingsView {
   traffic_body_retention_bytes?: number
   /** Read-only judge summary (absent on servers that predate the projection). */
   guardrail?: SettingsGuardrailSummary
+  gateway?: { instances: number; enabled: number; proxy_configured: boolean; reason?: string }
 }
 
 /** Instance-level knobs that live beside the model profile: the auxiliary gate

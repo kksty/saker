@@ -11,6 +11,7 @@ import {
   type MoveCoalescer,
 } from '@/graph/sim'
 import { PILL_MAX_LINES, PILL_TEXT_W, fitText, halfExtentX, paint, wrapText, type Camera } from '@/graph/render'
+import type { GraphPalette } from '@/graph/palette'
 import { layoutBounds, openCamera, parseCamera, focusCamera, type NodeExtent } from '@/graph/camera'
 import { focusFadeMix, initialFocusFade } from '@/graph/focus-fade'
 import { GraphIndex, edgeHitTest, pickAt as pickLinear, type GraphPick } from '@/graph/hit'
@@ -78,6 +79,7 @@ const REDUCED_SETTLE_TICKS = 600
 
 interface Props {
   model: GraphModel
+  palette?: GraphPalette
   selected: string | null
   matches: Set<string> | null
   /** The hit the search list is on: painted with a stronger, doubled ring. */
@@ -168,7 +170,7 @@ const NO_DRAG: DragState = { mode: null, sx: 0, sy: 0, cx: 0, cy: 0, moved: fals
  * so the frame loop always paints the current selection.
  */
 export const GraphCanvas = forwardRef<GraphControls, Props>(function GraphCanvas(
-  { model, selected, matches, activeMatch = null, showLabels, layout, cameraKey, ready = true, timeGate, hoverPreview = true, onSelect, showHelpers = true, rightInset = 0, leftInset = 0, bottomInset = 0, coldDim = false },
+  { model, palette, selected, matches, activeMatch = null, showLabels, layout, cameraKey, ready = true, timeGate, hoverPreview = true, onSelect, showHelpers = true, rightInset = 0, leftInset = 0, bottomInset = 0, coldDim = false },
   ref,
 ) {
   const wrapRef = useRef<HTMLDivElement | null>(null)
@@ -251,8 +253,8 @@ export const GraphCanvas = forwardRef<GraphControls, Props>(function GraphCanvas
   // from the deterministic layout, so a drop has to be re-applied to each new
   // sim. Only 重新布局 (or a layout switch) clears it.
   const manualRef = useRef(new Map<string, { x: number; y: number }>())
-  const stateRef = useRef({ selected, matches, activeMatch, showLabels, showHelpers, timeGate, hoverPreview, rightInset, leftInset, bottomInset, coldDim })
-  stateRef.current = { selected, matches, activeMatch, showLabels, showHelpers, timeGate, hoverPreview, rightInset, leftInset, bottomInset, coldDim }
+  const stateRef = useRef({ palette, selected, matches, activeMatch, showLabels, showHelpers, timeGate, hoverPreview, rightInset, leftInset, bottomInset, coldDim })
+  stateRef.current = { palette, selected, matches, activeMatch, showLabels, showHelpers, timeGate, hoverPreview, rightInset, leftInset, bottomInset, coldDim }
   // The 发起边 drawing switch filters sim.edges (so paint AND hit-testing agree),
   // but the unfiltered model is the source of truth when it is toggled back on.
   const modelRef = useRef(model)
@@ -582,7 +584,7 @@ export const GraphCanvas = forwardRef<GraphControls, Props>(function GraphCanvas
     // on a settled canvas.
     if (focusFadeUntilRef.current > performance.now()) start()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, matches, activeMatch, showLabels, showHelpers, timeGate, hoverPreview, rightInset, leftInset, coldDim])
+  }, [palette, selected, matches, activeMatch, showLabels, showHelpers, timeGate, hoverPreview, rightInset, leftInset, coldDim])
 
   /** One coalesced size measurement per frame (see the resize effect). */
   function scheduleSizeSync() {
@@ -817,6 +819,7 @@ export const GraphCanvas = forwardRef<GraphControls, Props>(function GraphCanvas
     const paintStart = performance.now()
     paint({
       ctx,
+      palette: state.palette,
       width: w,
       height: h,
       dpr,

@@ -464,6 +464,112 @@ func TestAutoVerifyFailedReviewIsNotRetriedEveryWake(t *testing.T) {
 	}
 }
 
+// The automatic queue's failure/block state used to live only in process memory:
+// a restart forgot why a finding was not moving and retried it immediately. The
+// durable attempt keeps the run-failure cooldown, the needs_evidence block and
+// the independent reject apart, and a material change is what re-admits a
+// blocked assertion.
+func TestReviewAttemptsSurviveRestartAndKeepOutcomesApart(t *testing.T) {
+	dir := t.TempDir()
+	cases := filepath.Join(dir, "cases")
+	if err := os.MkdirAll(cases, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "ledger.json")
+	st, err := store.OpenSQLitePooled(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := New(st, &blockingExec{}, dir, cases)
+	s.AutoVerify = true
+	s.Verifier = verifier.New(st, &blockingExec{}, cases)
+	in, err := st.CreateIntent(model.Intent{Title: "重启后仍可读的复核状态"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := addReviewableFact(t, st, in.ID, "vuln", "需要重启的状态")
+	s.noteReviewFailure(f, time.Now().Add(-time.Minute))
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	st2, err := store.OpenSQLitePooled(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st2.Close() })
+	probe := &reviewProbeExec{}
+	s2 := New(st2, probe, dir, cases)
+	s2.AutoVerify = true
+	s2.Verifier = verifier.New(st2, probe, cases)
+
+	f2, ok := st2.FactByID(f.ID)
+	if !ok {
+		t.Fatal("fact lost after restart")
+	}
+	if wait, cooling := s2.reviewCoolingDown(f2, time.Now()); !cooling || wait <= 0 {
+		t.Fatalf("the run-failure cooldown did not survive the restart: wait=%s cooling=%v", wait, cooling)
+	}
+	summary := s2.reviewSummary()
+	if summary.Cooling != 1 || summary.Pending != 0 {
+		t.Fatalf("restart summary = %+v, want one cooling attempt", summary)
+	}
+	if len(summary.Details) != 1 || summary.Details[0].Outcome != store.ReviewAttemptRunFailed {
+		t.Fatalf("run-failure detail = %+v", summary.Details)
+	}
+
+	// A finished review that asked for evidence is blocked, not cooling: no
+	// automatic run should be bought again for the same material.
+	s2.recordReviewAttempt(f2, store.ReviewAttemptNeedsEvidence, "缺少可复现的登录态", "run_review", time.Now(), nil)
+	if _, blocked := s2.reviewBlocked(f2); !blocked {
+		t.Fatal("needs_evidence did not block the queue")
+	}
+	summary = s2.reviewSummary()
+	if summary.Blocked != 1 || summary.Cooling != 0 {
+		t.Fatalf("blocked summary = %+v", summary)
+	}
+	if len(summary.Details) != 1 || summary.Details[0].Outcome != store.ReviewAttemptNeedsEvidence {
+		t.Fatalf("blocked detail = %+v", summary.Details)
+	}
+	if len(summary.Details[0].MissingEvidence) == 0 {
+		t.Fatal("blocked detail lost the cited originals")
+	}
+	s2.autoVerify(in.ID)
+	if got := probe.runs(); got != 0 {
+		t.Fatalf("a blocked assertion bought %d review run(s)", got)
+	}
+
+	// Adding material changes the evidence set and the claim version. The old
+	// attempt no longer describes this fact, so the queue is free again.
+	extra, err := st2.AddEvidence(model.Evidence{IntentID: in.ID, URI: in.ID + "/extra.txt", Name: "extra.txt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed, err := st2.UpdateFact(f.ID, func(f *model.Fact) {
+		f.EvidenceIDs = append(f.EvidenceIDs, extra.ID)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, blocked := s2.reviewBlocked(changed); blocked {
+		t.Fatal("new material did not re-admit the assertion")
+	}
+	// Re-admission is not only a predicate: the next pass actually runs the
+	// corrected assertion instead of skipping it on the old attempt.
+	s2.autoVerify(in.ID)
+	waitFor(t, 5*time.Second, func() bool { return probe.runs() > 0 })
+
+	// The independent veto is recorded as its own outcome, not as a broken run.
+	s2.recordReviewAttempt(changed, store.ReviewAttemptRejected, "独立复现不成立", "run_verdict", time.Now(), nil)
+	summary = s2.reviewSummary()
+	if summary.Rejected != 1 || summary.Blocked != 0 {
+		t.Fatalf("rejected summary = %+v", summary)
+	}
+	if len(summary.Details) != 1 || summary.Details[0].Outcome != store.ReviewAttemptRejected {
+		t.Fatalf("rejected detail = %+v", summary.Details)
+	}
+}
+
 func mustFact(t *testing.T, st *store.Store, id string) model.Fact {
 	t.Helper()
 	f, ok := st.FactByID(id)

@@ -67,7 +67,7 @@ func (s *Server) deliverToCommander(ctx context.Context, msg model.Message) mode
 		}
 		return msg
 	}
-	claimed, acquired, claimErr := s.Store.BeginMessageDelivery(msg.ID)
+	claimed, acquired, claimErr := s.Store.BeginMessageDelivery(msg.ID, run.ID)
 	if claimErr != nil {
 		log.Printf("消息 %s 投递准入失败：%v", msg.ID, claimErr)
 		return msg
@@ -289,7 +289,7 @@ func (s *Server) inboxSection(participant, deliveryID, runID, closing string, ma
 // claimed row. A row already claimed elsewhere is skipped: the delivery state is
 // the single-winner record.
 func (s *Server) claimInboxRow(m model.Message, deliveryID, runID string) (model.Message, bool) {
-	claimed, acquired, err := s.Store.BeginMessageDelivery(m.ID)
+	claimed, acquired, err := s.Store.BeginMessageDelivery(m.ID, runID)
 	if err != nil {
 		log.Printf("未读消息 %s 认领失败：%v", m.ID, err)
 		return model.Message{}, false

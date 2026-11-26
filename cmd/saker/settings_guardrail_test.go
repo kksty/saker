@@ -70,7 +70,6 @@ func TestSettingsGETExposesGuardrailPolicy(t *testing.T) {
 			// fixtures around it keep pinning the read fallback for old files.
 			sections: `guardrail:
   provider: jev
-  on_error: allow
 jev:
   api_key: jev-secret
 `,
@@ -80,7 +79,7 @@ jev:
 				}
 			},
 		},
-		"jev fail-open": {
+		"invalid top-level error policy for jev": {
 			sections: `extensions:
   guardrail:
     provider: jev
@@ -89,7 +88,7 @@ jev:
     api_key: jev-secret
 `,
 			check: func(t *testing.T, got settingsGuardrailJSON) {
-				if !got.Guardrail.Configured || got.Guardrail.Provider != "jev" || got.Guardrail.OnError != "allow" || !got.Guardrail.JEVConfigured {
+				if got.Guardrail.Configured || got.Guardrail.Provider != "jev" || got.Guardrail.Reason == "" || !got.Guardrail.JEVConfigured {
 					t.Fatalf("jev = %+v", got.Guardrail)
 				}
 			},
@@ -118,7 +117,10 @@ jev:
     scope: [bash, subagent]
     allow_prefixes: ["git status"]
     llm:
+      base_url: http://judge.test/v1
       model: judge-small
+  jev:
+    api_key: jev-secret
 `,
 			check: func(t *testing.T, got settingsGuardrailJSON) {
 				if !got.Guardrail.Configured || got.Guardrail.Mode != "safe" || got.Guardrail.AllowPrefixesCount != 1 ||

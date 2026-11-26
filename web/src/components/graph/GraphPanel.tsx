@@ -10,8 +10,8 @@
 // polls (runs/changes) stop with the map, as before.
 
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Crosshair, Download, Plus, RefreshCw } from 'lucide-react'
-import { Button, EmptyState, buttonVariants } from '@cyber/ui'
+import { Crosshair, Download, Map as MapIcon, MoreHorizontal, Plus, RefreshCw } from 'lucide-react'
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, buttonVariants } from '@cyber/ui'
 import { cn } from '@cyber/theme'
 import { BoardSummary, MetaRule } from '@/components/BoardCounters'
 import { CommanderCard } from '@/components/CommanderCard'
@@ -22,6 +22,7 @@ import { Page } from '@/components/Page'
 import { ProjectTokens } from '@/components/TokenUsage'
 import { cameraStorageKey } from '@/graph/camera'
 import { useViewWidth } from '@/graph/view-store'
+import { useGraphPalette } from '@/graph/use-palette'
 import type { GraphNode } from '@/graph/model'
 import type { LayoutMode } from '@/graph/sim'
 import { buildTimelineFromSnapshot, revealedCount, timelineGate, revealedIn } from '@/graph/timeline'
@@ -111,6 +112,9 @@ export function GraphPanel({
   // The width is clamped against the *map* (published by the canvas), not the
   // window: the rail and the dock itself leave far less room than innerWidth.
   const stageWidth = useViewWidth()
+  const palette = useGraphPalette()
+  const compactMap = stageWidth > 0 && stageWidth < NARROW_MAP_PX
+  const [minimapOpen, setMinimapOpen] = useState(false)
   const dock = useDockSize(stageWidth)
   const filterCard = useRef<HTMLDivElement | null>(null)
   const filterResize = useGraphCardResize('saker.graph.filterSize', 'bottom-right', filterCard)
@@ -703,7 +707,7 @@ export function GraphPanel({
         // accent（primary），其余 ghost / outline——一条横幅里只有一个主操作。
         <>
           <a
-            className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-1.5 px-3')}
+            className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'hidden gap-1.5 px-3 md:inline-flex')}
             href={`/p/${encodeURIComponent(current)}/api/graph/export`}
             download
             aria-label="导出全图"
@@ -715,7 +719,7 @@ export function GraphPanel({
           <Button
             size="sm"
             variant="outline"
-            className="gap-1.5 px-3"
+            className="hidden gap-1.5 px-3 md:inline-flex"
             aria-label="刷新"
             onClick={refresh}
             title="立即重取最新快照"
@@ -723,6 +727,23 @@ export function GraphPanel({
             <RefreshCw className="h-4 w-4" />
             <span className="whitespace-nowrap">刷新</span>
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="px-2.5 md:hidden" aria-label="更多图谱操作">
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <a href={`/p/${encodeURIComponent(current)}/api/graph/export`} download>
+                  <Download className="size-4" /> 导出全图
+                </a>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={refresh}>
+                <RefreshCw className="size-4" /> 刷新
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </>
       }
       headerClassName="min-h-10 gap-y-1 py-1.5"
@@ -731,6 +752,7 @@ export function GraphPanel({
           390px the other cards wrap around it instead of taking its place. */}
       <GraphCanvas
         ref={canvas}
+        palette={palette}
         model={model}
         selected={selected}
         matches={matches}
@@ -894,25 +916,31 @@ export function GraphPanel({
             </div>
           )}
 
-          <GraphLegend />
+          <GraphLegend palette={palette} />
 
-          <CommanderCard board={board} onOpen={() => onNavigate('decisions')} />
+          <CommanderCard board={board} key={String(compactMap)} compact={compactMap} onOpen={() => onNavigate('decisions')} />
         </div>
       </div>
 
       {/* The minimap shares its corner with the pinned inspector and chat dock. */}
       <div className="saker-graph-corner-br absolute flex flex-col items-end gap-1.5">
         {!node && !chatDock && !listView && (
-          <div className="saker-graph-minimap">
-            <GraphMinimap
+          <div className="saker-graph-minimap flex flex-col items-end gap-1.5">
+            {(!compactMap || minimapOpen) && <GraphMinimap
               model={model}
+              palette={palette}
               layout={layout}
               defaultSide={stageWidth >= 2000 ? 184 : stageWidth >= 1150 ? 160 : undefined}
               live={running > 0 || model.nodes.some((n) => n.status === 'reviewing')}
               matches={matches}
               onCenter={(x, y) => canvas.current?.centerOn(x, y)}
               onFit={() => canvas.current?.fit()}
-            />
+            />}
+            {compactMap && (
+              <Button size="sm" variant="outline" className="bg-card/95 shadow-lifted" aria-expanded={minimapOpen} onClick={() => setMinimapOpen((value) => !value)}>
+                <MapIcon className="size-4" /> 缩略图
+              </Button>
+            )}
           </div>
         )}
       </div>

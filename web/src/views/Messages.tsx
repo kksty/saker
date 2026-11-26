@@ -598,7 +598,9 @@ function ChatMessage({
     message.in_reply_to ||
     (message.fact_refs?.length ?? 0) > 0 ||
     message.notice_intent_id ||
-    (message.redeliveries ?? 0) > 0,
+    (message.redeliveries ?? 0) > 0 ||
+    (message.deliveries?.length ?? 0) > 1 ||
+    Boolean(message.acked_run_id),
   )
   return (
     <article
@@ -653,6 +655,18 @@ function ChatMessage({
               <Badge size="sm" variant="warning" title={`重试已重新注入这条未确认消息 ${message.redeliveries} 次`}>
                 重投 {message.redeliveries}
               </Badge>
+            )}
+            {(message.deliveries?.length ?? 0) > 1 && (
+              <span
+                title={message.deliveries!.map((d, i) => `${i + 1}. run ${d.run_id || '未知'} · ${d.delivery_id || '无投递 id'} · ${d.path || '路径未知'}${d.error ? ` · ${d.error}` : ''}`).join('\n')}
+              >
+                投递 {message.deliveries!.length} 轮
+              </span>
+            )}
+            {message.acked_run_id && (
+              <span title={`已读回执绑定本次投递${message.acked_delivery_id ? `（${message.acked_delivery_id}）` : ''}`}>
+                回执 run <span className="font-mono">{message.acked_run_id}</span>
+              </span>
             )}
             {notice && (
               <>

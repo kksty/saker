@@ -1,10 +1,6 @@
 // DOM tint for intent statuses.
 //
-// The canvas paints fixed dark-theme hues (render.ts CANVAS). The inspector and
-// node panel sit on themed cards, so they must use the app's semantic tokens:
-// the dark values match the canvas, and the light theme keeps enough contrast
-// on a white card. Keeping the map here means the panel, the hover card and any
-// future graph surface agree on one vocabulary.
+// The inspector and node panel use the same semantic tokens as the canvas.
 
 /** Chip classes (border + tint + text) for one intent status. */
 export const INTENT_STATUS_TINT: Record<string, string> = {

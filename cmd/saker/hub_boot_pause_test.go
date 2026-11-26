@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -390,4 +391,71 @@ func boardBody(t *testing.T, k *kit) string {
 		t.Fatalf("board = %d: %s", rec.Code, rec.Body.String())
 	}
 	return rec.Body.String()
+}
+
+// A boot write can fail before the cancellation or between the cancellation
+// and the intent update. Neither partial state permits a new dispatch.
+func TestBootRecoveryWriteFailureKeepsProjectPausedUntilReconciled(t *testing.T) {
+	for _, phase := range []string{"run", "intent"} {
+		t.Run(phase, func(t *testing.T) {
+			mgr, err := project.Open(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			p, err := mgr.Create("fixture", "fixture.invalid")
+			if err != nil {
+				t.Fatal(err)
+			}
+			intentID, runID := seedInterruptedRun(t, p)
+			db, err := sql.Open("sqlite", p.Store.Path())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close()
+			if _, err := db.Exec("CREATE TRIGGER fail_boot BEFORE UPDATE ON objects WHEN NEW.kind='" + phase + "' BEGIN SELECT RAISE(ABORT,'fixture boot failure'); END"); err != nil {
+				t.Fatal(err)
+			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			h := newBootHub(ctx, mgr)
+			h.start()
+			t.Cleanup(func() { shutdownKits(h) })
+			k := h.kits[p.ID]
+			if !p.IsPaused() || p.PauseKindOf() != project.PauseKindRestart || !k.dec.Paused() {
+				t.Fatal("failed reconciliation released the restart pause")
+			}
+			body := boardBody(t, k)
+			if !strings.Contains(body, "restart_recovery_error") || !strings.Contains(body, runID) || !strings.Contains(body, "fixture boot failure") {
+				t.Fatalf("board omitted the failure: %s", body)
+			}
+			run, _ := p.Store.GetRun(runID)
+			want := model.RunRunning
+			if phase == "intent" {
+				want = model.RunCanceled
+			}
+			if run.Status != want {
+				t.Fatalf("after failed %s write, got %s, want %s", phase, run.Status, want)
+			}
+			resume := func() *httptest.ResponseRecorder {
+				rec := httptest.NewRecorder()
+				k.mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/project/resume", nil))
+				return rec
+			}
+			if rec := resume(); rec.Code != http.StatusConflict || !p.IsPaused() || len(p.Store.Runs()) != 1 {
+				t.Fatalf("resume during failure = %d %s", rec.Code, rec.Body.String())
+			}
+			if _, err := db.Exec("DROP TRIGGER fail_boot"); err != nil {
+				t.Fatal(err)
+			}
+			if rec := resume(); rec.Code != http.StatusOK || p.IsPaused() {
+				t.Fatalf("resume after repair = %d %s", rec.Code, rec.Body.String())
+			}
+			in, _ := p.Store.GetIntent(intentID)
+			run, _ = p.Store.GetRun(runID)
+			if in.Status != model.StatusPending || in.RunID != runID || run.Status != model.RunCanceled || len(p.Store.Runs()) != 1 {
+				t.Fatalf("reconciliation after retry: intent=%+v run=%+v", in, run)
+			}
+		})
+	}
 }

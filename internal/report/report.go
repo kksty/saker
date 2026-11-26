@@ -66,9 +66,15 @@ const DefaultStaleAfter = 30 * 24 * time.Hour
 
 // Finding is one line of findings.json: the machine-readable half of a report.
 type Finding struct {
-	Fact    string `json:"fact"`
-	Verdict string `json:"verdict"`
-	Title   string `json:"title"`
+	Fact string `json:"fact"`
+	// FactClaimVersion is the claim version the row was written against. It
+	// makes a report citation a (fact id, assertion version) pair: a later
+	// correction does not silently turn an old report into coverage of the new
+	// claim. Rows written before this field are version-unknown, never assumed
+	// current.
+	FactClaimVersion uint64 `json:"fact_claim_version,omitempty"`
+	Verdict          string `json:"verdict"`
+	Title            string `json:"title"`
 	// Severity is copied from the fact's current label, never invented by the
 	// writing run: the report may not grade a conclusion higher than the ledger.
 	// Empty means the fact is ungraded.
@@ -581,13 +587,16 @@ type rejectedView struct {
 }
 
 type factView struct {
-	ID      string `json:"id"`
-	Kind    string `json:"kind"`
-	Title   string `json:"title"`
-	Summary string `json:"summary"`
-	Doc     string `json:"doc,omitempty"`
-	Surface string `json:"surface,omitempty"`
-	Status  string `json:"status"`
+	ID   string `json:"id"`
+	Kind string `json:"kind"`
+	// ClaimVersion is the assertion the report writer saw. The finding row must
+	// copy it so the citation stays bound to the content it described.
+	ClaimVersion uint64 `json:"claim_version"`
+	Title        string `json:"title"`
+	Summary      string `json:"summary"`
+	Doc          string `json:"doc,omitempty"`
+	Surface      string `json:"surface,omitempty"`
+	Status       string `json:"status"`
 	// Severity is the fact's current label, carried into the snapshot so the
 	// writer copies it instead of judging the conclusion itself.
 	Severity string   `json:"severity,omitempty"`
@@ -643,7 +652,7 @@ func writeSnapshot(dir string, db store.DB, evidence map[string][]string, scope 
 	}
 	for _, f := range reportable(db.Facts) {
 		v := factView{
-			ID: f.ID, Kind: f.Kind, Title: f.Title, Summary: f.Summary,
+			ID: f.ID, ClaimVersion: f.ClaimVersion, Kind: f.Kind, Title: f.Title, Summary: f.Summary,
 			Doc: f.Doc, Status: f.Status, Severity: f.Severity,
 			Evidence: evidence[f.ID], Refs: f.Refs,
 		}
@@ -688,6 +697,124 @@ func SafePath(dir, rel string) (string, bool) {
 	return safeJoin(dir, rel)
 }
 
+// Evidence issue kinds. The API shows them as machine codes; the generator's
+// own error strings use the same classification so the preflight shown before
+// generation and the refusal during generation cannot disagree.
+const (
+	EvidenceMissing        = "missing"         // the file (or its ledger row) is not there
+	EvidenceDigestMismatch = "digest_mismatch" // the bytes are not the admitted proof
+	EvidenceUnreadable     = "unreadable"      // the file exists but cannot be read
+	EvidenceNoLedgerRow    = "no_ledger_row"   // an evidence id with no ledger row
+)
+
+// EvidenceIssue is one reason a report could not carry a cited proof. FactIDs
+// names every conclusion that rests on the broken evidence, so the operator can
+// fix (or reject) the right facts without reading the report writer's log.
+type EvidenceIssue struct {
+	Evidence string   `json:"evidence,omitempty"`
+	URI      string   `json:"uri,omitempty"`
+	FactIDs  []string `json:"fact_ids,omitempty"`
+	Kind     string   `json:"kind"`
+	Detail   string   `json:"detail,omitempty"`
+}
+
+// EvidenceIssues lists the evidence originals a report would cite but cannot
+// trust: files that are gone, files whose bytes no longer match the digest the
+// ledger recorded, and ids with no ledger row. The two operator problems are
+// kept apart — restore the file vs. the preserved proof was altered — because
+// the way out is different.
+//
+// One evidence id is one issue even when several conclusions cite it: the facts
+// are attached to that issue instead of repeating the same broken path.
+func EvidenceIssues(caseRoot string, db store.DB) (missing, conflicts []EvidenceIssue) {
+	byID := make(map[string]model.Evidence, len(db.Evidence))
+	for _, e := range db.Evidence {
+		byID[e.ID] = e
+	}
+	missingAt := map[string]int{}
+	conflictAt := map[string]int{}
+	for _, f := range reportable(db.Facts) {
+		for _, eid := range f.EvidenceIDs {
+			e, ok := byID[eid]
+			if !ok {
+				if at, seen := missingAt[eid]; seen {
+					missing[at].FactIDs = appendUnique(missing[at].FactIDs, f.ID)
+				} else {
+					missingAt[eid] = len(missing)
+					missing = append(missing, EvidenceIssue{
+						Evidence: eid, FactIDs: []string{f.ID}, Kind: EvidenceNoLedgerRow,
+						Detail: "图谱里没有这一行",
+					})
+				}
+				continue
+			}
+			err := evidence.Verify(caseRoot, e)
+			switch {
+			case err == nil:
+			case errors.Is(err, evidence.ErrDigestMismatch):
+				if at, seen := conflictAt[eid]; seen {
+					conflicts[at].FactIDs = appendUnique(conflicts[at].FactIDs, f.ID)
+				} else {
+					conflictAt[eid] = len(conflicts)
+					conflicts = append(conflicts, EvidenceIssue{
+						Evidence: eid, URI: e.URI, FactIDs: []string{f.ID}, Kind: EvidenceDigestMismatch,
+						Detail: "保全副本已被改动",
+					})
+				}
+			case errors.Is(err, evidence.ErrMissing), errors.Is(err, evidence.ErrOutside):
+				if at, seen := missingAt[eid]; seen {
+					missing[at].FactIDs = appendUnique(missing[at].FactIDs, f.ID)
+				} else {
+					missingAt[eid] = len(missing)
+					missing = append(missing, EvidenceIssue{
+						Evidence: eid, URI: e.URI, FactIDs: []string{f.ID}, Kind: EvidenceMissing,
+						Detail: "原件不在",
+					})
+				}
+			default:
+				if at, seen := missingAt[eid]; seen {
+					missing[at].FactIDs = appendUnique(missing[at].FactIDs, f.ID)
+				} else {
+					missingAt[eid] = len(missing)
+					missing = append(missing, EvidenceIssue{
+						Evidence: eid, URI: e.URI, FactIDs: []string{f.ID}, Kind: EvidenceUnreadable,
+						Detail: err.Error(),
+					})
+				}
+			}
+		}
+	}
+	return missing, conflicts
+}
+
+func appendUnique(values []string, add string) []string {
+	for _, v := range values {
+		if v == add {
+			return values
+		}
+	}
+	return append(values, add)
+}
+
+// evidenceProblemText is the human sentence both the preflight and the copy path
+// use for one structured issue.
+func evidenceProblemText(i EvidenceIssue) string {
+	facts := strings.Join(i.FactIDs, "、")
+	switch i.Kind {
+	case EvidenceNoLedgerRow:
+		return i.Evidence + "（图谱里没有这一行；事实 " + facts + "）"
+	case EvidenceDigestMismatch:
+		return i.Evidence + "（" + i.URI + "；事实 " + facts + "）"
+	case EvidenceUnreadable:
+		return i.URI + "（事实 " + facts + "；无法读取：" + i.Detail + "）"
+	default:
+		if i.URI == "" {
+			return i.Evidence + "（事实 " + facts + "）"
+		}
+		return i.URI + "（事实 " + facts + "）"
+	}
+}
+
 // Preflight answers whether a report could be generated at all, without
 // spending a model run. The API uses it to fail fast with a useful message.
 func (g *Generator) Preflight() error {
@@ -705,45 +832,22 @@ func (g *Generator) preflight() error {
 	}
 	// Checked here, synchronously, so the operator sees it as a 409 instead of
 	// a line in the server log while the request returns 202 (D45).
-	missing, conflicts := g.evidenceProblems(db, facts)
+	missing, conflicts := EvidenceIssues(g.CaseRoot, db)
 	if len(conflicts) > 0 {
-		return digestConflictError(conflicts)
+		return digestConflictError(issueTexts(conflicts))
 	}
 	if len(missing) > 0 {
-		return missingEvidenceError(missing)
+		return missingEvidenceError(issueTexts(missing))
 	}
 	return nil
 }
 
-// evidenceProblems lists the evidence originals a report would cite but cannot
-// trust: files that are gone, and files whose bytes no longer match the digest
-// the ledger recorded. The two are different operator problems — restore the
-// file vs. the preserved proof was altered — so they are never merged.
-func (g *Generator) evidenceProblems(db store.DB, facts []model.Fact) (missing, conflicts []string) {
-	byID := make(map[string]model.Evidence, len(db.Evidence))
-	for _, e := range db.Evidence {
-		byID[e.ID] = e
+func issueTexts(issues []EvidenceIssue) []string {
+	out := make([]string, 0, len(issues))
+	for _, i := range issues {
+		out = append(out, evidenceProblemText(i))
 	}
-	for _, f := range facts {
-		for _, eid := range f.EvidenceIDs {
-			e, ok := byID[eid]
-			if !ok {
-				missing = append(missing, eid+"（图谱里没有这一行）")
-				continue
-			}
-			err := evidence.Verify(g.CaseRoot, e)
-			switch {
-			case err == nil:
-			case errors.Is(err, evidence.ErrDigestMismatch):
-				conflicts = append(conflicts, eid+"（"+e.URI+"）")
-			case errors.Is(err, evidence.ErrMissing), errors.Is(err, evidence.ErrOutside):
-				missing = append(missing, e.URI+"（事实 "+f.ID+"）")
-			default:
-				missing = append(missing, e.URI+"（无法读取："+err.Error()+"）")
-			}
-		}
-	}
-	return missing, conflicts
+	return out
 }
 
 // missingEvidenceError is the one sentence both the preflight and the copy path

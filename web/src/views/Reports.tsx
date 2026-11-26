@@ -25,7 +25,8 @@ import { ApiError, api } from '@/lib/api'
 import { fmtInt, fmtTime, severityLabel, severityVariant, statusKind, statusLabel } from '@/lib/format'
 import { useLoad, usePoll, useConsoleLocation } from '@/lib/hooks'
 import { navigate } from '@/lib/navigation'
-import { factHref, precheckVerdict, unreportedView, withReportParam } from '@/lib/report-trace'
+import { evidenceProblems, factHref, precheckVerdict, unreportedView, withReportParam } from '@/lib/report-trace'
+import type { EvidenceProblemView } from '@/lib/report-trace'
 import { tallyFindingSeverities } from '@/lib/report-severity'
 import { useSessionState } from '@/lib/session-state'
 import type { Fact, ReportFinding, ReportMeta, ReportPrecheck } from '@/lib/types'
@@ -93,6 +94,10 @@ export function Reports({
   // The reason a precheck read failed. Kept apart from the generic poll error:
   // this one stops generation until the operator chooses retry or proceed.
   const [precheckIssue, setPrecheckIssue] = useState('')
+  // Generation-time evidence problems: the same verification the report itself
+  // runs, shown before a run is queued so a missing original or altered digest
+  // names its evidence id and facts first.
+  const [evidenceIssue, setEvidenceIssue] = useState<EvidenceProblemView[]>([])
   const queueLock = useRef(false)
 
   /** Queue the actual report run (the "生成报告" path, and "仍然生成"). */
@@ -122,11 +127,14 @@ export function Reports({
     setBusy(true)
     setNote('')
     setPrecheckIssue('')
+    setEvidenceIssue([])
     try {
       let precheck: ReportPrecheck | undefined
       let readError = ''
       try {
-        precheck = await api.reportPrecheck()
+        // The generation path asks for the full check; the 4 s poll above stays
+        // on the light count so a large evidence set is not re-hashed forever.
+        precheck = await api.reportPrecheckEvidence()
       } catch (e) {
         readError = e instanceof Error ? e.message : String(e)
       }
@@ -145,6 +153,14 @@ export function Reports({
       if (verdict.kind === 'running') {
         setNote('报告正在生成，将自动更新列表。')
         progress.reload()
+        return
+      }
+      // Evidence problems are blocking facts about the deliverable, not advice:
+      // the final generation would refuse for the same reason, so stop here and
+      // name the evidence and the conclusions it supports.
+      const problems = evidenceProblems(verdict.precheck)
+      if (problems.length > 0) {
+        setEvidenceIssue(problems)
         return
       }
       if (verdict.precheck.unverified > 0 && !verdict.precheck.reviews_disabled) {
@@ -212,6 +228,35 @@ export function Reports({
         </Callout>
       )}
       {note && <Callout tone="info" className="mb-3">{note}</Callout>}
+
+      {evidenceIssue.length > 0 && (
+        <Callout tone="destructive" className="mb-3" data-testid="evidence-precheck">
+          <div className="font-medium">证据不完整，报告不能生成</div>
+          <p className="mt-1 text-[12px] leading-relaxed">
+            生成前的完整校验找到 {evidenceIssue.length} 处证据问题。最终生成会因同样原因拒绝；补回原件，或把对应事实判为不成立（review reject）后再生成。
+          </p>
+          <ul className="mt-2 space-y-1.5 text-[12px] leading-5">
+            {evidenceIssue.map((issue) => (
+              <li key={`${issue.kind}:${issue.id}`} className="saker-break">
+                <span className="font-mono text-ink">{issue.id}</span>
+                <span className="text-ink-2"> · {issue.label}</span>
+                {issue.uri && issue.uri !== issue.id && <span className="text-ink-3"> · {issue.uri}</span>}
+                {issue.facts.length > 0 && (
+                  <span className="text-ink-2">
+                    {' '}· 关联事实：
+                    {issue.facts.map((id, index) => (
+                      <span key={id}>
+                        {index > 0 ? '、' : ''}
+                        <FactRef id={id} onOpenFact={onOpenFact} />
+                      </span>
+                    ))}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Callout>
+      )}
 
       {/* A failed precheck read is a decision point, not a silent fallback: the
           operator either retries the check or says "generate anyway". */}
@@ -314,6 +359,12 @@ export function Reports({
                       <li key={item.fact} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[12px] leading-5">
                         <FactRef id={item.fact} onOpenFact={onOpenFact} />
                         <span className="saker-break min-w-0 flex-1 text-ink-2">{item.title || '（没有标题）'}</span>
+                        {item.previous.length > 0 && (
+                          <span className="basis-full text-[11px] leading-relaxed text-ink-3">
+                            历史报告 {item.previous.map((p) => (p.claimVersion ? `${p.report}（v${p.claimVersion}）` : `${p.report}（版本未知）`)).join('、')}
+                            引用过旧断言；当前断言尚未收录。
+                          </span>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -337,6 +388,12 @@ export function Reports({
               <p className="text-[11px] leading-relaxed text-ink-3" data-testid="precheck-uncounted">
                 <span className="text-warning">未通过自身校验的报告 {unreported.uncounted.length} 份</span>
                 （{unreported.uncounted.join('、')}）：它们的引用不计入差额——没通过校验的报告不算已交付。
+              </p>
+            )}
+            {unreported.unknownVersionReports.length > 0 && (
+              <p className="text-[11px] leading-relaxed text-ink-3" data-testid="precheck-unknown-version">
+                <span className="text-warning">版本未知的报告 {unreported.unknownVersionReports.length} 份</span>
+                （{unreported.unknownVersionReports.join('、')}）：写入时还没记录断言版本，不能算作当前断言的覆盖；需要重新生成报告才会按版本收录。
               </p>
             )}
           </div>
@@ -755,6 +812,9 @@ function ReportSheetBody({ report, onOpenFact }: { report: ReportMeta; onOpenFac
                           title with no ledger row behind it (the trace's ①). */}
                       {f.fact && <FactRef id={f.fact} onOpenFact={onOpenFact} />}
                       <span className="shrink-0 font-mono text-[11px] text-ink-3">{f.verdict}</span>
+                      <span className="shrink-0 text-[11px] text-ink-3">
+                        {f.fact_claim_version ? `断言 v${f.fact_claim_version}` : '断言版本未知'}
+                      </span>
                     </li>
                   ))}
                 </ul>

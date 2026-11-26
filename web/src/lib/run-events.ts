@@ -56,7 +56,11 @@ export function eventOutcome(event: Event): EventOutcome {
     if(event.ok===false)return 'failed'
     return 'unknown'
   }
-  if(event.kind==='turn_ended'&&!!event.stop_reason&&!['completed','done'].includes(event.stop_reason))return 'failed'
+  if (event.kind === 'turn_ended') {
+    if (event.ok === false) return 'failed'
+    const reason = event.stop_reason
+    if (reason && !['completed', 'done', 'end_turn'].includes(reason)) return 'failed'
+  }
   return 'ok'
 }
 

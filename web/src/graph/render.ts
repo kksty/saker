@@ -19,6 +19,10 @@
 import type { GraphEdge, GraphNode, IntentOrigin } from './model.ts'
 import { edgeKindLabel } from './model.ts'
 import { revealedIn } from './timeline.ts'
+import { DEFAULT_GRAPH_PALETTE, type GraphPalette } from './palette.ts'
+
+export { CANVAS } from './palette.ts'
+export const { facts: FACT_COLORS, intents: INTENT_COLORS, edges: EDGE_COLORS } = DEFAULT_GRAPH_PALETTE
 import { radiusOf, type DepthBand } from './sim.ts'
 
 export interface Camera {
@@ -46,6 +50,7 @@ export function dotRadius(n: GraphNode, camK: number): number {
 }
 
 export interface PaintOptions {
+  palette?: GraphPalette
   ctx: CanvasRenderingContext2D
   width: number
   height: number
@@ -111,76 +116,6 @@ export interface PaintOptions {
   leftInset?: number
 }
 
-// ---------------------------------------------------------------------------
-// Palette. The canvas paints the same dark console the DOM does, so its colours
-// are the app.css token values: canvas #0a0c10, surface #11151c, hairline
-// #1b2129, ink #e7eaf0/#a9b2c1/#788294, primary #f2554d, success #3dd68c,
-// warning #e5b53c, caution #f0883e, info #6cb6ff, review #2dd4bf, ai #b388ff,
-// stopped #de93b2.
-// `nodeColor` and `edgeColor` stay the only place a colour is chosen, and the
-// legend imports the same tables instead of re-declaring hexes that drift from
-// the brush.
-// ---------------------------------------------------------------------------
-export const CANVAS = {
-  background: '#0a0c10',
-  surface: '#11151c',
-  hairline: '#1b2129',
-  ink: '#e7eaf0',
-  ink2: '#a9b2c1',
-  ink3: '#788294',
-  primary: '#f2554d',
-  success: '#3dd68c',
-  warning: '#e5b53c',
-  caution: '#f0883e',
-  info: '#6cb6ff',
-  review: '#2dd4bf',
-  ai: '#b388ff',
-  stopped: '#de93b2',
-} as const
-
-// Solid red + marching dashes + a travelling comet is the live execution hue.
-// Teal + a slow breathing frame is "independent verification in progress": it
-// must not borrow the blue hard-gate hue. Blue is the gate hue, and only as a
-// *solid* line: a blocked premise is dotted red (gate currently unsatisfied),
-// and a reviewing direction's produced-fact edge is dashed teal. A failed intent
-// is not executing anything, so it gets the ai hue instead of the live red.
-export const FACT_COLORS: Record<string, string> = {
-  vuln: CANVAS.primary,
-  cred: CANVAS.ai,
-  host: CANVAS.info,
-  service: CANVAS.success,
-  loot: CANVAS.warning,
-  artifact: CANVAS.caution,
-  note: CANVAS.ink3,
-}
-
-export const INTENT_COLORS: Record<string, string> = {
-  running: CANVAS.primary,
-  // Pre-run / waiting family: pending, claimed and waiting have no live work
-  // yet, so they share amber. They are separated by the status label and by
-  // the dashed produced edge; review_failed keeps its own orange.
-  claimed: CANVAS.warning,
-  pending: CANVAS.warning,
-  waiting: CANVAS.warning,
-  // Reviewing is the verification hue (teal), deliberately not the premise
-  // gate's blue. Its intent edges are dashed, so a solid blue line still only
-  // means 必要前提.
-  reviewing: CANVAS.review,
-  done: CANVAS.success,
-  failed: CANVAS.ai,
-  review_failed: CANVAS.caution,
-  parked: CANVAS.ink3,
-  // Not a ledger status: `failed`/`pending` with hold=true, i.e. an explicit
-  // stop. It gets its own hue (and the 已停止 label) so a policy stop never
-  // reads as a failed attempt.
-  stopped: CANVAS.stopped,
-}
-
-// Green is the "reading choice" family: a reference is a dashed green line, a
-// pin is the same hue as a solid double line, so the operator never has to guess
-// whether a relation is a gate (blue premise) or context they asked to see.
-export const PIN_COLOR = 'rgba(61,214,140,0.95)'
-export const REFERENCE_COLOR = 'rgba(61,214,140,0.82)'
 /**
  * 选中后的“冷”不透明度：0.06 时非邻域只剩一层几乎看不见的底纹，选中的链满亮、
  * 一跳旁支半亮——三档一眼分得开。0.38 那版“被压暗”但仍会抢注意力，0.12 那版
@@ -244,18 +179,6 @@ export function focusColdAlpha(mix: number): number {
   return 1 - (1 - FOCUS_COLD_ALPHA) * m
 }
 
-export const KEYBOARD_FOCUS_RING = 'rgba(108,182,255,0.95)'
-export const REVIEW_RING = 'rgba(229,181,60,0.9)'
-export const MATCH_RING = 'rgba(242,85,77,0.7)'
-/** The active search hit: full-alpha, doubled, so ↑↓ has a visible target. */
-export const ACTIVE_MATCH_RING = 'rgba(242,85,77,0.95)'
-export const HOVER_RING = 'rgba(231,234,240,0.42)'
-/** The standing marker on the selected node. Full alpha, drawn last: the panel
- *  says what is selected, but the map has to keep showing *where* it is after
- *  the pointer moves away. Shape as well as colour, so it survives colour-blind
- *  viewing, the dark theme and the narrow layout. */
-export const SELECTION_RING = 'rgba(236,240,248,0.95)'
-
 /** Which nodes dim, and by how much.
  *
  *  A selected node dims everything outside its focus set, but a **search hit
@@ -298,44 +221,6 @@ export function chainDimAlpha(
   return focusAlpha(id, { focus: o.focus, matches: o.matches, focusMix: o.coldDim ? o.focusMix : 0 })
 }
 
-/** The relation colours the legend has to explain, in one place. */
-export const EDGE_COLORS = {
-  produced: 'rgba(242,85,77,0.45)',
-  brief: 'rgba(120,130,148,0.65)',
-  host: 'rgba(120,130,148,0.5)',
-  goal: 'rgba(229,181,60,0.62)',
-  // A hard prerequisite is context, not the subject: faded (and drawn before
-  // the intent chain) so its blue reads as scaffolding instead of covering the
-  // other lines. A blocked gate keeps its stronger red on purpose.
-  premise: 'rgba(108,182,255,0.72)',
-  // A premise whose source fact has not passed a review is a blocked gate, not
-  // a normal prerequisite. Red is otherwise the live-execution hue, so this is
-  // a dotted red: "hard gate, currently unsatisfied", not "running".
-  premiseBlocked: 'rgba(242,85,77,0.85)',
-  reference: REFERENCE_COLOR,
-  pin: PIN_COLOR,
-  supports: 'rgba(229,181,60,0.7)',
-} as const
-
-/** Boundary leaves keep a glyph per reason they are not on the map. */
-export const BOUNDARY_COLORS = {
-  not_loaded: CANVAS.ink3,
-  missing: 'rgba(242,85,77,0.72)',
-  rejected: 'rgba(179,136,255,0.72)',
-  withdrawn: 'rgba(229,181,60,0.72)',
-} as const
-
-export const PROJECT_COLOR = CANVAS.ink3
-export const GOAL_COLORS = { met: CANVAS.success, open: CANVAS.warning } as const
-
-// 发起者 is the graph's *second* channel: status colour stays the first one, so
-// these marks are shape-only and neutral — reading them never depends on hue.
-// The one outlier (unknown/legacy) draws nothing: an empty created_by is not a
-// fourth role, and a "?" on every historical row would be noise, not information.
-export const ORIGIN_MARKER_COLOR = 'rgba(231,234,240,0.9)'
-/** Native-subagent satellites: neutral by design (temporary helper, not work). */
-export const HELPER_MARKER_COLOR = 'rgba(231,234,240,0.8)'
-
 /** The shape drawn for one provenance class; null = no mark at all. */
 export type OriginMarker = 'diamond' | 'circle' | 'double-ring' | null
 
@@ -352,54 +237,54 @@ export function originMarker(origin: IntentOrigin | undefined): OriginMarker {
   }
 }
 
-export function nodeColor(n: GraphNode): string {
+export function nodeColor(n: GraphNode, palette = DEFAULT_GRAPH_PALETTE): string {
   if (n.type === 'ghost' || n.type === 'step' || n.type === 'intent') {
-    if (n.stopped) return INTENT_COLORS.stopped
-    return INTENT_COLORS[n.status ?? ''] ?? CANVAS.ink3
+    if (n.stopped) return palette.intents.stopped
+    return palette.intents[n.status ?? ''] ?? palette.colors.ink3
   }
-  if (n.type === 'goal') return n.status === 'met' ? GOAL_COLORS.met : GOAL_COLORS.open
+  if (n.type === 'goal') return n.status === 'met' ? palette.goals.met : palette.goals.open
   // A boundary leaf is not a fact: its colour says why it is not on the map.
   // not_loaded is expandable; missing is gone from the ledger; rejected exists
   // but was explicitly negated. The same grey for all three hid the difference.
   if (n.type === 'boundary') {
-    if (n.boundaryState === 'missing') return BOUNDARY_COLORS.missing
-    if (n.boundaryState === 'rejected') return BOUNDARY_COLORS.rejected
-    if (n.boundaryState === 'withdrawn') return BOUNDARY_COLORS.withdrawn
-    return BOUNDARY_COLORS.not_loaded
+    if (n.boundaryState === 'missing') return palette.boundaries.missing
+    if (n.boundaryState === 'rejected') return palette.boundaries.rejected
+    if (n.boundaryState === 'withdrawn') return palette.boundaries.withdrawn
+    return palette.boundaries.not_loaded
   }
-  return FACT_COLORS[n.kind ?? ''] ?? CANVAS.ink3
+  return palette.facts[n.kind ?? ''] ?? palette.colors.ink3
 }
 
-function edgeColor(e: GraphEdge): string {
+function edgeColor(e: GraphEdge, palette: GraphPalette): string {
   const kind = e.kind
   if (kind === 'intent') {
-    if (e.stopped) return INTENT_COLORS.stopped
-    return INTENT_COLORS[e.status ?? ''] ?? CANVAS.ink3
+    if (e.stopped) return palette.intents.stopped
+    return palette.intents[e.status ?? ''] ?? palette.colors.ink3
   }
   switch (kind) {
     case 'brief':
-      return EDGE_COLORS.brief
+      return palette.edges.brief
     case 'host':
-      return EDGE_COLORS.host
+      return palette.edges.host
     case 'goal':
-      return EDGE_COLORS.goal
+      return palette.edges.goal
     // Solid blue = a hard prerequisite; a reference must never borrow that
     // colour. A blocked gate (unreviewable/unverified/missing source) is dotted
     // red — never the live-execution red.
     case 'premise':
-      return e.blocked ? EDGE_COLORS.premiseBlocked : EDGE_COLORS.premise
+      return e.blocked ? palette.edges.premiseBlocked : palette.edges.premise
     // Green dashed = a reading choice (reference); green solid double = a pin.
     case 'reference':
-      return REFERENCE_COLOR
+      return palette.edges.reference
     case 'pin':
-      return PIN_COLOR
+      return palette.edges.pin
     // Gold = a fact that backs an achieved goal's evidence.
     case 'supports':
-      return EDGE_COLORS.supports
+      return palette.edges.supports
     // Unknown/legacy relation kind: keep the historical quiet produced stroke.
     // The console never invents a new relation colour for a kind it does not know.
     default:
-      return EDGE_COLORS.produced
+      return palette.edges.produced
   }
 }
 
@@ -422,7 +307,7 @@ export interface EdgeStyle {
  *     premise blue, so a colour never has to be decoded from the shape;
  *   - references and goal support are dashed families of their own.
  */
-export function edgeStyle(e: GraphEdge): EdgeStyle {
+export function edgeStyle(e: GraphEdge, palette = DEFAULT_GRAPH_PALETTE): EdgeStyle {
   const intentEdge = e.kind === 'intent'
   const dashed =
     (intentEdge &&
@@ -434,7 +319,7 @@ export function edgeStyle(e: GraphEdge): EdgeStyle {
     (e.kind === 'premise' && Boolean(e.blocked)) ||
     e.kind === 'reference' ||
     e.kind === 'supports'
-  return { color: edgeColor(e), dashed }
+  return { color: edgeColor(e, palette), dashed }
 }
 
 /** Horizontal half-extent of the drawn shape: where an edge may touch it. */
@@ -888,10 +773,11 @@ const curveCache = new GeometryCache<EdgeCurve>()
 // ---------------------------------------------------------------------------
 
 const BACKGROUND_GAP = 26
-const patternCache = new WeakMap<CanvasRenderingContext2D, CanvasPattern | null>()
+const patternCache = new WeakMap<CanvasRenderingContext2D, { color: string; pattern: CanvasPattern | null }>()
 
-function dotPattern(ctx: CanvasRenderingContext2D): CanvasPattern | null {
-  if (patternCache.has(ctx)) return patternCache.get(ctx) ?? null
+function dotPattern(ctx: CanvasRenderingContext2D, color: string): CanvasPattern | null {
+  const cached = patternCache.get(ctx)
+  if (cached?.color === color) return cached.pattern
   let pattern: CanvasPattern | null = null
   try {
     const doc = typeof document !== 'undefined' ? document : null
@@ -901,7 +787,7 @@ function dotPattern(ctx: CanvasRenderingContext2D): CanvasPattern | null {
       tile.height = BACKGROUND_GAP
       const tileCtx = tile.getContext('2d')
       if (tileCtx) {
-        tileCtx.fillStyle = 'rgba(169,178,193,0.10)'
+        tileCtx.fillStyle = color
         tileCtx.fillRect(0, 0, 1, 1)
         pattern = ctx.createPattern(tile, 'repeat')
       }
@@ -909,7 +795,7 @@ function dotPattern(ctx: CanvasRenderingContext2D): CanvasPattern | null {
   } catch {
     pattern = null
   }
-  patternCache.set(ctx, pattern)
+  patternCache.set(ctx, { color, pattern })
   return pattern
 }
 
@@ -918,12 +804,14 @@ function paintBackground(
   width: number,
   height: number,
   cam: Camera,
-  _motion: boolean,
+  palette: GraphPalette,
 ): void {
   // 背景回到星云之前的样子：底色 + 点阵。星图观感只留在力导向的节点、光晕与航道里。
   const ox = cam.x % BACKGROUND_GAP
   const oy = cam.y % BACKGROUND_GAP
-  const pattern = dotPattern(ctx)
+  ctx.fillStyle = palette.colors.background
+  ctx.fillRect(0, 0, width, height)
+  const pattern = dotPattern(ctx, palette.dots)
   if (pattern) {
     ctx.save()
     ctx.fillStyle = pattern
@@ -935,7 +823,7 @@ function paintBackground(
     return
   }
   // No DOM (node tests never paint; this is for exotic 2d implementations).
-  ctx.fillStyle = 'rgba(169,178,193,0.10)'
+  ctx.fillStyle = palette.dots
   for (let x = ox; x < width; x += BACKGROUND_GAP) {
     for (let y = oy; y < height; y += BACKGROUND_GAP) {
       ctx.fillRect(x, y, 1, 1)
@@ -966,6 +854,7 @@ function drawStatusCross(
   n: GraphNode,
   radius: number,
   camK: number,
+  background: string,
 ): void {
   const d = radius * 0.6
   ctx.beginPath()
@@ -973,7 +862,7 @@ function drawStatusCross(
   ctx.lineTo(n.x + d, n.y + d)
   ctx.moveTo(n.x + d, n.y - d)
   ctx.lineTo(n.x - d, n.y + d)
-  ctx.strokeStyle = CANVAS.background
+  ctx.strokeStyle = background
   ctx.lineWidth = 1.6 / Math.max(camK, 0.5)
   ctx.stroke()
 }
@@ -1135,10 +1024,11 @@ function edgesInDrawOrder(edges: readonly GraphEdge[]): GraphEdge[] {
 }
 
 export function paint(o: PaintOptions) {
-  const { ctx, width, height, dpr, cam, nodes, edges, byId } = o
+  const { ctx, width, height, dpr, cam, nodes, edges, byId, palette = DEFAULT_GRAPH_PALETTE } = o
+  const { colors, rings } = palette
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  ctx.clearRect(0, 0, width, height)
-  paintBackground(ctx, width, height, cam, o.motion)
+  ctx.globalAlpha = 1
+  paintBackground(ctx, width, height, cam, palette)
 
   const vp = viewportOf(cam, width, height)
   const level = lod(cam.k, { layered: o.layered, showLabels: o.showLabels })
@@ -1196,12 +1086,12 @@ export function paint(o: PaintOptions) {
     })
     for (const [i, lane] of lanes.entries()) {
       if (lane.right < vp.x0 || lane.left > vp.x1) continue
-      ctx.globalAlpha = i % 2 === 0 ? 0.5 : 0.22
-      ctx.fillStyle = CANVAS.surface
-      ctx.fillRect(lane.left, top, lane.right - lane.left, bottom - top)
+      if (i % 2 === 0) {
+        ctx.fillStyle = palette.band
+        ctx.fillRect(lane.left, top, lane.right - lane.left, bottom - top)
+      }
       if (i < lanes.length - 1) {
-        ctx.globalAlpha = 0.5
-        ctx.strokeStyle = 'rgba(120,130,148,0.4)'
+        ctx.strokeStyle = palette.divider
         ctx.lineWidth = 1 / Math.max(cam.k, 0.5)
         ctx.setLineDash([2 / cam.k, 8 / cam.k])
         ctx.beginPath()
@@ -1268,15 +1158,15 @@ export function paint(o: PaintOptions) {
     if (tier === 'budget' && !takeLabel(false)) return
     boxes.insert(box)
     ctx.globalAlpha = alpha * 0.92
-    ctx.fillStyle = 'rgba(10,12,16,0.75)'
+    ctx.fillStyle = palette.labelBg
     if (flip) {
       ctx.fillRect(n.x - r - 4 - w - 6, n.y - 8, w + 6, 16)
-      ctx.fillStyle = 'rgba(231,234,240,0.92)'
+      ctx.fillStyle = palette.labelInk
       ctx.textAlign = 'right'
       ctx.fillText(text, n.x - r - 7, n.y + 0.5)
     } else {
       ctx.fillRect(n.x + r + 4, n.y - 8, w + 6, 16)
-      ctx.fillStyle = 'rgba(231,234,240,0.92)'
+      ctx.fillStyle = palette.labelInk
       ctx.fillText(text, n.x + r + 7, n.y + 0.5)
     }
   }
@@ -1329,7 +1219,7 @@ export function paint(o: PaintOptions) {
     if (!level.shapes) {
       // Dot-level zoom: one straight line, no curve, dashes, arrows or comets.
       ctx.globalAlpha = alpha
-      ctx.strokeStyle = edgeStyle(e).color
+      ctx.strokeStyle = edgeStyle(e, palette).color
       ctx.lineWidth = (isSel || isHover ? 2.4 : 1.3) / Math.max(cam.k, 0.5)
       ctx.setLineDash([])
       ctx.lineDashOffset = 0
@@ -1340,7 +1230,7 @@ export function paint(o: PaintOptions) {
       continue
     }
 
-    const style = edgeStyle(e)
+    const style = edgeStyle(e, palette)
     // 航道的光：只在被聚焦的那几条线上加一层宽而淡的描边，读起来像亮着的航道，
     // 而不是给 798 条边各画一遍光（那会直接吃掉每帧预算）。
     if (emphasized) {
@@ -1383,7 +1273,7 @@ export function paint(o: PaintOptions) {
     if (intentEdge || kind === 'brief') {
       ctx.save()
       ctx.globalAlpha = alpha * 0.85
-      ctx.strokeStyle = 'rgba(5,7,10,0.85)'
+      ctx.strokeStyle = palette.labelBg
       ctx.lineWidth = ctx.lineWidth + 2.6 / Math.max(cam.k, 0.5)
       ctx.setLineDash([])
       traceCurve(ctx, curve)
@@ -1461,7 +1351,7 @@ export function paint(o: PaintOptions) {
     // Travelling comet: the live work visibly moves from context to output.
     if (running && o.motion) {
       const phase = (o.time / 1100 + hashString(e.id) * 0.7) % 1
-      drawComet(ctx, o, curve, phase, style.color)
+      drawComet(ctx, o, curve, phase, style.color, palette.labelInk)
     }
   }
   ctx.setLineDash([])
@@ -1512,7 +1402,7 @@ export function paint(o: PaintOptions) {
       width: ctx.measureText(text).width + 10,
       alpha: Math.min(dim(s.id), dim(t.id)),
       priority: isSel ? 0 : 1,
-      color: edgeStyle(e).color,
+      color: edgeStyle(e, palette).color,
       exempt: true,
     })
   }
@@ -1536,7 +1426,7 @@ export function paint(o: PaintOptions) {
       width: ctx.measureText(text).width + 10,
       alpha: dim(n.id),
       priority: isSel ? 0 : isHover ? 1 : running ? 2 : isMatch ? 2 : 3,
-      color: nodeColor(n),
+      color: nodeColor(n, palette),
       exempt: isSel || isHover || isMatch,
     })
   }
@@ -1557,7 +1447,7 @@ export function paint(o: PaintOptions) {
         width: ctx.measureText(text).width + 10,
         alpha: dim(n.id),
         priority: isSel ? 0 : isHover ? 1 : 2,
-        color: nodeColor(n),
+        color: nodeColor(n, palette),
         exempt: true,
       })
     }
@@ -1587,7 +1477,7 @@ export function paint(o: PaintOptions) {
     if (!takeLabel(label.exempt)) continue
     boxes.insert(box)
     ctx.globalAlpha = label.alpha
-    ctx.fillStyle = 'rgba(17,21,28,0.92)'
+    ctx.fillStyle = colors.surface
     ctx.fillRect(lx - width / 2, ly - 9, width, 18)
     ctx.strokeStyle = label.color
     ctx.lineWidth = 0.8 / Math.max(cam.k, 0.5)
@@ -1602,7 +1492,7 @@ export function paint(o: PaintOptions) {
   // 不发光：星点就是纯色点。状态（选中/悬停/命中/键盘焦点）只用环来表示，
   // 不再靠亮度或光晕——亮度既看不清层级，也会在 563 个点上互相淹没。
   for (const n of visible) {
-    const color = nodeColor(n)
+    const color = nodeColor(n, palette)
     const alpha = dim(n.id)
     const isSel = n.id === o.selected
     const isHover = n.id === o.hovered
@@ -1637,14 +1527,14 @@ export function paint(o: PaintOptions) {
         ctx.beginPath()
         ctx.arc(n.x, n.y, r + screenPad(cam.k, 3), 0, TAU)
         ctx.strokeStyle = keyboard
-          ? KEYBOARD_FOCUS_RING
+          ? rings.keyboard
           : isSel
-            ? 'rgba(231,234,240,0.95)'
+            ? rings.selection
             : isActiveMatch
-              ? ACTIVE_MATCH_RING
+              ? rings.activeMatch
               : isMatch
-                ? MATCH_RING
-                : 'rgba(231,234,240,0.7)'
+                ? rings.match
+                : rings.hover
         ctx.lineWidth = (isSel ? 1.8 : isActiveMatch ? 2.2 : 1.4) / Math.max(cam.k, 0.5)
         ctx.stroke()
         if (isActiveMatch && !isSel) {
@@ -1662,7 +1552,7 @@ export function paint(o: PaintOptions) {
       // Status stays legible even at dot zoom: a rejected/withdrawn fact keeps
       // its fact colour but is crossed out.
       if (n.type === 'fact' && (n.status === 'rejected' || n.status === 'withdrawn')) {
-        drawStatusCross(ctx, n, r, cam.k)
+        drawStatusCross(ctx, n, r, cam.k, colors.background)
       }
       ctx.globalAlpha = alpha
       continue
@@ -1726,7 +1616,7 @@ export function paint(o: PaintOptions) {
       }
       ctx.beginPath()
       roundRect(ctx, x, y, w, h, r)
-      ctx.fillStyle = sealedGoal ? 'rgba(18,34,27,0.94)' : 'rgba(17,21,28,0.92)'
+      ctx.fillStyle = sealedGoal ? palette.sealed : colors.surface
       ctx.fill()
       ctx.lineWidth = (isSel ? 2.4 : 1.4) / cam.k
       ctx.strokeStyle = color
@@ -1788,7 +1678,7 @@ export function paint(o: PaintOptions) {
       }
       if (hasModel) {
         ctx.font = `500 11px "JetBrains Mono","Cascadia Code",monospace`
-        ctx.fillStyle = 'rgba(169,178,193,0.7)'
+        ctx.fillStyle = colors.ink2
         ctx.fillText(fitText(ctx, n.model!, w - 16), n.x, ty)
       }
       // The seal badge sits on the top-right corner, outside the label box, so
@@ -1803,14 +1693,14 @@ export function paint(o: PaintOptions) {
         ctx.arc(bx, by, br, 0, TAU)
         ctx.fillStyle = color
         ctx.fill()
-        ctx.strokeStyle = 'rgba(10,12,16,0.92)'
+        ctx.strokeStyle = colors.background
         ctx.lineWidth = 1.4 / cam.k
         ctx.stroke()
         ctx.beginPath()
         ctx.moveTo(bx - br * 0.46, by + 0.3)
         ctx.lineTo(bx - br * 0.1, by + br * 0.42)
         ctx.lineTo(bx + br * 0.5, by - br * 0.36)
-        ctx.strokeStyle = '#0a0c10'
+        ctx.strokeStyle = colors.background
         ctx.lineWidth = 1.8 / cam.k
         ctx.lineCap = 'round'
         ctx.lineJoin = 'round'
@@ -1825,7 +1715,7 @@ export function paint(o: PaintOptions) {
       ctx.rotate(Math.PI / 4)
       ctx.beginPath()
       ctx.rect(-r * 0.72, -r * 0.72, r * 1.44, r * 1.44)
-      ctx.fillStyle = 'rgba(17,21,28,0.95)'
+      ctx.fillStyle = colors.surface
       ctx.fill()
       ctx.strokeStyle = color
       ctx.lineWidth = (isSel ? 2.2 : 1.5) / cam.k
@@ -1925,7 +1815,7 @@ export function paint(o: PaintOptions) {
       ctx.fillStyle = color
       ctx.fill()
       ctx.lineWidth = (isSel ? 2 : 1) / cam.k
-      ctx.strokeStyle = isSel ? CANVAS.ink : 'rgba(10,12,16,0.6)'
+      ctx.strokeStyle = isSel ? colors.ink : colors.background
       ctx.stroke()
       // needs_review: the claim asserted a version newer than the last review.
       // A dashed outer ring says "read this before trusting it" without touching
@@ -1933,7 +1823,7 @@ export function paint(o: PaintOptions) {
       if (n.type === 'fact' && n.needsReview) {
         ctx.beginPath()
         ctx.arc(n.x, n.y, r + 4.5, 0, TAU)
-        ctx.strokeStyle = REVIEW_RING
+        ctx.strokeStyle = rings.review
         ctx.globalAlpha = alpha * 0.95
         ctx.lineWidth = 1.3 / Math.max(cam.k, 0.5)
         ctx.setLineDash([3 / cam.k, 3 / cam.k])
@@ -1942,7 +1832,7 @@ export function paint(o: PaintOptions) {
         ctx.globalAlpha = alpha
       }
       if (n.status === 'rejected' || n.status === 'withdrawn') {
-        drawStatusCross(ctx, n, r, cam.k)
+        drawStatusCross(ctx, n, r, cam.k, colors.background)
       }
     }
 
@@ -1959,12 +1849,12 @@ export function paint(o: PaintOptions) {
         const by = n.y - hh - 1
         ctx.beginPath()
         ctx.arc(bx, by, 6, 0, TAU)
-        ctx.fillStyle = 'rgba(108,182,255,0.92)'
+        ctx.fillStyle = colors.info
         ctx.fill()
         ctx.lineWidth = 1 / Math.max(cam.k, 0.5)
-        ctx.strokeStyle = 'rgba(10,12,16,0.9)'
+        ctx.strokeStyle = colors.background
         ctx.stroke()
-        ctx.fillStyle = CANVAS.background
+        ctx.fillStyle = colors.background
         ctx.font = `700 10px "Inter","PingFang SC","Microsoft YaHei",sans-serif`
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
@@ -1997,8 +1887,8 @@ export function paint(o: PaintOptions) {
     // decorations: no node, edge, depth, layout input or selectable target.
     if (n.type === 'step' || n.type === 'ghost') {
       const decorationAlpha = alpha * fadeIn(n.id)
-      drawOriginMark(ctx, n, o.layered, cam.k, decorationAlpha)
-      if (o.showHelpers !== false) drawHelperSatellites(ctx, n, o, decorationAlpha, cam.k)
+      drawOriginMark(ctx, n, o.layered, cam.k, decorationAlpha, palette)
+      if (o.showHelpers !== false) drawHelperSatellites(ctx, n, o, decorationAlpha, cam.k, palette.helperMarker)
     }
 
     // Hover/search get a quiet halo. A selected node uses the focus dim instead
@@ -2039,7 +1929,7 @@ export function paint(o: PaintOptions) {
         }
       }
       ringPath(screenPad(cam.k, 2.5))
-      ctx.strokeStyle = isActiveMatch ? ACTIVE_MATCH_RING : isMatch ? MATCH_RING : HOVER_RING
+      ctx.strokeStyle = isActiveMatch ? rings.activeMatch : isMatch ? rings.match : rings.hover
       ctx.lineWidth = (isActiveMatch ? 2.2 : 1) / Math.max(cam.k, 0.5)
       ctx.stroke()
       if (isActiveMatch) {
@@ -2057,7 +1947,7 @@ export function paint(o: PaintOptions) {
     // nor a hover sweep can hide it.
     if (isSel) {
       nodeRing(ctx, n, o.layered, screenPad(cam.k, 4.5))
-      ctx.strokeStyle = SELECTION_RING
+      ctx.strokeStyle = rings.selection
       ctx.globalAlpha = 1
       ctx.lineWidth = 2.2 / Math.max(cam.k, 0.5)
       ctx.stroke()
@@ -2067,7 +1957,7 @@ export function paint(o: PaintOptions) {
     // move the focus without selecting, so it must be visible next to selection.
     if (keyboard) {
       nodeRing(ctx, n, o.layered, screenPad(cam.k, 4))
-      ctx.strokeStyle = KEYBOARD_FOCUS_RING
+      ctx.strokeStyle = rings.keyboard
       ctx.globalAlpha = alpha
       ctx.lineWidth = 2 / Math.max(cam.k, 0.5)
       ctx.stroke()
@@ -2123,12 +2013,12 @@ export function paint(o: PaintOptions) {
     ctx.globalAlpha = alpha
     ctx.beginPath()
     ctx.arc(bx, by, 6, 0, TAU)
-    ctx.fillStyle = CANVAS.warning
+    ctx.fillStyle = colors.warning
     ctx.fill()
     ctx.lineWidth = 1 / Math.max(cam.k, 0.5)
-    ctx.strokeStyle = 'rgba(10,12,16,0.9)'
+    ctx.strokeStyle = colors.background
     ctx.stroke()
-    ctx.fillStyle = CANVAS.background
+    ctx.fillStyle = colors.background
     ctx.font = `700 10px "Inter","PingFang SC","Microsoft YaHei",sans-serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
@@ -2152,7 +2042,7 @@ export function paint(o: PaintOptions) {
       if (band.x2 < vp.x0 || band.x1 > vp.x1) continue
       const sx = cam.x + ((band.x1 + band.x2) / 2) * cam.k
       if (sx < left || sx > right) continue
-      ctx.fillStyle = 'rgba(169,178,193,0.6)'
+      ctx.fillStyle = colors.ink3
       ctx.fillText(depthLabel(band.depth), sx, 8)
     }
   }
@@ -2176,14 +2066,15 @@ function drawOriginMark(
   layered: boolean,
   camK: number,
   alpha: number,
+  palette: GraphPalette,
 ): void {
   const shape = originMarker(n.origin)
   if (!shape) return
   const { x, y, r } = originMarkAt(n, layered)
   ctx.save()
   ctx.globalAlpha = alpha
-  ctx.strokeStyle = ORIGIN_MARKER_COLOR
-  ctx.fillStyle = ORIGIN_MARKER_COLOR
+  ctx.strokeStyle = palette.originMarker
+  ctx.fillStyle = palette.originMarker
   ctx.lineWidth = 1.3 / Math.max(camK, 0.5)
   if (shape === 'diamond') {
     // 实心菱形: commander
@@ -2198,7 +2089,7 @@ function drawOriginMark(
     // 空心圆: executor (peer-launch)
     ctx.beginPath()
     ctx.arc(x, y, r, 0, TAU)
-    ctx.fillStyle = 'rgba(10,12,16,0.9)'
+    ctx.fillStyle = palette.labelBg
     ctx.fill()
     ctx.beginPath()
     ctx.arc(x, y, r, 0, TAU)
@@ -2207,7 +2098,7 @@ function drawOriginMark(
     // 双环: operator
     ctx.beginPath()
     ctx.arc(x, y, r, 0, TAU)
-    ctx.fillStyle = 'rgba(10,12,16,0.9)'
+    ctx.fillStyle = palette.labelBg
     ctx.fill()
     ctx.beginPath()
     ctx.arc(x, y, r * 0.52, 0, TAU)
@@ -2232,6 +2123,7 @@ function drawHelperSatellites(
   o: PaintOptions,
   alpha: number,
   camK: number,
+  markerColor: string,
 ): void {
   const helpers = n.helpers
   if (!helpers || helpers.calls <= 0) return
@@ -2244,7 +2136,7 @@ function drawHelperSatellites(
   const pulse = helpers.active > 0 && o.motion ? 0.45 + 0.55 * Math.sin(o.time / 900) : 0.85
   const dots = Math.min(3, helpers.calls)
   ctx.save()
-  ctx.fillStyle = HELPER_MARKER_COLOR
+  ctx.fillStyle = markerColor
   for (let i = 0; i < dots; i++) {
     ctx.globalAlpha = alpha * (helpers.active > 0 ? pulse : 0.8)
     ctx.beginPath()
@@ -2254,7 +2146,7 @@ function drawHelperSatellites(
   // The count is text, so it obeys the same LOD rule as background step titles.
   if (o.layered || o.showLabels || camK >= LOD_STEP_LABEL_K) {
     ctx.globalAlpha = alpha * pulse
-    ctx.fillStyle = HELPER_MARKER_COLOR
+    ctx.fillStyle = markerColor
     ctx.font = `600 9px "JetBrains Mono","Cascadia Code",monospace`
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
@@ -2270,10 +2162,11 @@ function drawComet(
   curve: EdgeCurve,
   phase: number,
   color: string,
+  coreColor: string,
 ) {
   const r = 3.2 / Math.max(o.cam.k, 0.5)
   const at = (t: number) => pointOnCurve(curve, t)
-  // A white-hot core over a coloured halo reads on top of both the dashed
+  // A contrasting core over a coloured halo reads on top of both the dashed
   // running edge and the node colours; the tail makes the direction obvious.
   const head = at(phase)
   ctx.beginPath()
@@ -2287,7 +2180,7 @@ function drawComet(
     const p = at(t)
     ctx.beginPath()
     ctx.arc(p.x, p.y, r * (0.3 + (4 - i) * 0.12), 0, TAU)
-    ctx.fillStyle = 'rgba(231,234,240,0.92)'
+    ctx.fillStyle = coreColor
     ctx.globalAlpha = i === 0 ? 0.95 : 0.18 + (4 - i) * 0.1
     ctx.fill()
   }

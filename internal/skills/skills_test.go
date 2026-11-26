@@ -97,7 +97,7 @@ func TestInstallPutsSkillWhereHarnessLooks(t *testing.T) {
 	// the hit list carries no body, so the skill must name the field that says
 	// a body exists and the call that opens exactly one entry. Without it the
 	// commander either pulls nothing or pulls the whole library.
-	for _, needle := range []string{"name: commander", "$SAKER_API", "$SAKER_API/api/kb", "has_detail", "api/kb?id=", "$SAKER_AUTH", "$SAKER_BATTLE", "`PUT /api/state`", ".saker/auth", "整份重写", "不是轮次日志", "只留对下一轮有价值", "可以自己整份重写或删改", "操作员定义", "说清目标口径怎么被证据满足", "目标是否达成由你", "是否要求独立复核由项目当前前提政策决定，完成同样须通过准入", "没有待办、在途意图或显式等待事项", "结束本轮", "可复核的原始证据", "不当作已验证结论或目标完成证明", "不依赖项目是否启用约束文档", "复核是控制面的 support run", "项目里已有事实时", "不要用无前提意图绕过", "按本轮提示的复核模式", "review_failed", "不会挂起等操作员", "不要抢跑"} {
+	for _, needle := range []string{"name: commander", "$SAKER_API", "$SAKER_API/api/kb", "has_detail", "api/kb?id=", "$SAKER_AUTH", "$SAKER_BATTLE", "`PUT /api/state`", ".saker/auth", "整份重写", "不是轮次日志", "只留对下一轮有价值", "可以自己整份重写或删改", "操作员定义", "说清目标口径怎么被证据满足", "目标是否达成由你", "没有待办、在途意图或显式等待事项", "结束本轮", "可复核的原始证据", "不当作已验证结论或目标完成证明", "不依赖项目是否启用约束文档", "复核是控制面的 support run", "项目里已有事实时", "不要用无前提意图绕过", "按本轮提示的复核模式", "review_failed", "不会挂起等操作员", "不要抢跑"} {
 		if !strings.Contains(string(body), needle) {
 			t.Errorf("skill body missing %q", needle)
 		}
@@ -107,6 +107,27 @@ func TestInstallPutsSkillWhereHarnessLooks(t *testing.T) {
 	const intentHandoff = "意图是下一步交给执行者做的事。意图标题写这一步的动作，验收标准写怎样判断这一步完成。"
 	if !strings.Contains(string(body), intentHandoff) {
 		t.Errorf("commander skill missing intent handoff guidance %q", intentHandoff)
+	}
+	// The first-turn skill used to assign the underlying engagement to the
+	// commander, contradicting the round prompt's separation of execution and judgment.
+	if strings.Contains(string(body), "你的职责是把渗透做完") {
+		t.Error("commander skill assigns execution to the commander")
+	}
+	// The shared skill is installed in both review modes. Requiring a verified
+	// status unconditionally makes the judgment guidance contradict review-off rounds.
+	for _, want := range []string{
+		"复核开启时，目标完成引用的事实须按当前断言版本通过独立复核",
+		"复核关闭时，有原始证据支撑的事实可以用于验收，无需等待独立复核",
+		"两种模式下，已撤回或已否定的事实都不能作为验收依据",
+	} {
+		if !strings.Contains(string(body), want) {
+			t.Errorf("commander skill missing goal review guidance %q", want)
+		}
+	}
+	for _, banned := range []string{"只引用支撑目标的那几条已验证事实", "未复核结论只能作为 candidate"} {
+		if strings.Contains(string(body), banned) {
+			t.Errorf("commander skill unconditionally requires review: %q", banned)
+		}
 	}
 	// A stale skill can conflict with a current round on stalls, review and
 	// premise links, even when the control plane computes them correctly.

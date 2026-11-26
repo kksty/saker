@@ -33,8 +33,8 @@ function useTick(active: boolean): number {
   return now
 }
 
-export function CommanderCard({ board, onOpen }: { board?: BoardResponse; onOpen: () => void }) {
-  const [open, setOpen] = useSessionState('graph.commanderOpen', true)
+export function CommanderCard({ board, compact = false, onOpen }: { board?: BoardResponse; compact?: boolean; onOpen: () => void }) {
+  const [open, setOpen] = useSessionState(compact ? 'graph.commanderOpenCompact' : 'graph.commanderOpen', !compact)
   const dec = board?.decider
   const activity = dec?.activity
   const running = board?.running_intents ?? []

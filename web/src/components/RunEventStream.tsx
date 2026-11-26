@@ -77,6 +77,8 @@ interface GroupCardProps {
 const GroupCard = memo(function GroupCard({ group, events, runID, sessionID, open, focused, copied, live, onToggle, onCopy }: GroupCardProps) {
   const first = events[group.indices[0]]
   const failed = group.indices.some((i) => eventFailed(events[i]))
+  const source = first.tool || first.role
+  const summary = first.text || source || first.kind
   // The evaluator's verdict is already folded into the status text; the row
   // badge lets the operator spot pass/fail/error without opening the group.
   const evaluator = parseEvaluatorEvent(first)
@@ -86,45 +88,49 @@ const GroupCard = memo(function GroupCard({ group, events, runID, sessionID, ope
   return (
     <article
       role="listitem"
-      className={`rounded-lg border p-2 ${failed ? 'border-warning/40' : 'border-hairline'} ${focused ? 'bg-primary/10' : ''}`}
+      className={`rounded-lg border px-3 py-2 ${failed ? 'border-warning/40 bg-warning/5' : 'border-hairline'} ${focused ? 'bg-primary/10' : ''}`}
     >
       <button
-        className="flex w-full items-start gap-x-2 gap-y-1 text-left text-xs @max-md:flex-wrap"
+        className="flex w-full items-start gap-2 rounded text-left focus-visible:outline-2 focus-visible:outline-ring"
         aria-expanded={open}
         onClick={() => onToggle(group.key)}
       >
-        <span className="text-ink-3" aria-hidden="true">{open ? '▾' : '▸'}</span>
+        <span className="text-xs leading-5 text-ink-3" aria-hidden="true">{open ? '▾' : '▸'}</span>
         {/* The dot is the only live marker handed to the card: the card itself
             never animates (a whole-card effect on the highest-churn list is a
             per-frame paint cost with no extra information). */}
         <span
           aria-hidden="true"
           title={live ? '这次运行仍在运行，事件流可能继续追加' : undefined}
-          className={`mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full ${live ? 'bg-success' : 'bg-ink-3/35'}`}
+          className={`mt-[7px] inline-block h-1.5 w-1.5 shrink-0 rounded-full ${live ? 'bg-success' : failed ? 'bg-warning' : 'bg-ink-3/35'}`}
         />
-        <Badge size="sm" variant={failed ? 'warning' : 'muted'}>{first.kind}</Badge>
-        {evaluator && (
-          <Badge size="sm" variant={evaluatorBadgeVariant(evaluator)} title={first.text}>
-            {evaluatorVerdictLabel(evaluator)}
-            {evaluatorRoundText(evaluator) ? ` · ${evaluatorRoundText(evaluator)}` : ''}
-          </Badge>
-        )}
-        {guardrail && (
-          <>
-            <Badge size="sm" variant={guardrailActionVariant(guardrail.action)} title={first.text}>
-              {guardrailActionLabel(guardrail.action)}
-            </Badge>
-            {guardrail.tool && <span className="font-mono text-[11px] text-ink-2">{guardrail.tool}</span>}
-          </>
-        )}
-        <span className="truncate font-mono text-info @max-md:max-w-24">{first.tool || first.role || `回合 ${group.turn || 1}`}</span>
-        {first.text && (
-          <span className="min-w-0 flex-1 truncate text-ink-2 @max-md:order-last @max-md:basis-full">
-            {first.text.slice(0, 160)}
+        <span className="min-w-0 flex-1 space-y-1">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {failed && <Badge size="sm" variant="warning">异常</Badge>}
+            <span className="saker-break line-clamp-2 text-[13px] font-medium leading-5 text-ink">
+              {summary.slice(0, 160)}
+            </span>
+            {evaluator && (
+              <Badge size="sm" variant={evaluatorBadgeVariant(evaluator)} title={first.text}>
+                {evaluatorVerdictLabel(evaluator)}
+                {evaluatorRoundText(evaluator) ? ` · ${evaluatorRoundText(evaluator)}` : ''}
+              </Badge>
+            )}
+            {guardrail && (
+              <Badge size="sm" variant={guardrailActionVariant(guardrail.action)} title={first.text}>
+                {guardrailActionLabel(guardrail.action)}
+              </Badge>
+            )}
           </span>
-        )}
-        {group.result?.duration_ms !== undefined && <span>{(group.result.duration_ms / 1000).toFixed(2)}s</span>}
-        <span className="ml-auto shrink-0 whitespace-nowrap text-ink-3">{fmtTime(first.at)}</span>
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-4 text-ink-3">
+            {first.kind !== summary && <span className="font-mono">{first.kind}</span>}
+            {source && source !== summary && <span className="saker-break font-mono">{source}</span>}
+            {guardrail?.tool && guardrail.tool !== source && <span className="saker-break font-mono">{guardrail.tool}</span>}
+            <span>回合 {group.turn || 1}</span>
+            {group.result?.duration_ms !== undefined && <span>{(group.result.duration_ms / 1000).toFixed(2)}s</span>}
+            <span className="ml-auto whitespace-nowrap">{fmtTime(first.at)}</span>
+          </span>
+        </span>
       </button>
       {group.indices.map((index) => {
         const event = events[index]
@@ -258,7 +264,7 @@ export function RunEventStream({
   return (
     <div ref={root} className="space-y-2">
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-hairline bg-card p-2 text-xs text-ink-3">
-        <span className="w-full" title="保留最近 400 条事件及本次输入">已载入 {metrics.events} 条 · {metrics.perMinute ?? '—'}/分钟 · 工具失败 {metrics.failures}/{metrics.completed}{metrics.unknown > 0 ? ` · 未知 ${metrics.unknown}` : ''}</span>
+        <span className="order-last w-full text-[11px]" title="保留最近 400 条事件及本次输入">已载入 {metrics.events} 条 · {metrics.perMinute ?? '—'}/分钟 · 工具失败 {metrics.failures}/{metrics.completed}{metrics.unknown > 0 ? ` · 未知 ${metrics.unknown}` : ''}</span>
         <Button size="xs" variant="ghost" onClick={() => expand(groups.map((g) => g.key))}>全部展开</Button>
         <Button size="xs" variant="ghost" onClick={() => expand([])}>全部收起</Button>
         <Button size="xs" variant="ghost" onClick={() => void copy('all', events)}>{copied === 'all' ? '已复制' : '复制原始 JSON'}</Button>

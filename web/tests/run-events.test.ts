@@ -33,6 +33,16 @@ test('tool results pair by call id and cannot leak across turns',()=>{
  assert.equal(runEventMetrics(events).failures,1)
 })
 
+test('a normal turn ending stays out of the anomaly filter', () => {
+  // Legacy events used end_turn for normal completion. An explicit harness
+  // error still wins over a completion reason, and cancellation stays visible.
+  const end: Event = { kind: 'turn_ended', at: '' }
+  assert.equal(eventOutcome({ ...end, stop_reason: 'end_turn' }), 'ok')
+  assert.equal(eventOutcome({ ...end, stop_reason: 'completed', ok: true }), 'ok')
+  assert.equal(eventOutcome({ ...end, stop_reason: 'completed', ok: false }), 'failed')
+  assert.equal(eventOutcome({ ...end, stop_reason: 'canceled' }), 'failed')
+})
+
 test('plaintext JSON arguments parse into an object, Unicode included',()=>{
  const value={command:'echo 测试',timeout:30}
  const raw={tool_call:{arguments:JSON.stringify(value)}}

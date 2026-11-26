@@ -44,3 +44,28 @@ func TestChildEnvPathFixupOnWindows(t *testing.T) {
 		t.Fatalf("PATH defined %d times", n)
 	}
 }
+
+func TestChildEnvFindsPortableGitInChildPath(t *testing.T) {
+	// A portable Git install can appear only in the child's PATH. Probing
+	// conventional install roots alone leaves its coreutils undiscoverable.
+	root := filepath.Join(t.TempDir(), "Portable Git")
+	gitDir := filepath.Join(root, "cmd")
+	coreutils := filepath.Join(root, "usr", "bin")
+	for _, file := range []string{filepath.Join(gitDir, "git.exe"), filepath.Join(coreutils, "ls.exe")} {
+		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("ProgramFiles", "")
+	t.Setenv("ProgramFiles(x86)", "")
+	t.Setenv("LOCALAPPDATA", "")
+	t.Setenv("PATH", `C:\Windows\System32`)
+
+	h := &Host{cfg: Config{Logf: func(string, ...any) {}}}
+	if got, want := envValue(h.childEnv([]string{"Path=" + gitDir}), "PATH"), coreutils+`;`+gitDir; got != want {
+		t.Fatalf("PATH = %q, want %q", got, want)
+	}
+}

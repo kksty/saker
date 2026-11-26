@@ -15,6 +15,11 @@ func (s *Server) projectCloseout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.controlMu.Lock()
+	if reason := s.restartRecoveryError; reason != "" {
+		s.controlMu.Unlock()
+		writeErr(w, http.StatusConflict, reason)
+		return
+	}
 	if !s.paused.Load() || s.deleting.Load() || s.closing.Load() {
 		s.controlMu.Unlock()
 		writeErr(w, http.StatusConflict, "先暂停项目，再让指挥官收口")

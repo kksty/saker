@@ -7,7 +7,7 @@
 //   - 大图不画边：上千条产出边加上百条前提边在小地图里只会变成放射噪点，关系
 //     类型在 184px 上也读不出来；小图仍画全量边和事实颜色，此时它就是一张真正
 //     的缩略图；
-//   - 视口用暗角 + 白框圈出，卡片头给出“视口覆盖全图的比例”；
+//   - 视口用暗角和对比色描边圈出，卡片头给出“视口覆盖全图的比例”；
 //   - 实时意图在它真实的位置上画呼吸环，不再有绕中心空转的扫描扇面。
 //
 // 相机由画布发布到 view-store（docs/33 §4.5）；这里用 useView 订阅，所以只有
@@ -15,7 +15,8 @@
 // 坐标换算回世界坐标交给 onCenter（GraphPanel 接 canvas.centerOn）。
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { EdgeKind, GraphModel, GraphNode } from '@/graph/model'
-import { CANVAS, MATCH_RING, edgeStyle, halfExtentX, nodeColor } from '@/graph/render'
+import { DEFAULT_GRAPH_PALETTE, type GraphPalette } from '@/graph/palette'
+import { edgeStyle, halfExtentX, nodeColor } from '@/graph/render'
 import { radiusOf, type LayoutMode } from '@/graph/sim'
 import { useHovered, useView, type GraphView } from '@/graph/view-store'
 import { GraphResizeHandle, useGraphResize, type OverlaySize } from './GraphResize'
@@ -57,9 +58,6 @@ const MAX_VISIBLE_EDGES = 36
 const FULL_VIEW = 0.97
 
 const TAU = Math.PI * 2
-const VIEWPORT_DIM = 'rgba(5,7,10,0.42)'
-const VIEWPORT_FRAME = 'rgba(231,234,240,0.95)'
-const FOCUS_RING = 'rgba(231,234,240,0.95)'
 
 interface WorldBounds {
   minX: number
@@ -221,6 +219,7 @@ export function GraphMinimap({
   live = false,
   matches = null,
   defaultSide = MINI_LONG,
+  palette = DEFAULT_GRAPH_PALETTE,
 }: {
   model: GraphModel
   layout?: LayoutMode
@@ -232,6 +231,7 @@ export function GraphMinimap({
   /** 搜索命中的节点 id：在缩略图上圈出来，整图范围也能看到命中位置。 */
   matches?: ReadonlySet<string> | null
   defaultSide?: number
+  palette?: GraphPalette
 }) {
   const view = useView()
   const hovered = useHovered()
@@ -272,12 +272,12 @@ export function GraphMinimap({
       list.push({
         source: s,
         target: t,
-        color: edgeStyle(e).color,
+        color: edgeStyle(e, palette).color,
         alpha: edgeAlpha(e.kind),
       })
     }
     return list
-  }, [model, dense, layout])
+  }, [model, dense, layout, palette])
 
   // 事实是底图，意图/目标/项目是骨架：分层画，骨架永远压在密度上面。
   const { dust, marks } = useMemo(() => {
@@ -329,7 +329,7 @@ export function GraphMinimap({
   const sceneRef = useRef<DrawScene | null>(null)
   sceneRef.current = scene
 
-  // 画布：骨架边 → 事实密度 → 意图/目标 → 视口暗角与白框 → 命中/悬停/实时环。
+  // 画布：骨架边 → 事实密度 → 意图/目标 → 视口边框 → 命中/悬停/实时环。
   const draw = (now: number) => {
     const canvas = canvasRef.current
     const current = sceneRef.current
@@ -366,14 +366,14 @@ export function GraphMinimap({
     //    会在首帧堆出几十毫秒的 long task，而 1100 个 1px 方块本身并不慢。
     if (current.dense) {
       ctx.globalAlpha = 0.42
-      ctx.fillStyle = CANVAS.ink3
+      ctx.fillStyle = palette.colors.ink3
       for (const n of current.dust) {
         ctx.fillRect(xOf(n.x) - 0.7, yOf(n.y) - 0.7, 1.4, 1.4)
       }
     } else {
       for (const n of current.dust) {
         ctx.globalAlpha = n.type === 'ghost' ? 0.6 : 0.9
-        ctx.fillStyle = nodeColor(n)
+        ctx.fillStyle = nodeColor(n, palette)
         ctx.fillRect(xOf(n.x) - 1, yOf(n.y) - 1, 2, 2)
       }
     }
@@ -386,7 +386,7 @@ export function GraphMinimap({
       const y = yOf(n.y)
       const quiet = n.status === 'done' || n.status === 'parked'
       ctx.globalAlpha = quiet ? 0.55 : 0.96
-      ctx.fillStyle = nodeColor(n)
+      ctx.fillStyle = nodeColor(n, palette)
       if (n.type !== 'step' || current.layout === 'layered') {
         const halfWidth = n.type === 'project' ? 3.4 : n.type === 'goal' ? 4.1 : 3.7
         const halfHeight = n.type === 'step' && quiet ? 1.15 : 1.75
@@ -424,29 +424,29 @@ export function GraphMinimap({
       ctx.beginPath()
       ctx.rect(0, 0, size.w, size.h)
       if (visible) ctx.rect(rx, ry, rw, rh)
-      ctx.fillStyle = VIEWPORT_DIM
+      ctx.fillStyle = palette.minimapDim
       ctx.fill('evenodd')
       ctx.restore()
       if (visible) {
         ctx.globalAlpha = 1
-        ctx.fillStyle = 'rgba(231,234,240,0.05)'
+        ctx.fillStyle = palette.band
         ctx.fillRect(rx, ry, rw, rh)
-        // 深色垫底再描亮框，压得住下面的灰色密度。
+        // 两条对比色描边让视口边界盖住下面的灰色密度。
         if (clipped) ctx.setLineDash([3, 3])
         ctx.lineWidth = 2.4
-        ctx.strokeStyle = 'rgba(5,7,10,0.8)'
+        ctx.strokeStyle = palette.colors.background
         ctx.strokeRect(rx, ry, rw, rh)
         ctx.lineWidth = 1
-        ctx.strokeStyle = VIEWPORT_FRAME
+        ctx.strokeStyle = palette.rings.selection
         ctx.strokeRect(rx, ry, rw, rh)
         ctx.setLineDash([])
       }
     }
 
-    // 5. 搜索命中：红圈；悬停：白圈；实时意图：状态色的呼吸环。
+    // 5. 搜索命中、悬停和实时意图各有对应的环。
     if (current.matched.length > 0) {
       ctx.lineWidth = 1
-      ctx.strokeStyle = MATCH_RING
+      ctx.strokeStyle = palette.rings.match
       for (const n of current.matched) {
         ctx.beginPath()
         ctx.arc(xOf(n.x), yOf(n.y), 3.2, 0, TAU)
@@ -457,7 +457,7 @@ export function GraphMinimap({
       const n = current.model.byId.get(current.hovered)
       if (n) {
         ctx.lineWidth = 1.2
-        ctx.strokeStyle = FOCUS_RING
+        ctx.strokeStyle = palette.rings.selection
         ctx.beginPath()
         ctx.arc(xOf(n.x), yOf(n.y), 4, 0, TAU)
         ctx.stroke()
@@ -466,7 +466,7 @@ export function GraphMinimap({
     if (current.live) {
       for (const n of current.active) {
         const pulse = current.motion ? (Math.sin(now / 520) + 1) / 2 : 0.55
-        const color = nodeColor(n)
+        const color = nodeColor(n, palette)
         ctx.globalAlpha = 0.28 + pulse * 0.45
         ctx.lineWidth = 1.2
         ctx.strokeStyle = color
@@ -489,7 +489,7 @@ export function GraphMinimap({
   // 关掉实时或系统减少动态效果时必须补画一帧，否则上一帧的呼吸环会留在画布上。
   useEffect(() => {
     drawRef.current(typeof performance !== 'undefined' ? performance.now() : 0)
-  }, [bounds, model, view, live, motion, hovered, matches])
+  }, [bounds, model, view, live, motion, hovered, matches, palette])
 
   // prefers-reduced-motion 是无障碍设置：环仍画出来，但不再转动。
   useEffect(() => {

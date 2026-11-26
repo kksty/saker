@@ -49,6 +49,9 @@ before(async () => {
   ConfirmProvider = (await server.ssrLoadModule('@cyber/ui')).ConfirmProvider
   const client = await server.ssrLoadModule('/src/lib/api.ts')
   api = client.api
+  // The generation path asks for the full evidence check; these tests mock the
+  // light precheck per case, so route the full call through the same stub.
+  api.reportPrecheckEvidence = () => api.reportPrecheck()
   ApiError = client.ApiError
   const listeners = new Map<string, Set<() => void>>()
   const applyURL = (url: string) => {

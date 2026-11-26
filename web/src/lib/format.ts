@@ -165,13 +165,13 @@ export function cancelCauseText(cause?: string): string {
     case 'retry':
       return '重派：本次 run 让位给同意图的新一次执行'
     case 'stop_loss':
-      return '止损：连续多轮没有新事实或派发，平台主动停止'
+      return '止损：显式取消意图后结束本次运行'
     case 'handoff':
       return '新执行者接班：旧 run 先停，新执行者从同一意图继续（同一统一模型连接）'
     case 'restart':
-      return '平台重启时仍未结束，进程重启前统一取消'
+      return '进程重启中断运行，按记录完成对账'
     case 'watchdog':
-      return '运行守卫超时：超过时限没有事件，平台自动重派该意图（最多 3 次）'
+      return '守卫取消：触发依据见该运行的取消记录'
     case 'operator':
       return '操作员在控制台人工取消（或重派前取消旧 run）'
     case 'worker_kill':
@@ -408,6 +408,23 @@ export function fmtDuration(from?: string, to?: string, now: number = Date.now()
   const m = Math.floor(s / 60)
   if (m < 60) return `${m}m${String(s % 60).padStart(2, '0')}s`
   return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}m`
+}
+
+/** Seconds since `iso`, or null when the value is absent/unparseable. Kept
+ *  separate from fmtDuration because a caller that says "N 秒前" must fall back
+ *  to the unknown placeholder, never to NaN. */
+export function secondsSince(iso: string | undefined | null, now: number = Date.now()): number | null {
+  if (!iso) return null
+  const at = Date.parse(iso)
+  if (!Number.isFinite(at)) return null
+  return Math.max(0, Math.round((now - at) / 1000))
+}
+
+/** A known percentage (including a real 0) renders with its unit; a missing or
+ *  non-finite observation is "未上报", not "—%" or "0%". */
+export function fmtPercent(value?: number | null): string {
+  if (value === undefined || value === null || !Number.isFinite(value)) return '未上报'
+  return `${value}%`
 }
 
 /**

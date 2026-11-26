@@ -540,18 +540,10 @@
     scrollbar-gutter: stable;
   }
 
-  /* Brand (Brand.tsx). The wordmark is drawn geometry, not text: the CSS only
-   * picks the ink. It follows the rail's foreground so the same file works in
-   * both shells and on the login page, and stays a legible shape for assistive
-   * tech through its aria-label.
-   *
-   * Colour is deliberately neutral rather than the vermillion accent: the
-   * wordmark sits beside every primary action in the console, and a second red
-   * mass there competes with the CTA and the active-marker. The accent lives in
-   * the tab icon (public/favicon.svg), which has the tab strip to itself. */
   .saker-wordmark {
-    color: var(--ink-1);
-    overflow: visible;
+    aspect-ratio: 246 / 54;
+    background-color: var(--ink-1);
+    mask: url('/saker-wordmark.svg') center / contain no-repeat;
   }
 
 
@@ -799,12 +791,6 @@
  * nothing. These used to be `sm:`/`md:` viewport queries, which are wrong once
  * the rail and a dock shrink the map.
  */
-.saker-graph-minimap {
-  /* Placement belongs to the bottom-right stack (`.saker-graph-corner-br`).
-     小地图不再按宽度隐藏：它能被拖到 88px，窄图上正好是「一眼看全图」的那张小卡；
-     只有选中节点（右下角归详情面板）或列表视图时才收起，由 GraphPanel 决定。 */
-  display: block;
-}
 @container graph (inline-size < 44rem) {
   .saker-graph-list-id {
     display: none;

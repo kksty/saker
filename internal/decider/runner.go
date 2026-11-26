@@ -248,7 +248,7 @@ type Status struct {
 	Stalled            int                     `json:"stalled"`
 	ContextTokens      int                     `json:"context_tokens,omitempty"`
 	ContextWindow      int                     `json:"context_window,omitempty"`
-	ContextPercent     int                     `json:"context_percent,omitempty"`
+	ContextPercent     *int                    `json:"context_percent,omitempty"`
 	Compacted          bool                    `json:"compacted,omitempty"`
 	HandoffMissing     int                     `json:"handoff_missing,omitempty"`
 	HandoffReleased    bool                    `json:"handoff_released,omitempty"`
@@ -330,7 +330,7 @@ func (r *Runner) Status() Status {
 		Stalled:         r.stalled,
 		ContextTokens:   r.lastContext,
 		ContextWindow:   r.windowLocked(),
-		ContextPercent:  (ContextStatus{Used: r.lastContext, Window: r.windowLocked()}).Percent(),
+		ContextPercent:  (ContextStatus{Used: r.lastContext, Window: r.windowLocked()}).PercentPtr(),
 		Compacted:       r.lastCompacted,
 		HandoffMissing:  r.handoffMissing,
 		HandoffReleased: r.handoffBypassed,
@@ -1309,7 +1309,7 @@ func (r *Runner) Run(ctx context.Context, wake string, force bool) *Decision {
 	if d.ContextWindow == 0 {
 		d.ContextWindow = ctxStatus.Window
 	}
-	d.ContextPercent = (ContextStatus{Used: d.ContextTokens, Window: d.ContextWindow}).Percent()
+	d.ContextPercent = (ContextStatus{Used: d.ContextTokens, Window: d.ContextWindow}).PercentPtr()
 	d.NewFacts = len(r.Store.ListFacts("", 0)) - b.Facts.Total
 	timedOut := errors.Is(context.Cause(roundCtx), ErrRoundTimeout)
 	d.MS = time.Since(start).Milliseconds()
@@ -1596,11 +1596,22 @@ func (r *Runner) observeStall(d *Decision) {
 	r.stalled = obs.Rounds
 	r.mu.Unlock()
 	if obs.Escalate {
-		detail := "没有新增事实、也没有关闭意图"
-		if obs.Directions > 0 {
-			detail = fmt.Sprintf("期间新增 %d 条意图、零新增事实，也没有关闭意图", obs.Directions)
+		var changes []string
+		for _, item := range []struct {
+			label string
+			count int
+		}{
+			{"新开", obs.Opened}, {"停放", obs.Parked}, {"失败", obs.Failed}, {"复核未通过", obs.ReviewFailed},
+		} {
+			if item.count > 0 {
+				changes = append(changes, fmt.Sprintf("%s %d 条", item.label, item.count))
+			}
 		}
-		d.Notes = append(d.Notes, fmt.Sprintf("看门狗：意图连续 %d 轮没有进展（%s）；只提示，不自动停意图、不改变派发。", obs.Rounds, detail))
+		note := fmt.Sprintf("看门狗：连续 %d 个计入的决策轮没有新增事实、有效核验或意图完成。", obs.Rounds)
+		if len(changes) > 0 {
+			note += "期间" + strings.Join(changes, "、") + "。"
+		}
+		d.Notes = append(d.Notes, note)
 	}
 }
 

@@ -66,9 +66,10 @@ const (
 // decider's human-readable pause reason (free text, for display only); Kind is
 // the machine code the append-and-continue contract uses.
 type projectState struct {
-	Paused bool   `json:"paused"`
-	Kind   string `json:"kind"`
-	Reason string `json:"reason,omitempty"`
+	Paused        bool   `json:"paused"`
+	Kind          string `json:"kind"`
+	Reason        string `json:"reason,omitempty"`
+	RecoveryError string `json:"restart_recovery_error,omitempty"`
 }
 
 // projectState is projectStateLocked with the control mutex taken. Readers that
@@ -96,7 +97,7 @@ func (s *Server) projectState() projectState {
 //   - not paused but with a waiting direction is waiting_human: live work that
 //     must not be disturbed, not a park.
 func (s *Server) projectStateLocked() projectState {
-	st := projectState{Paused: s.paused.Load()}
+	st := projectState{Paused: s.paused.Load(), RecoveryError: s.restartRecoveryError}
 	if s.Decider != nil {
 		st.Reason = s.Decider.Status().PausedReason
 	}

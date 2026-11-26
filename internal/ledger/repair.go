@@ -4,25 +4,39 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/kksty/saker/internal/evidence"
-	"github.com/kksty/saker/internal/store"
 	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
+
+	"github.com/kksty/saker/internal/evidence"
+	"github.com/kksty/saker/internal/store"
 )
 
 // CursorRepair only advances past declarations already preserved verbatim in
 // the ledger. It never re-applies historical claims or invalidates reviews.
 type CursorRepair struct {
-	Before    int64    `json:"before"`
-	Through   int64    `json:"through"`
-	SHA256    string   `json:"sha256"`
-	Matched   int      `json:"matched"`
-	Playbooks int      `json:"playbooks"`
-	Problems  []string `json:"problems,omitempty"`
-	Warnings  []string `json:"warnings,omitempty"`
+	Before    int64                `json:"before"`
+	Through   int64                `json:"through"`
+	SHA256    string               `json:"sha256"`
+	Matched   int                  `json:"matched"`
+	Playbooks int                  `json:"playbooks"`
+	Persisted int                  `json:"persisted"`
+	Skipped   int                  `json:"skipped"`
+	Truncated bool                 `json:"truncated"`
+	Pending   []UnconfirmedHandoff `json:"pending,omitempty"`
+	Problems  []string             `json:"problems,omitempty"`
+	Warnings  []string             `json:"warnings,omitempty"`
+}
+
+// UnconfirmedHandoff locates a declaration whose current ledger state could
+// not be confirmed against the unconsumed handoff file.
+type UnconfirmedHandoff struct {
+	DeclarationID string   `json:"declaration_id"`
+	SourceRef     string   `json:"source_ref,omitempty"`
+	Location      string   `json:"location"`
+	Reasons       []string `json:"reasons"`
 }
 
 func PlanCursorRepair(db store.DB, caseRoot, workDir, intentID string) (CursorRepair, error) {
@@ -39,51 +53,89 @@ func PlanCursorRepair(db store.DB, caseRoot, workDir, intentID string) (CursorRe
 	}
 	p.Through = decl.Consumed
 	p.Warnings = decl.Warnings
+	p.Skipped = decl.Bad
+	p.Truncated = decl.Truncated
 	for _, df := range decl.Facts {
+		var reasons []string
 		if df.Kind == "playbook" {
 			p.Playbooks++
 			if problem := checkRepairPlaybook(db, intentID, df); problem != "" {
-				p.Problems = append(p.Problems, problem)
+				reasons = append(reasons, problem)
 			}
+		} else {
+			reasons = checkRepairFact(db, caseRoot, workDir, intentID, df)
+			if len(reasons) == 0 {
+				p.Matched++
+			}
+		}
+		if len(reasons) == 0 {
+			p.Persisted++
 			continue
 		}
-		matches := 0
-		for _, f := range db.Facts {
-			if f.IntentID != intentID {
-				continue
-			}
-			identity := df.SourceRef != "" && f.SourceRef == df.SourceRef || df.DeclarationID != "" && f.DeclarationID == df.DeclarationID
-			if !identity {
-				continue
-			}
-			matches++
-			next := declarationUpdate(f, df, f.SourceRunID, strings.TrimSpace(df.Summary), nil)
-			if !sameDeclarationFields(f, next) {
-				p.Problems = append(p.Problems, fmt.Sprintf("声明 %s 与账本 %s 的当前断言不同，拒绝跳过", df.DeclarationID, f.ID))
-			}
-			for _, rel := range df.Evidence {
-				content, readErr := os.ReadFile(filepath.Join(workDir, filepath.FromSlash(rel)))
-				digest := sha256.Sum256(content)
-				source := evidence.OriginPath(caseRoot, filepath.Join(workDir, filepath.FromSlash(rel)))
-				kept := false
-				for _, e := range db.Evidence {
-					if slices.Contains(f.EvidenceIDs, e.ID) && e.SourceURI == source && e.Digest == hex.EncodeToString(digest[:]) {
-						kept = true
-						break
-					}
-				}
-				if readErr != nil || !kept {
-					p.Problems = append(p.Problems, fmt.Sprintf("声明 %s 的证据 %s 尚未按原件摘要保全，拒绝跳过", df.DeclarationID, rel))
-				}
-			}
-		}
-		if matches != 1 {
-			p.Problems = append(p.Problems, fmt.Sprintf("声明 %s 尚未唯一落库（匹配 %d），拒绝跳过", df.DeclarationID, matches))
-		} else {
-			p.Matched++
-		}
+		p.Pending = append(p.Pending, UnconfirmedHandoff{
+			DeclarationID: df.DeclarationID,
+			SourceRef:     df.SourceRef,
+			Location:      df.Location,
+			Reasons:       reasons,
+		})
+		p.Problems = append(p.Problems, reasons...)
 	}
 	return p, nil
+}
+
+func checkRepairFact(db store.DB, caseRoot, workDir, intentID string, df DeclaredFact) []string {
+	var reasons []string
+	matches := 0
+	for _, f := range db.Facts {
+		identity := df.SourceRef != "" && f.SourceRef == df.SourceRef || df.DeclarationID != "" && f.DeclarationID == df.DeclarationID
+		if f.IntentID != intentID || !identity {
+			continue
+		}
+		matches++
+		// Settlement supplies a non-nil evidence list. Using the live-read
+		// form here would mark an already preserved declaration as pending.
+		evidenceIDs := f.EvidenceIDs
+		if len(df.Evidence) > 0 && evidenceIDs == nil {
+			evidenceIDs = []string{}
+		}
+		next := declarationUpdate(f, df, f.SourceRunID, strings.TrimSpace(df.Summary), evidenceIDs)
+		if !sameDeclarationFields(f, next) {
+			reasons = append(reasons, fmt.Sprintf("声明 %s 与账本 %s 的当前断言不同，拒绝跳过", df.DeclarationID, f.ID))
+		}
+		for _, rel := range df.Evidence {
+			path := filepath.Join(workDir, filepath.FromSlash(rel))
+			content, err := os.ReadFile(path)
+			if err != nil {
+				reasons = append(reasons, fmt.Sprintf("声明 %s 的证据 %s 无法读取：%v", df.DeclarationID, rel, err))
+				continue
+			}
+			digest := sha256.Sum256(content)
+			want := hex.EncodeToString(digest[:])
+			source := evidence.OriginPath(caseRoot, path)
+			kept := false
+			var verifyErr error
+			for _, e := range db.Evidence {
+				if !slices.Contains(f.EvidenceIDs, e.ID) || e.SourceURI != source || e.Digest != want {
+					continue
+				}
+				if err := evidence.Verify(caseRoot, e); err != nil {
+					verifyErr = fmt.Errorf("证据 %s：%w", e.ID, err)
+					continue
+				}
+				kept = true
+				break
+			}
+			if verifyErr != nil && !kept {
+				reasons = append(reasons, fmt.Sprintf("声明 %s 的证据 %s 未通过原件核对：%v", df.DeclarationID, rel, verifyErr))
+			} else if !kept {
+				reasons = append(reasons, fmt.Sprintf("声明 %s 的证据 %s 尚未按原件摘要保全，拒绝跳过", df.DeclarationID, rel))
+			}
+		}
+	}
+	if matches != 1 {
+		reasons = append(reasons, fmt.Sprintf("声明 %s 尚未唯一落库（匹配 %d），拒绝跳过", df.DeclarationID, matches))
+	}
+	return reasons
 }
 
 func CommitCursorRepair(workDir string, p CursorRepair) error {

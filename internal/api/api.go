@@ -4,6 +4,8 @@ package api
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -199,10 +201,8 @@ type Server struct {
 	// run's live context_tokens into a pressure bar. It changes when the
 	// settings page saves, so it is atomic rather than a plain field.
 	contextWindow atomic.Int64
-	// lastWatch is when the watchdog last swept (unix nano). It is observation
-	// for the console's guard panel, not scheduling state: the loop itself owns
-	// its ticker.
-	lastWatch atomic.Int64
+	// watchPulse publishes the start and completion of a single sweep together.
+	watchPulse atomic.Pointer[watchTimes]
 	// paused is the project-level gate (projectPause). A decision round that
 	// already passed the decider's own pause check used to dispatch anyway;
 	// starting a run is the point where "paused" must be enforced.
@@ -221,7 +221,8 @@ type Server struct {
 	// classifies inside that same section. The manifest persists the same cause
 	// next to the boolean, and a boot attach restores it, so a restart keeps
 	// saying who stopped the project instead of collapsing to "operator".
-	pauseCause string
+	pauseCause           string
+	restartRecoveryError string // guarded by controlMu
 	// scopeMu guards resumeScope. The operator's "continue current goal" resume
 	// attaches the named goal to exactly one commander round (StartCommander
 	// consumes it), so the round continues that goal without a persistent
@@ -303,15 +304,9 @@ type Server struct {
 	journals   map[string]*runJournal
 	// verifyBatchMu guards verifyBatch: a project runs at most one batch review
 	// at a time, so a second click cannot double the token bill (D100).
-	verifyBatchMu sync.Mutex
-	verifyBatch   bool
-	// reviewFailMu guards reviewFailed: the automatic review queue's retry
-	// cooldown. An automatic review that ends without a usable verdict leaves the
-	// fact unverified, so without this every wake would spend another model run
-	// on the same known-bad candidate (F11, auto_verify.go).
-	reviewFailMu      sync.Mutex
+	verifyBatchMu     sync.Mutex
+	verifyBatch       bool
 	autoReviewMu      sync.RWMutex
-	reviewFailed      map[string]reviewFailure
 	reviewPumpMu      sync.Mutex
 	reviewPumpRunning bool
 	reviewPumpEpoch   uint64
@@ -594,6 +589,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/proposals", s.createProposal)
 	mux.HandleFunc("GET /api/proposals", s.listProposals)
 	mux.HandleFunc("GET /api/proposals/{id}", s.getProposal)
+	mux.HandleFunc("GET /api/proposals/{id}/related", s.relatedProposalIntents)
 	mux.HandleFunc("POST /api/proposals/{id}/withdraw", s.withdrawProposal)
 	mux.HandleFunc("POST /api/proposals/{id}/approve", s.approveProposal)
 	mux.HandleFunc("POST /api/proposals/{id}/reject", s.rejectProposal)
@@ -1104,6 +1100,16 @@ func (s *Server) runIntent(w http.ResponseWriter, r *http.Request) {
 // StartRun claims an intent and dispatches it. It is exported because the
 // decider uses it to start the work it just created.
 func (s *Server) StartRun(id string) (string, error) {
+	return s.startRunAfterInterruption(id, "")
+}
+
+func (s *Server) startRunAfterInterruption(id, autoRedispatchedFrom string) (string, error) {
+	start := func(prompt, continuedFrom string, resume bool) (string, error) {
+		if autoRedispatchedFrom != "" {
+			return s.Lifecycle.StartAutoRedispatch(id, prompt, continuedFrom, resume, resume, autoRedispatchedFrom)
+		}
+		return s.startRunWith(id, prompt, continuedFrom, resume, resume)
+	}
 	// Administrative interruption keeps the task alive. Prefer its preserved
 	// native session; an explicit retry with resume=false still opens a fresh one.
 	if in, ok := s.Store.GetIntent(id); ok && in.Status == model.StatusPending && in.RunID != "" {
@@ -1115,9 +1121,9 @@ func (s *Server) StartRun(id string) (string, error) {
 			}
 			if executor.CanResume(s.Exec, nodeID, work) {
 				prompt := s.continuePrompt(in, previous, "项目暂停或进程重启后恢复；按当前有效指令核对断点，再继续未完成工作", s.readWorkerNote(work))
-				return s.startRunWith(id, prompt, previous.ID, true, true)
+				return start(prompt, previous.ID, true)
 			}
-			newRun, err := s.startRun(id, "", "")
+			newRun, err := start("", "", false)
 			if err == nil {
 				_, _ = s.Store.UpdateRun(newRun, func(r *model.Run) {
 					r.Infos = append(r.Infos, "暂停恢复：原 harness 会话不可用，本轮以账本、工作区和 worker-note 重建会话")
@@ -1126,7 +1132,7 @@ func (s *Server) StartRun(id string) (string, error) {
 			return newRun, err
 		}
 	}
-	return s.startRun(id, "", "")
+	return start("", "", false)
 }
 
 // SetPaused arms/disarms the project-level dispatch gate. The decider's own
@@ -2183,27 +2189,44 @@ func (s *Server) readLiveDeclarations(intentID, workDir, sourceRun string, offse
 // material, and it is passed through redactSecrets first: the live prompt may
 // carry a credential in a section the journal already redacts, and an archived
 // copy must not become the one place it survives (task-13 boundary, task-25).
-func (s *Server) archiveBrief(workDir, runID, prompt string) (string, error) {
+func (s *Server) archiveBrief(workDir, runID, prompt string) (rel, digest string, size int, err error) {
+	body := []byte(s.redactSecrets(prompt))
+	sum := sha256.Sum256(body)
+	digest = hex.EncodeToString(sum[:])
 	dir := filepath.Join(workDir, ".saker", "briefs")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", err
+		return "", digest, len(body), err
 	}
 	path := filepath.Join(dir, runID+".md")
-	if err := os.WriteFile(path, []byte(s.redactSecrets(prompt)), 0o600); err != nil {
-		return "", err
+	if err := os.WriteFile(path, body, 0o600); err != nil {
+		return "", digest, len(body), err
 	}
 	// The mode above is the creation request; POSIX must also get it on an
 	// existing file (a retried run id never reuses a path, but a test or a
 	// restored case can). Windows ignores the bits; the ACL there is the
 	// operator's, and the file is inside the case.
 	if err := os.Chmod(path, 0o600); err != nil {
-		return "", err
+		return "", digest, len(body), err
 	}
-	rel, err := filepath.Rel(s.CaseRoot, path)
+	rel, err = filepath.Rel(s.CaseRoot, path)
 	if err != nil {
-		return filepath.ToSlash(path), nil
+		return filepath.ToSlash(path), digest, len(body), nil
 	}
-	return filepath.ToSlash(rel), nil
+	return filepath.ToSlash(rel), digest, len(body), nil
+}
+
+// writeBriefArchivePath is the one ledger write that makes an archive traceable.
+// It is a package variable so the failure path (file written, path update
+// failed) can be exercised in a test; production uses the store directly.
+var writeBriefArchivePath = func(s *Server, runID, rel, digest string, size int) error {
+	_, err := s.Store.UpdateRun(runID, func(r *model.Run) {
+		r.BriefPath = rel
+		r.BriefArchive = &model.BriefArchive{
+			Status: model.BriefArchiveArchived, Path: rel, SHA256: digest,
+			Bytes: size, At: time.Now(),
+		}
+	})
+	return err
 }
 
 func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID string, resume bool, prompt string, keepPrompt bool) {
@@ -2311,6 +2334,10 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 		handoffAuth.SourceRun = in.Handoff.FromRun
 		if src, ok := s.Store.GetRun(in.Handoff.FromRun); ok {
 			handoffAuth.SourceBrief = src.BriefPath
+			if src.BriefArchive != nil {
+				handoffAuth.SourceArchiveStatus = src.BriefArchive.Status
+				handoffAuth.SourceArchiveError = src.BriefArchive.Error
+			}
 		}
 	}
 	waitSection := s.readyWaitSection(in)
@@ -2333,7 +2360,7 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 	case slimPrompt:
 		prompt = buildPromptWithoutOptionalSummaries(db, in, brief, s.pocDir(), s.KBDir, s.Timeout, graphOK, focusOK, probes, s.ReviewsDisabled())
 		if in.Handoff != nil {
-			prompt += handoffSection(db, in, *in.Handoff, handoffAuth) + "\n\n" + handoffIndexNote
+			prompt += handoffSection(db, in, *in.Handoff, handoffAuth, s.ReviewsDisabled()) + "\n\n" + handoffIndexNote
 		}
 		s.noteContextSlimRetry(runID,
 			"harness 报告上下文超限：本次改用精简任务书（可选摘要省略，硬约束与交接契约保留；按本轮输入清单与 fact ID 读取）")
@@ -2341,7 +2368,7 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 		prompt = buildDispatchPrompt(db, in, brief, s.pocDir(), s.KBDir, s.Timeout, graphOK, focusOK,
 			s.readWorkerNote(workDir), probes, s.ReviewsDisabled())
 		if in.Handoff != nil {
-			prompt += handoffSection(db, in, *in.Handoff, handoffAuth) + "\n\n" + handoffIndexNote
+			prompt += handoffSection(db, in, *in.Handoff, handoffAuth, s.ReviewsDisabled()) + "\n\n" + handoffIndexNote
 		}
 	default:
 		// A continued session still holds the task it was started with, and that
@@ -2354,7 +2381,7 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 		current := buildDispatchPrompt(db, in, brief, s.pocDir(), s.KBDir, s.Timeout, graphOK, focusOK,
 			s.readWorkerNote(workDir), probes, s.ReviewsDisabled())
 		if in.Handoff != nil {
-			current += handoffSection(db, in, *in.Handoff, handoffAuth) + "\n\n" + handoffIndexNote
+			current += handoffSection(db, in, *in.Handoff, handoffAuth, s.ReviewsDisabled()) + "\n\n" + handoffIndexNote
 		}
 		prompt = continuationBriefHeader + current + "\n\n## 本轮续跑\n" + prompt
 	}
@@ -2417,10 +2444,32 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 	// the model received — keeping it out left the resumed run's task text
 	// unrecorded while the session's older copy looked like the answer.
 	if prompt != "" {
-		if rel, err := s.archiveBrief(workDir, runID, prompt); err != nil {
+		// The pending stamp is written before the file: if the process stops (or
+		// the final path write fails) after the bytes landed, the run still says
+		// "archive pending" instead of looking like a run nobody archived. That
+		// is the only way the half-written state stays visible.
+		if _, err := s.Store.UpdateRun(runID, func(r *model.Run) {
+			r.BriefArchive = &model.BriefArchive{Status: model.BriefArchivePending, At: time.Now()}
+		}); err != nil {
+			log.Printf("run %s：记录任务书归档开始失败：%v", runID, err)
+		}
+		rel, digest, size, err := s.archiveBrief(workDir, runID, prompt)
+		if err != nil {
 			log.Printf("run %s：归档任务书失败：%v", runID, err)
-		} else {
-			_, _ = s.Store.UpdateRun(runID, func(r *model.Run) { r.BriefPath = rel })
+			_, _ = s.Store.UpdateRun(runID, func(r *model.Run) {
+				r.BriefArchive = &model.BriefArchive{
+					Status: model.BriefArchiveWriteFailed, Error: err.Error(), At: time.Now(),
+				}
+			})
+		} else if err := writeBriefArchivePath(s, runID, rel, digest, size); err != nil {
+			// The file is on disk and its digest is known; only the ledger path
+			// did not commit. Keep the pending state rather than claiming either
+			// success or a write failure.
+			log.Printf("run %s：任务书已写成但账本路径未写回（%s）：%v", runID, rel, err)
+		} else if in.Wait != nil {
+			if err := s.Store.MarkWaitDelivery(runID, model.WaitDeliveryArchived, rel); err != nil {
+				log.Printf("run %s：记录等待结果归档失败：%v", runID, err)
+			}
 		}
 	}
 	// A per-run identity is the collaboration credential: one token, one run,
@@ -2442,6 +2491,7 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 		}
 	}
 	modelRecorded := false
+	waitReceived := false
 	var executionObserved atomic.Bool
 	// Liveness (final-e2e I1): a weak model can emit "empty assistant reply ->
 	// llm_request" forever, which keeps the idle sweep from ever firing.
@@ -2461,6 +2511,15 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 		Eval:     in.Eval,
 		MaxTurns: in.MaxTurns,
 	}, func(ev executor.Event) {
+		// The first event is the confirmable node that proves the executor's
+		// session started this turn, including the wait results the archived
+		// brief carried. Before it, a crash leaves the delivery redeliverable.
+		if in.Wait != nil && !waitReceived {
+			waitReceived = true
+			if err := s.Store.MarkWaitDelivery(runID, model.WaitDeliveryReceived, ""); err != nil {
+				log.Printf("run %s：记录等待结果已送达失败：%v", runID, err)
+			}
+		}
 		if ev.Kind == executor.KindToolCall || ev.Kind == executor.KindToolResult || ev.NativeOperation != nil {
 			executionObserved.Store(true)
 		}
@@ -2486,7 +2545,7 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 		// The pulse keeps one line of the event so the board says what the run
 		// is doing, not just that it moved. The journal above stays the full
 		// record; the decider reads its tail through run_events (D57).
-		s.noteRunEvent(runID, time.Now(), ev.Kind, ev.Tool, ev.Text)
+		s.Store.NoteHarnessEvent(runID, time.Now(), ev.Kind, ev.Tool, s.redactSecrets(ev.Text), ev.CallID)
 		if ev.ContextTokens > 0 {
 			s.Store.ProgressRun(runID, ev.ContextTokens)
 		}
@@ -2497,6 +2556,16 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 			s.noteModelStall(runID)
 		}
 	})
+
+	// A turn that made at least one model call or produced a tool event has
+	// certainly received its prompt. Without this confirmation the next claim
+	// would redeliver results the executor already acted on.
+	if in.Wait != nil && !waitReceived && (executionObserved.Load() || res.UsageRequests > 0) {
+		waitReceived = true
+		if err := s.Store.MarkWaitDelivery(runID, model.WaitDeliveryReceived, ""); err != nil {
+			log.Printf("run %s：记录等待结果已送达失败：%v", runID, err)
+		}
+	}
 
 	status, reason := model.RunDone, ""
 	stopCleanup()
@@ -2556,7 +2625,8 @@ func (s *Server) dispatch(base context.Context, in model.Intent, runID, nodeID s
 	// here on OnFinish is the only writer, so its update-by-title cannot race
 	// with the watcher's add-by-title.
 	stopFacts()
-	declared := s.Ingest.OnFinish(runID, in.ID, s.CaseRoot, workDir, started)
+	settled := s.Ingest.Settle(runID, in.ID, s.CaseRoot, workDir, started)
+	declared := settled.Declared
 	// The finish ingest writes the authoritative fact set; route its changes
 	// before the run settles so related directions are notified promptly.
 	s.routeAndDeliver()
@@ -2715,45 +2785,63 @@ func (s *Server) finish(runID, intentID, status, reason string, res executor.Res
 // host.SweepStaleSessions, before projects attach — see watchdog-liveness §4.2
 // for why scanning the case tree in every Recover would be wasteful and why the
 // endpoint comparison belongs to whoever knows the live host.
-func (s *Server) Recover() {
+func (s *Server) Recover() (int, error) {
+	s.controlMu.Lock()
+	defer s.controlMu.Unlock()
+	return s.recoverLocked()
+}
+
+func (s *Server) recoverLocked() (int, error) {
 	// Crash repair is owned by the lifecycle service. Snapshot the orphan rows
 	// first so the Phase 1 sidecar sees the same restart cancels the ledger does:
 	// the lifecycle sweep writes rows directly and has no recorder handle.
 	var live []model.Run
-	if s.Metrics != nil && s.Store != nil {
+	if s.Store != nil {
 		for _, r := range s.Store.Runs() {
 			if r.Status == model.RunRunning {
 				live = append(live, r)
 			}
 		}
 	}
-	s.Lifecycle.Recover()
-	// The runs this sweep just settled were killed with the previous process, so
-	// their journals end mid-flight and cannot say why. Write the cause into each
-	// one: "restart" is the answer a review needs, and without this line the only
-	// possible reading is "something killed it" (20 of the 49 cancelled runs in the
-	// TSecBench 2026-11-22 package looked exactly like that).
-	for _, before := range live {
-		cur, ok := s.Store.GetRun(before.ID)
-		if !ok || cur.Status != model.RunCanceled {
-			continue
-		}
-		if err := s.appendJournalOnDisk(before.ID, map[string]any{
-			"kind": "run_cancel", "at": time.Now(), "run_id": before.ID,
-			"cause": model.CancelCauseRestart, "reason": s.redactSecrets(cur.ExitReason), "source": "recover",
-		}); err != nil {
-			log.Printf("run %s: 记录重启取消原因失败：%v", before.ID, err)
+	n, err := s.Lifecycle.Recover()
+	s.restartRecoveryError = ""
+	if err != nil {
+		s.restartRecoveryError = s.redactSecrets(err.Error())
+		s.SetPaused(true)
+		if s.Decider != nil && !s.Decider.Paused() {
+			s.Decider.PauseFor("项目已暂停，等待启动对账")
 		}
 	}
-	if s.Metrics != nil {
-		for _, before := range live {
-			cur, ok := s.Store.GetRun(before.ID)
-			if !ok || cur.Status != model.RunCanceled {
-				continue
+	// Mirror committed restart cancellations to the audit streams.
+	for _, before := range live {
+		cur, ok := s.Store.GetRun(before.ID)
+		if !ok || cur.Status != model.RunCanceled || cur.CancelCause != model.CancelCauseRestart {
+			continue
+		}
+		if cur.LogPath != "" || s.Metrics != nil {
+			if err := s.appendJournalOnDisk(before.ID, map[string]any{
+				"kind": "run_cancel", "at": time.Now(), "run_id": before.ID,
+				"cause": model.CancelCauseRestart, "reason": s.redactSecrets(cur.ExitReason), "source": "recover",
+			}); err != nil {
+				log.Printf("run %s: 记录重启取消原因失败：%v", before.ID, err)
 			}
+		}
+		if s.Metrics != nil {
 			s.Metrics.Cancel(before.ID, model.CancelCauseRestart, cur.ExitReason, before.StopReason)
 		}
 	}
+	if err == nil && !s.paused.Load() {
+		go s.pump()
+	}
+	return n, err
+}
+
+func (s *Server) retryRestartRecoveryLocked() error {
+	if s.restartRecoveryError == "" {
+		return nil
+	}
+	_, err := s.recoverLocked()
+	return err
 }
 
 // watchInterval is the guard's cadence. It is exported to the console as
@@ -2764,32 +2852,49 @@ const watchInterval = 30 * time.Second
 // Watch runs the watchdog: intents whose dispatcher disappeared go back to
 // pending so the next decision round can pick them up.
 func (s *Server) Watch(ctx context.Context) {
-	// Sweep once before the first tick: a process that was down for a while
-	// would otherwise keep dead queue rows for another full interval, and
-	// "restart then immediately read the queue" is exactly when that shows.
-	s.sweepMessages()
-	s.routeAndDeliver()
 	t := time.NewTicker(watchInterval)
 	defer t.Stop()
+	s.watchOnce(func() {
+		s.sweepMessages()
+		s.routeAndDeliver()
+	})
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			s.lastWatch.Store(time.Now().UnixNano())
-			s.reapOrphans()
-			s.reapIdle()
-			s.reapClaims()
-			s.reapDanglingIntents()
-			// The scheduler is also the wait-deadline tick: pump evaluates stored
-			// waits and starts unstarted children that were waiting for a slot.
-			s.pump()
-			// Queue cleanup is a tick too: a queued message that no run is going
-			// to carry expires instead of growing the ledger forever.
-			s.sweepMessages()
-			s.routeAndDeliver()
+			s.watchOnce(func() {
+				s.reapOrphans()
+				s.reapIdle()
+				s.reapClaims()
+				s.reapDanglingIntents()
+				s.pump()
+				s.sweepMessages()
+				s.routeAndDeliver()
+			})
 		}
 	}
+}
+
+type watchTimes struct {
+	started, completed time.Time
+	inProgress         bool
+}
+
+func (s *Server) watchOnce(sweep func()) {
+	s.controlMu.Lock()
+	blocked := s.restartRecoveryError != ""
+	s.controlMu.Unlock()
+	if blocked {
+		return
+	}
+	pulse := watchTimes{started: time.Now(), inProgress: true}
+	if previous := s.watchPulse.Load(); previous != nil {
+		pulse.completed = previous.completed
+	}
+	s.watchPulse.Store(&pulse)
+	sweep()
+	s.watchPulse.Store(&watchTimes{started: pulse.started, completed: time.Now()})
 }
 
 func (s *Server) reapOrphans() {
@@ -3529,12 +3634,24 @@ const unreportedLimit = 20
 // or a report whose validation failed is not a delivered citation, and letting
 // it vouch for its facts would hide exactly the gap this view exists to show.
 // The projection is a set difference, not a coverage claim.
-const unreportedNote = "只按已通过校验（status=ready）报告的 findings.json 里的 fact id 算差：命中即算已入，不判断该报告是否已过期，也不判断引用的是否为当前断言版本；没通过校验的报告的引用不算已入，单独列在 uncounted；没出现在名单里不代表结论未复核或报告有误。"
+const unreportedNote = "按「事实 ID + 断言版本」算差：只有已通过校验（status=ready）报告里的 fact_claim_version 与当前断言版本相同才算已收录；旧报告引用过 v1、事实已是 v2 时，本清单仍列出该事实并给出历史引用。没有版本信息的历史报告标为版本未知，不用当前状态倒推历史。没通过校验的报告的引用不算已入，单独列在 uncounted；没出现在名单里不代表结论未复核或报告有误。"
 
-// unreportedFact is one verified conclusion no report cites.
+// unreportedFact is one verified conclusion no delivered report cites at its
+// current claim version.
 type unreportedFact struct {
 	ID    string `json:"fact"`
 	Title string `json:"title"`
+	// Previous lists the delivered reports that cite this fact at another (or
+	// unknown) version. The gap is "v2 not covered", not "never mentioned".
+	Previous []reportCitationRef `json:"previous,omitempty"`
+}
+
+// reportCitationRef is one delivered report's citation of a fact. ClaimVersion
+// is zero for rows written before findings carried the assertion version; those
+// are version-unknown and never count as coverage of the current claim.
+type reportCitationRef struct {
+	Report       string `json:"report"`
+	ClaimVersion uint64 `json:"claim_version,omitempty"`
 }
 
 // reportPrecheck answers "what would the report contain right now" without
@@ -3568,18 +3685,29 @@ func (s *Server) reportPrecheck(w http.ResponseWriter, r *http.Request) {
 			verified = append(verified, f)
 		}
 	}
-	cited, unreadable, uncounted := s.reportFactCitations()
+	citations, unreadable, uncounted := s.reportFactCitations()
 	sort.Slice(verified, func(i, j int) bool { return verified[i].ID < verified[j].ID })
 	unreported := make([]unreportedFact, 0, len(verified))
 	for _, f := range verified {
-		if cited[f.ID] {
+		if citedAtClaim(citations[f.ID], f.ClaimVersion) {
 			continue
 		}
-		unreported = append(unreported, unreportedFact{ID: f.ID, Title: f.Title})
+		previous := citations[f.ID]
+		sort.SliceStable(previous, func(i, j int) bool { return previous[i].Report < previous[j].Report })
+		unreported = append(unreported, unreportedFact{ID: f.ID, Title: f.Title, Previous: previous})
 	}
 	total := len(unreported)
 	if len(unreported) > unreportedLimit {
 		unreported = unreported[:unreportedLimit]
+	}
+	unknownVersions := unknownVersionReports(citations)
+	// The polled precheck stays a light count. The full evidence check runs only
+	// when the operator asks to generate (`?evidence=1`), using the same rule the
+	// final generation uses, and names the evidence and the facts it supports.
+	var evidence *evidencePrecheck
+	if r.URL.Query().Get("evidence") == "1" {
+		missing, conflicts := report.EvidenceIssues(s.CaseRoot, db)
+		evidence = &evidencePrecheck{Checked: true, Missing: missing, Conflicts: conflicts}
 	}
 	writeJSON(w, 200, map[string]any{
 		"reportable":       reportable,
@@ -3588,20 +3716,33 @@ func (s *Server) reportPrecheck(w http.ResponseWriter, r *http.Request) {
 		"withdrawn":        withdrawn,
 		"running":          s.Reports != nil && s.Reports.Busy(),
 		"reviews_disabled": s.ReviewsDisabled(),
+		"evidence":         evidence,
 		"unreported": map[string]any{
-			"total":      total,
-			"limit":      unreportedLimit,
-			"items":      unreported,
-			"note":       unreportedNote,
-			"unreadable": unreadable,
-			"uncounted":  uncounted,
+			"total":                   total,
+			"limit":                   unreportedLimit,
+			"items":                   unreported,
+			"note":                    unreportedNote,
+			"unreadable":              unreadable,
+			"uncounted":               uncounted,
+			"unknown_version_reports": unknownVersions,
 		},
 	})
 }
 
-// reportFactCitations is the read-only half of the precheck: the fact ids a
-// delivered report's findings.json cites, the ids of reports whose rows could not
-// be read, and the ids of reports whose rows were readable but do not count.
+// evidencePrecheck is the on-demand evidence completeness answer. Checked
+// distinguishes "the scan ran and found nothing" from an older server that did
+// not answer the field at all.
+type evidencePrecheck struct {
+	Checked   bool                   `json:"checked"`
+	Missing   []report.EvidenceIssue `json:"missing,omitempty"`
+	Conflicts []report.EvidenceIssue `json:"conflicts,omitempty"`
+}
+
+// reportFactCitations is the read-only half of the precheck: every citation a
+// delivered report's findings.json makes, keyed by fact id and carrying the
+// assertion version the row was written against. Keeping the whole list — not a
+// set of fact ids — is what lets the precheck say "v1 is covered, v2 is not"
+// instead of treating a correction as already reported.
 //
 // A report that cannot be read is not treated as citing nothing — that would
 // report its facts as unreported when the opposite may be true — so it is named.
@@ -3610,8 +3751,8 @@ func (s *Server) reportPrecheck(w http.ResponseWriter, r *http.Request) {
 // fact reached a report. Counting them would let a failed check vouch for the
 // very facts it failed on, so they are listed separately instead of silently
 // dropped. A draft without rows yet is normal and not an error.
-func (s *Server) reportFactCitations() (cited map[string]bool, unreadable, uncounted []string) {
-	cited = map[string]bool{}
+func (s *Server) reportFactCitations() (byFact map[string][]reportCitationRef, unreadable, uncounted []string) {
+	byFact = map[string][]reportCitationRef{}
 	unreadable = make([]string, 0)
 	uncounted = make([]string, 0)
 	for _, m := range report.List(s.CaseRoot) {
@@ -3632,14 +3773,50 @@ func (s *Server) reportFactCitations() (cited map[string]bool, unreadable, uncou
 			continue
 		}
 		for _, row := range rows {
-			if row.Fact != "" {
-				cited[row.Fact] = true
+			if row.Fact == "" {
+				continue
 			}
+			byFact[row.Fact] = append(byFact[row.Fact], reportCitationRef{
+				Report: m.ID, ClaimVersion: row.FactClaimVersion,
+			})
 		}
 	}
 	sort.Strings(unreadable)
 	sort.Strings(uncounted)
-	return cited, unreadable, uncounted
+	return byFact, unreadable, uncounted
+}
+
+// citedAtClaim reports whether one fact is covered by a delivered report at the
+// exact assertion version. A zero version is unknown, not current: assuming it
+// matched would let a pre-version report vouch for an assertion it never read.
+func citedAtClaim(citations []reportCitationRef, claimVersion uint64) bool {
+	if claimVersion == 0 {
+		return false
+	}
+	for _, c := range citations {
+		if c.ClaimVersion == claimVersion {
+			return true
+		}
+	}
+	return false
+}
+
+// unknownVersionReports names the delivered reports that cite at least one fact
+// without a version. It is a set: the console shows the reports once, not once
+// per row.
+func unknownVersionReports(byFact map[string][]reportCitationRef) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0)
+	for _, citations := range byFact {
+		for _, c := range citations {
+			if c.ClaimVersion == 0 && !seen[c.Report] {
+				seen[c.Report] = true
+				out = append(out, c.Report)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 func (s *Server) getReport(w http.ResponseWriter, r *http.Request) {
@@ -4060,7 +4237,7 @@ func (s *Server) autoVerifyWithContext(ctx context.Context, intentID string) {
 		return
 	}
 	cursor := start
-	reviewed, busy, cooling, failed := 0, 0, 0, 0
+	reviewed, busy, cooling, blocked, failed := 0, 0, 0, 0, 0
 	for _, f := range facts {
 		// Stop before the first candidate this pass did not reach: the cursor
 		// stays on the last handled candidate, so a resumed pass continues with
@@ -4074,10 +4251,16 @@ func (s *Server) autoVerifyWithContext(ctx context.Context, intentID string) {
 			busy++
 			continue
 		}
+		if a, isBlocked := s.reviewBlocked(f); isBlocked {
+			blocked++
+			log.Printf("自动复核 %s（%s）：%s，等待断言或证据变化（%s）",
+				f.ID, clipRunes(f.Title, 60), a.Outcome, clipRunes(a.Reason, 200))
+			continue
+		}
 		now := time.Now()
 		if wait, ok := s.reviewCoolingDown(f, now); ok {
 			cooling++
-			log.Printf("自动复核 %s（%s）：上次未得到可用结论，冷却中（约 %s 后重试）",
+			log.Printf("自动复核 %s（%s）：上次运行失败，冷却中（约 %s 后重试）",
 				f.ID, clipRunes(f.Title, 60), wait.Round(time.Second))
 			continue
 		}
@@ -4088,29 +4271,38 @@ func (s *Server) autoVerifyWithContext(ctx context.Context, intentID string) {
 				break
 			}
 			failed++
-			s.noteReviewFailure(f, time.Now())
+			retry := time.Now().Add(reviewRetryCooldown)
+			s.recordReviewAttempt(f, store.ReviewAttemptRunFailed, err.Error(), "", time.Now(), &retry)
 			log.Printf("自动复核 %s（%s）失败，进入冷却：%v", f.ID, clipRunes(f.Title, 60), err)
 			continue
 		}
-		if review.Verdict != "pass" && review.Verdict != "reject" {
-			// needs_evidence: the run happened but the fact is still unverified.
-			// Treat it as a failed attempt for retry budgeting, otherwise every
-			// wake would pay for the same unsuccessful review again.
+		switch review.Verdict {
+		case "pass":
+			s.clearReviewFailure(f)
+			reviewed++
+		case "reject":
+			// An independent veto is a verdict, not a broken run: it is shown
+			// separately and is not retried on a timer.
 			failed++
-			s.noteReviewFailure(f, time.Now())
-			log.Printf("自动复核 %s（%s）：结论 %q 未改变事实状态，进入冷却（%s）",
-				f.ID, clipRunes(f.Title, 60), review.Verdict, reviewRetryCooldown)
-			continue
+			s.recordReviewAttempt(f, store.ReviewAttemptRejected, review.Notes, review.VerifierRun, time.Now(), nil)
+			log.Printf("自动复核 %s（%s）：独立复核否决（%s）", f.ID, clipRunes(f.Title, 60), clipRunes(review.Notes, 200))
+			reviewed++
+		default:
+			// needs_evidence: the run happened but the material did not support a
+			// verdict. Retrying the same assertion/evidence set would only pay for
+			// the same answer again; wait for a material change.
+			failed++
+			s.recordReviewAttempt(f, store.ReviewAttemptNeedsEvidence, review.Notes, review.VerifierRun, time.Now(), nil)
+			log.Printf("自动复核 %s（%s）：%q，等待补充材料或更正断言（%s）",
+				f.ID, clipRunes(f.Title, 60), review.Verdict, clipRunes(review.Notes, 200))
 		}
-		s.clearReviewFailure(f)
-		reviewed++
 	}
 	if err := s.Store.SetReviewCursor(intentID, cursor); err != nil {
 		log.Printf("自动复核 %s：记录复核游标失败：%v", intentID, err)
 	}
-	if reviewed+busy+cooling+failed > 0 {
-		log.Printf("自动复核 %s：本批 %d 个候选，%d 个得到结论，%d 个未得结论（冷却），%d 个忙碌跳过，%d 个冷却跳过",
-			intentID, len(facts), reviewed, failed, busy, cooling)
+	if reviewed+busy+cooling+blocked+failed > 0 {
+		log.Printf("自动复核 %s：本批 %d 个候选，%d 个得到结论，%d 个未得结论，%d 个忙碌跳过，%d 个冷却跳过，%d 个等待材料",
+			intentID, len(facts), reviewed, failed, busy, cooling, blocked)
 	}
 	if reviewed > 0 && s.Decider != nil {
 		s.wakeCommanderIfNeeded("review")
@@ -4463,15 +4655,6 @@ func (s *Server) listRuns(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"runs": runs})
 }
 
-// guardInfo is the watchdog's public pulse for the console: cadence, idle
-// threshold, and when it last swept. It is observation only — the guard has no
-// model and no policy; the page must not have to guess its numbers.
-type guardInfo struct {
-	IntervalSeconds    int        `json:"interval_seconds"`
-	IdleTimeoutSeconds int        `json:"idle_timeout_seconds,omitempty"`
-	LastTickAt         *time.Time `json:"last_tick_at,omitempty"`
-}
-
 // boardRunWarnings is one run's handoff problems as the board shows them. The
 // board is the operator's first look, so "why is this evidence missing" must be
 // answerable there without opening the run list (task-17).
@@ -4542,10 +4725,15 @@ func (s *Server) getBoard(w http.ResponseWriter, r *http.Request) {
 		if s.IdleTimeout > 0 {
 			g.IdleTimeoutSeconds = int(s.IdleTimeout / time.Second)
 		}
-		if n := s.lastWatch.Load(); n > 0 {
-			t := time.Unix(0, n)
-			g.LastTickAt = &t
+		if pulse := s.watchPulse.Load(); pulse != nil {
+			g.StartedAt = &pulse.started
+			if !pulse.completed.IsZero() {
+				g.CompletedAt = &pulse.completed
+			}
+			g.InProgress = pulse.inProgress
 		}
+		g.observeRuns(db.Runs)
+		g.Activity = s.guardActivity(db, v.Running)
 		guard = &g
 	}
 	// Review/report queue state is operator-side post-processing: the commander
@@ -4908,6 +5096,9 @@ func (s *Server) setProjectPaused(paused bool) error {
 // keeps whatever the manifest already carries (a pause is a transition, not a
 // reclassification); resuming always clears it.
 func (s *Server) setProjectPausedKind(paused bool, kind string) error {
+	if !paused && s.restartRecoveryError != "" {
+		return errors.New(s.restartRecoveryError)
+	}
 	if s.persistPausedKind != nil {
 		return s.persistPausedKind(paused, kind)
 	}
@@ -4989,6 +5180,14 @@ func (s *Server) projectResume(w http.ResponseWriter, r *http.Request) {
 	// projectStateLocked reads the pause cause under the lock we already hold.
 	before := s.projectStateLocked()
 	verdict := s.resumeActionLocked(before, s.projectFactsLocked())
+	if before.RecoveryError != "" && verdict.ReasonCode == reasonRestartRecovery {
+		if err := s.retryRestartRecoveryLocked(); err != nil {
+			writeJSON(w, http.StatusConflict, map[string]any{"code": reasonRestartRecovery, "error": s.restartRecoveryError, "paused": true})
+			return
+		}
+		before = s.projectStateLocked()
+		verdict = s.resumeActionLocked(before, s.projectFactsLocked())
+	}
 	if verdict.ReasonCode == reasonCloseoutInProgress {
 		writeJSON(w, http.StatusConflict, map[string]any{
 			"error": verdict.Reason,
@@ -5098,7 +5297,7 @@ func (s *Server) ResumeAfterRestart() {
 	before := s.projectStateLocked()
 	verdict := s.resumeActionLocked(before, s.projectFactsLocked())
 	switch verdict.ReasonCode {
-	case reasonDeleting, reasonCloseoutInProgress:
+	case reasonDeleting, reasonCloseoutInProgress, reasonRestartRecovery:
 		// Neither is the restart's to clear: deletion owns the tree, and a
 		// closeout owns the runtime until its round settles.
 		return

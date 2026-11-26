@@ -52,6 +52,12 @@ type Memory struct {
 	// queue, and SetReviewCursor persists it through the same meta transaction
 	// without bumping the decider's change counter.
 	ReviewCursors map[string]string `json:"review_cursors,omitempty"`
+	// ReviewAttempts is the durable last attempt per fact, keyed by fact ID and
+	// carrying the assertion version it judged. The automatic queue's cooldown
+	// and blocked state used to live only in process memory, so a restart forgot
+	// why a finding was not moving and retried it immediately. It is queue
+	// bookkeeping, not a verdict: the Review row stays the proof record.
+	ReviewAttempts map[string]ReviewAttempt `json:"review_attempts,omitempty"`
 	// AttentionThrough is a delivery checkpoint for global decision events, not
 	// a fact/read ACK. Local events remain in History after routing past them.
 	AttentionThrough uint64 `json:"attention_through,omitempty"`
@@ -71,10 +77,13 @@ type Memory struct {
 	// alert can name the reshuffling instead of saying only "no progress". They
 	// are durable on purpose: a restart that reset the count would hide a
 	// direction that has been idling for hours.
-	StallThrough    uint64 `json:"stall_through,omitempty"`
-	StallRounds     int    `json:"stall_rounds,omitempty"`
-	StallEscalated  bool   `json:"stall_escalated,omitempty"`
-	StallDirections int    `json:"stall_directions,omitempty"`
+	StallThrough      uint64 `json:"stall_through,omitempty"`
+	StallRounds       int    `json:"stall_rounds,omitempty"`
+	StallEscalated    bool   `json:"stall_escalated,omitempty"`
+	StallDirections   int    `json:"stall_directions,omitempty"`
+	StallParked       int    `json:"stall_parked,omitempty"`
+	StallFailed       int    `json:"stall_failed,omitempty"`
+	StallReviewFailed int    `json:"stall_review_failed,omitempty"`
 }
 
 type record struct {

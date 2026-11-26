@@ -498,6 +498,13 @@ func (s *Service) ProjectCapacity() (running, limit int) {
 
 // ---- start ----
 
+// proposalClaim identifies the proposal row whose dispatch receipt commits with
+// the intent claim and run row. A nil claim is a normal start.
+type proposalClaim struct {
+	ID              string
+	ExpectedVersion uint64
+}
+
 // Start claims one direction and launches its run. It is the only admission
 // entry point: handlers and the scheduler both call it, so the closing/deleting/
 // paused gates, project/instance capacity, blocked premises, CAS claim
@@ -507,14 +514,45 @@ func (s *Service) ProjectCapacity() (running, limit int) {
 // wake or a replacement session all arrive here with the prompt already built
 // (keeping prompt assembly in the API).
 func (s *Service) Start(id, prompt, continuedFrom string, resume, keepPrompt bool, owner string) (string, error) {
+	_, runID, err := s.start(id, prompt, continuedFrom, resume, keepPrompt, owner, nil, "")
+	return runID, err
+}
+
+// StartAutoRedispatch records provenance on the same transaction as the new run.
+func (s *Service) StartAutoRedispatch(id, prompt, continuedFrom string, resume, keepPrompt bool, previousRun string) (string, error) {
+	_, runID, err := s.start(id, prompt, continuedFrom, resume, keepPrompt, "", nil, previousRun)
+	return runID, err
+}
+
+// StartProposal is Start for a proposal dispatch. The proposal version check,
+// the intent claim, the run row and the dispatch receipt are committed by one
+// store transaction before the executor is launched; a retry after the response
+// was lost returns the recorded run instead of starting a second one.
+func (s *Service) StartProposal(proposalID string, expectedVersion uint64, id, prompt, continuedFrom string, resume, keepPrompt bool, owner string) (model.Proposal, string, error) {
+	// A completed dispatch is a receipt, not a new start. Check it before the
+	// admission gates: the intent may already have settled since, and a retry
+	// must still be answered with the original run.
+	if p, ok := s.o.Store.GetProposal(proposalID); ok && p.Status == model.ProposalDispatched {
+		if p.RunID == "" {
+			return model.Proposal{}, "", fmt.Errorf("%w：提议 %s 已派发但缺少运行回执", store.ErrProposalConflict, p.ID)
+		}
+		if run, found := s.o.Store.GetRun(p.RunID); !found || run.IntentID != p.IntentID {
+			return model.Proposal{}, "", fmt.Errorf("%w：提议 %s 的回执运行 %s 不在账本中", store.ErrProposalConflict, p.ID, p.RunID)
+		}
+		return p, p.RunID, nil
+	}
+	return s.start(id, prompt, continuedFrom, resume, keepPrompt, owner, &proposalClaim{ID: proposalID, ExpectedVersion: expectedVersion}, "")
+}
+
+func (s *Service) start(id, prompt, continuedFrom string, resume, keepPrompt bool, owner string, claim *proposalClaim, autoRedispatchedFrom string) (model.Proposal, string, error) {
 	if s.o.Gates.Closing.Load() {
-		return "", errors.New("控制台正在关闭：不能再派发")
+		return model.Proposal{}, "", errors.New("控制台正在关闭：不能再派发")
 	}
 	if s.o.Gates.Deleting.Load() {
-		return "", errors.New("项目正在删除：不能再派发")
+		return model.Proposal{}, "", errors.New("项目正在删除：不能再派发")
 	}
 	if s.o.Gates.Paused.Load() {
-		return "", errors.New("项目已暂停：点「继续」后再派发")
+		return model.Proposal{}, "", errors.New("项目已暂停：点「继续」后再派发")
 	}
 	// Concurrent starts are serialized so the cap is a real cap: two API calls
 	// arriving together must not both observe "one slot free".
@@ -529,43 +567,59 @@ func (s *Service) Start(id, prompt, continuedFrom string, resume, keepPrompt boo
 
 	in, ok := s.o.Store.GetIntent(id)
 	if !ok {
-		return "", fmt.Errorf("intent %s 不存在", id)
+		return model.Proposal{}, "", fmt.Errorf("intent %s 不存在", id)
 	}
 	if resume && continuedFrom != "" && in.RunID != continuedFrom {
-		return "", fmt.Errorf("意图已切换运行，拒绝续接过期 run %s", continuedFrom)
+		return model.Proposal{}, "", fmt.Errorf("意图已切换运行，拒绝续接过期 run %s", continuedFrom)
 	}
 	if limit := s.o.ProjectLimit(); limit > 0 && s.o.RunningIntentCount() >= limit {
-		return "", fmt.Errorf("并发已到上限 %d：等一个 run 结束，或在「设置 → 项目并发」/ --max-runs 调大", limit)
+		return model.Proposal{}, "", fmt.Errorf("并发已到上限 %d：等一个 run 结束，或在「设置 → 项目并发」/ --max-runs 调大", limit)
 	}
 	if maxWorkers := s.o.MaxWorkers(); maxWorkers > 0 && s.o.GlobalRunning != nil {
 		if running := s.o.GlobalRunning(); running >= maxWorkers {
-			return "", fmt.Errorf("实例并发已到上限 %d（--max-workers）：等一个 run 结束再派发", maxWorkers)
+			return model.Proposal{}, "", fmt.Errorf("实例并发已到上限 %d（--max-workers）：等一个 run 结束再派发", maxWorkers)
 		}
 	}
 	// The graph is the memory: a direction whose from_facts are gone or were
 	// rejected is dead work, not queued work (D52).
 	if blocked := s.o.BlockedPremises(in); len(blocked) > 0 {
-		return "", fmt.Errorf("意图 %s 的前提事实不成立：%s", id, strings.Join(blocked, "；"))
+		return model.Proposal{}, "", fmt.Errorf("意图 %s 的前提事实不成立：%s", id, strings.Join(blocked, "；"))
 	}
 	if in.Status == model.StatusRunning || in.Status == model.StatusClaimed {
-		return "", fmt.Errorf("intent %s 已在运行", id)
+		return model.Proposal{}, "", fmt.Errorf("intent %s 已在运行", id)
 	}
 	run, nodeID, err := s.o.PlanRun(in, continuedFrom)
 	if err != nil {
-		return "", err
+		return model.Proposal{}, "", err
 	}
+
+	run.AutoRedispatchedFrom = autoRedispatchedFrom
 
 	// Publish a cancel handle before returning the admitted run. A pause/cancel
 	// racing goroutine startup must not miss a run already in the ledger.
 	s.mu.Lock()
 	if s.o.Gates.Paused.Load() || s.o.Gates.Deleting.Load() || s.o.Gates.Closing.Load() {
 		s.mu.Unlock()
-		return "", errors.New("项目已暂停、正在删除或控制台关闭：不能再派发")
+		return model.Proposal{}, "", errors.New("项目已暂停、正在删除或控制台关闭：不能再派发")
 	}
-	claimed, run, err := s.o.Store.StartIntentRun(id, nodeID, owner, run)
+	var claimed model.Intent
+	var dispatched model.Proposal
+	created := false
+	if claim != nil {
+		dispatched, claimed, run, created, err = s.o.Store.StartProposalRun(claim.ID, claim.ExpectedVersion, nodeID, owner, run)
+	} else {
+		claimed, run, err = s.o.Store.StartIntentRun(id, nodeID, owner, run)
+		created = err == nil
+	}
 	if err != nil {
 		s.mu.Unlock()
-		return "", err
+		return model.Proposal{}, "", err
+	}
+	if !created {
+		// Another request committed this dispatch between our read and the
+		// transaction. The receipt is the answer; nothing is launched here.
+		s.mu.Unlock()
+		return dispatched, run.ID, nil
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancels[run.ID] = cancel
@@ -583,7 +637,7 @@ func (s *Service) Start(id, prompt, continuedFrom string, resume, keepPrompt boo
 		}()
 		s.o.Dispatch(ctx, claimed, run.ID, nodeID, resume, prompt, keepPrompt)
 	}()
-	return run.ID, nil
+	return dispatched, run.ID, nil
 }
 
 // ---- settlement ----
@@ -735,70 +789,67 @@ func (s *Service) redeliverPossiblyUnread(intentID, runID string) {
 // that pause and lets the interrupted directions continue; an operator pause or a
 // commander stop is left alone. It is idempotent and returns the number of rows
 // it repaired; a second call returns 0.
-func (s *Service) ReconcileAfterRestart() int {
+func (s *Service) ReconcileAfterRestart() (int, error) {
 	now := time.Now()
 	settled := 0
 	for _, r := range s.o.Store.Runs() {
-		if r.Status != model.RunRunning {
-			continue
-		}
-		settled++
-		_, _ = s.o.Store.UpdateRun(r.ID, func(x *model.Run) {
-			x.Status = model.RunCanceled
-			x.CancelCause = model.CancelCauseRestart
-			x.EndedAt = &now
-			// StopReason is the harness's own verdict on the turn. This process
-			// was not there to observe a new one, so it stays exactly as the dead
-			// process left it — a synthesized verdict would be a fabricated fact.
-			reason := "进程重启对账：上个进程退出时该运行仍在执行，已收敛为取消；意图保持可重试，未重放外部动作"
-			if x.ExitReason != "" {
-				reason = "进程重启对账：" + x.ExitReason
-			}
-			x.ExitReason = reason
-		})
-		if r.Purpose == "commander" {
-			if _, err := s.o.Store.RedeliverPossiblyUnread(collab.CommanderID, r.ID, time.Time{}); err != nil {
-				log.Printf("恢复指挥官未确认输入失败：%v", err)
-			}
-			continue
-		}
-		// Repair only the intent still pointing at this run: an older run must
-		// not reset a replacement direction's state.
-		if in, ok := s.o.Store.GetIntent(r.IntentID); ok && in.RunID == r.ID {
-			if in.Status == model.StatusRunning || in.Status == model.StatusClaimed {
-				if _, _, err := s.recoverInterruptedIntent(in, true); err != nil {
-					log.Printf("恢复意图 %s 失败：%v", in.ID, err)
+		changed := false
+		switch {
+		case r.Status == model.RunRunning:
+			if _, err := s.o.Store.UpdateRun(r.ID, func(x *model.Run) {
+				x.Status = model.RunCanceled
+				x.CancelCause = model.CancelCauseRestart
+				x.EndedAt = &now
+				if x.ExitReason == "" {
+					x.ExitReason = "上个进程退出时该运行仍在执行"
 				}
+				x.ExitReason = "进程重启对账：" + x.ExitReason
+			}); err != nil {
+				return settled, fmt.Errorf("重启对账写入运行 %s：%w", r.ID, err)
 			}
+			settled++
+			changed = true
+			s.restarted.Store(true)
+		case r.Status == model.RunCanceled && r.CancelCause == model.CancelCauseRestart:
+			// The previous attempt may have persisted the run before its intent.
+		default:
+			continue
+		}
+		if r.Purpose == "commander" {
+			n, err := s.o.Store.RedeliverPossiblyUnread(collab.CommanderID, r.ID, time.Time{})
+			if err != nil {
+				return settled, fmt.Errorf("重启对账恢复指挥官运行 %s 的未确认输入：%w", r.ID, err)
+			}
+			if n > 0 && !changed {
+				settled++
+			}
+			continue
+		}
+		in, ok := s.o.Store.GetIntent(r.IntentID)
+		if !ok || in.RunID != r.ID || (in.Status != model.StatusRunning && in.Status != model.StatusClaimed) {
+			continue
+		}
+		_, applied, err := s.recoverInterruptedIntent(in, true)
+		if err != nil {
+			return settled, fmt.Errorf("重启对账修复运行 %s 的意图 %s：%w", r.ID, in.ID, err)
+		}
+		if applied && !changed {
+			settled++
+			s.restarted.Store(true)
 		}
 	}
-	// Waiting directions survive a restart: their condition is in the ledger.
-	if settled > 0 {
-		s.restarted.Store(true)
-	}
-	return settled
+	return settled, nil
 }
 
-// Recover repairs what a crash leaves behind. At startup no goroutine owns any
-// run, so a run recorded as running is necessarily an orphan. It is the boot
-// sequence: message/handoff repair, the idempotent run reconciliation above, then
-// a scheduler wake (the pump only advances already-durable waits/children; it
-// never re-sends external work).
-func (s *Service) Recover() {
+// Recover repairs durable state left by the previous process.
+func (s *Service) Recover() (int, error) {
 	if err := s.o.Store.RecoverMessageDeliveries(); err != nil {
-		log.Printf("恢复消息投递失败：%v", err)
-		return
+		return 0, fmt.Errorf("重启对账恢复消息投递：%w", err)
 	}
 	if err := s.o.Store.RecoverHandoffs(); err != nil {
-		log.Printf("恢复交接失败：%v", err)
-		return
+		return 0, fmt.Errorf("重启对账恢复交接：%w", err)
 	}
-	if n := s.ReconcileAfterRestart(); n > 0 {
-		log.Printf("重启对账：收敛 %d 个上个进程遗留的运行（意图保持可重试）", n)
-	}
-	if s.o.Pump != nil {
-		go s.o.Pump()
-	}
+	return s.ReconcileAfterRestart()
 }
 
 // ReapOrphans returns a running intent run whose dispatcher vanished to
@@ -822,12 +873,15 @@ func (s *Service) ReapOrphans() {
 		if r.Status != model.RunRunning || active[r.ID] || now.Sub(r.StartedAt) < 2*time.Minute {
 			continue
 		}
-		_, _ = s.o.Store.UpdateRun(r.ID, func(x *model.Run) {
+		if _, err := s.o.Store.UpdateRun(r.ID, func(x *model.Run) {
 			x.Status = model.RunCanceled
 			x.CancelCause = model.CancelCauseWatchdog
 			x.EndedAt = &now
-			x.ExitReason = "调度丢失，守卫回收"
-		})
+			x.ExitReason = "守卫回收：未找到该运行的调度句柄"
+		}); err != nil {
+			log.Printf("守卫回收运行 %s 失败：%v", r.ID, err)
+			continue
+		}
 		if in, ok := s.o.Store.GetIntent(r.IntentID); ok && in.RunID == r.ID {
 			if in.Status == model.StatusRunning || in.Status == model.StatusClaimed {
 				_, applied, err := s.recoverInterruptedIntent(in, true)
@@ -872,7 +926,10 @@ func (s *Service) ReapIdle(idleTimeout time.Duration) {
 		if !ok || in.RunID != r.ID || (in.Status != model.StatusRunning && in.Status != model.StatusClaimed) {
 			continue
 		}
-		reason := fmt.Sprintf("静默 %s（疑似卡死）：守卫取消并 hold", idleTimeout)
+		reason := fmt.Sprintf("守卫取消：距最近运行事件（或运行开始）已 %s，静默阈值 %s", idle.Round(time.Second), idleTimeout)
+		if n := len(r.OpenToolCalls); n > 0 {
+			reason += fmt.Sprintf("，%d 个工具调用尚未收到结果", n)
+		}
 		if _, applied, err := s.o.Store.UpdateIntentIfCurrent(in.ID, in.Status, r.ID, func(i *model.Intent) {
 			i.Hold = true
 			i.HeldBy = model.HoldActorWatchdog

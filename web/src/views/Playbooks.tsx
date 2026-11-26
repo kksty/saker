@@ -19,6 +19,7 @@ import { Page } from '@/components/Page'
 import { api, projectID } from '@/lib/api'
 import { fmtTime } from '@/lib/format'
 import { useDebounced, useLoad } from '@/lib/hooks'
+import { useCopyFeedback } from '@/lib/use-copy-feedback'
 import type { Playbook, PlaybookStatus } from '@/lib/types'
 
 // The API derives the displayed status from the entry and its source facts.
@@ -59,7 +60,7 @@ export function Playbooks() {
   const searchInput = useRef<HTMLInputElement>(null)
   const [sort, setSort] = useState<SortMode>('updated')
   const [selected, setSelected] = useState<string | null>(null)
-  const [copied, setCopied] = useState('')
+  const { feedback: copyFeedback, copy } = useCopyFeedback()
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [archived, setArchived] = useState(false)
@@ -166,16 +167,6 @@ export function Playbooks() {
       if (request === generation.current) setError(e instanceof Error ? e.message : String(e))
     } finally {
       if (request === generation.current) setBusy('')
-    }
-  }
-
-  async function copy(text: string, key: string) {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(key)
-      window.setTimeout(() => setCopied((v) => (v === key ? '' : v)), 1200)
-    } catch {
-      /* clipboard is best-effort; the text is visible anyway */
     }
   }
 
@@ -470,7 +461,16 @@ export function Playbooks() {
 
               <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2">{current.when}</p>
 
-              {current.status === 'candidate' && (
+              {current.source_changed && (
+                <Callout tone="warning" className="mt-3" data-testid="playbook-source-changed">
+                  <div className="font-medium">来源已变化，原确认保留</div>
+                  <p className="mt-1 text-[12px] leading-relaxed">
+                    {current.source_change || '确认时引用的事实断言已经更新。'}
+                    旧条目和确认历史不会被改写；需要执行者按新版本重新引用这条打法，才会恢复确认。
+                  </p>
+                </Callout>
+              )}
+              {current.status === 'candidate' && !current.source_changed && (
                 <Callout tone="warning" className="mt-3">
                   {current.origin === 'executor'
                     ? '执行者已声明这条知识。来源事实缺失、未核验、已失效，或缺少原始证据登记时，条目显示为候选。'
@@ -494,13 +494,20 @@ export function Playbooks() {
                       size="xs"
                       variant="ghost"
                       className="absolute right-1 top-1 h-7 gap-1 text-[11px]"
-                      onClick={() => copy(current.doc ?? '', current.id)}
-                      title="复制战场知识"
+                      onClick={() => void copy(current.doc ?? '', current.id)}
+                      title={copyFeedback?.key === current.id && copyFeedback.status === 'failed' ? '复制失败：请手动选择上面的文本' : '复制战场知识'}
                     >
-                      {copied === current.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                      {copied === current.id ? '已复制' : '复制'}
+                      {copyFeedback?.key === current.id && copyFeedback.status === 'ok' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      {copyFeedback?.key === current.id
+                        ? copyFeedback.status === 'ok' ? '已复制' : '复制失败'
+                        : '复制'}
                     </Button>
                   </div>
+                  {copyFeedback?.key === current.id && copyFeedback.status === 'failed' && (
+                    <span role="status" className="mt-1 block text-[11px] leading-relaxed text-destructive">
+                      剪贴板不可用；上面这段文本可以直接选中手工复制。
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -525,11 +532,39 @@ export function Playbooks() {
                   <div className="flex flex-wrap gap-1.5">
                     {(current.from_fact_ids ?? []).map((id) => (
                       <Badge key={id} size="sm" variant="muted" className="saker-break font-mono">
-                        {id}{current.from_fact_versions?.[id] ? ` · v${current.from_fact_versions[id]}` : ''}
+                        {id}
+                        {current.from_fact_claims?.[id] ? ` · 断言 v${current.from_fact_claims[id]}` : ' · 断言版本未知'}
                       </Badge>
                     ))}
                   </div>
                 </div>
+              )}
+
+              {(current.confirmations ?? []).length > 0 && (
+                <details className="mt-3 rounded-lg border border-hairline" data-testid="playbook-confirmations">
+                  <summary className="cursor-pointer list-none px-3 py-2 text-[11px] text-ink-2 [&::-webkit-details-marker]:hidden">
+                    确认历史（{(current.confirmations ?? []).length} 次）：只追加，不改写旧回执
+                  </summary>
+                  <ul className="space-y-1.5 border-t border-hairline px-3 py-2">
+                    {(current.confirmations ?? []).map((c, index) => (
+                      <li key={`${c.at}:${index}`} className="text-[11px] leading-5 text-ink-2">
+                        <span className="text-ink-3">{fmtTime(c.at)}</span>
+                        {c.source_run_id && <> · 运行 <span className="font-mono">{c.source_run_id}</span></>}
+                        {c.from_fact_ids?.length ? (
+                          <span>
+                            {' '}· 依据：
+                            {c.from_fact_ids.map((id) => (
+                              <span key={id} className="font-mono">
+                                {id}
+                                {c.from_fact_claims?.[id] ? `（断言 v${c.from_fact_claims[id]}）` : '（版本未知）'}
+                              </span>
+                            ))}
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
               )}
 
               {current.source_run_id && (

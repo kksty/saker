@@ -1,4 +1,4 @@
-import type { ReportPrecheck } from './types.ts'
+import type { ReportEvidenceIssue, ReportPrecheck } from './types.ts'
 
 /**
  * The report trace, read from the precheck the backend already returns.
@@ -37,6 +37,8 @@ export function withReportParam(search: string, reportID: string | null): string
 export interface UnreportedFactRef {
   fact: string
   title: string
+  /** Reports that cite this fact at another (or unknown) version. */
+  previous: { report: string; claimVersion: number }[]
 }
 
 export interface UnreportedView {
@@ -50,16 +52,27 @@ export interface UnreportedView {
   note: string
   unreadable: string[]
   uncounted: string[]
+  unknownVersionReports: string[]
 }
 
 export function unreportedView(precheck?: ReportPrecheck | null): UnreportedView {
   const raw = precheck?.unreported
   if (!raw) {
-    return { present: false, total: 0, items: [], hidden: 0, limit: 0, note: '', unreadable: [], uncounted: [] }
+    return {
+      present: false, total: 0, items: [], hidden: 0, limit: 0, note: '',
+      unreadable: [], uncounted: [], unknownVersionReports: [],
+    }
   }
   const items = (raw.items ?? [])
     .filter((item) => Boolean(item?.fact))
-    .map((item) => ({ fact: item.fact, title: item.title ?? '' }))
+    .map((item) => ({
+      fact: item.fact,
+      title: item.title ?? '',
+      previous: (item.previous ?? []).map((p) => ({
+        report: p.report,
+        claimVersion: p.claim_version ?? 0,
+      })),
+    }))
   // `total` is the whole set; `items` may be capped by `limit`. Never report
   // fewer rows than were returned, even if a server under-counts.
   const total = Math.max(raw.total ?? items.length, items.length)
@@ -72,6 +85,7 @@ export function unreportedView(precheck?: ReportPrecheck | null): UnreportedView
     note: raw.note ?? '',
     unreadable: (raw.unreadable ?? []).filter(Boolean),
     uncounted: (raw.uncounted ?? []).filter(Boolean),
+    unknownVersionReports: (raw.unknown_version_reports ?? []).filter(Boolean),
   }
 }
 
@@ -94,4 +108,41 @@ export function precheckVerdict(
   if (!precheck) return { kind: 'loading' }
   if (precheck.running) return { kind: 'running' }
   return { kind: 'ok', precheck }
+}
+
+/** One generation-time evidence problem, rendered from the structured issue the
+ *  report's own verifier returns. The evidence id and its facts stay side by
+ *  side: "a file is missing" without "which conclusion rests on it" cannot be
+ *  fixed or rejected. */
+export interface EvidenceProblemView {
+  id: string
+  uri: string
+  facts: string[]
+  kind: string
+  label: string
+}
+
+export function evidenceProblems(precheck?: ReportPrecheck | null): EvidenceProblemView[] {
+  const raw = precheck?.evidence
+  if (!raw?.checked) return []
+  return [...(raw.missing ?? []), ...(raw.conflicts ?? [])].map((issue: ReportEvidenceIssue) => ({
+    id: issue.evidence ?? issue.uri ?? '未知证据',
+    uri: issue.uri ?? '',
+    facts: (issue.fact_ids ?? []).filter(Boolean),
+    kind: issue.kind,
+    label: evidenceIssueLabel(issue.kind),
+  }))
+}
+
+function evidenceIssueLabel(kind: string): string {
+  switch (kind) {
+    case 'digest_mismatch':
+      return '摘要不匹配（保全副本被改动）'
+    case 'unreadable':
+      return '原件无法读取'
+    case 'no_ledger_row':
+      return '账本没有这条证据'
+    default:
+      return '原件缺失'
+  }
 }

@@ -59,7 +59,7 @@ func TestWatchdogLeavesVerifierAndReportRunsAlone(t *testing.T) {
 	if r.Status != model.RunCanceled {
 		t.Fatalf("dispatched run should have been reaped, got status=%s", r.Status)
 	}
-	if r.ExitReason != "调度丢失，守卫回收" {
+	if r.ExitReason != "守卫回收：未找到该运行的调度句柄" {
 		t.Fatalf("unexpected exit reason %q", r.ExitReason)
 	}
 	if r.CancelCause != model.CancelCauseWatchdog {

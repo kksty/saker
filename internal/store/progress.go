@@ -2,41 +2,29 @@ package store
 
 import (
 	"encoding/json"
+	"slices"
 
 	"github.com/kksty/saker/internal/model"
 )
 
-// RoundProgress is one completed decision round's view of the durable journal:
-// did the engagement move since the previous counted round, and how many
-// consecutive rounds have moved nothing.
-//
-// It is the same journal differential the attention router reads
-// (attention.go). Progress is deliberately narrow: a new fact or a direction
-// reaching a settled status. A newly opened direction is observed (Directions /
-// NewIntents) but is NOT progress: splitting one plan into more directions
-// leaves the ledger exactly as dry as before, and counting it reset the counter
-// in the live ledger, hiding stalls of six or more no-fact rounds. The alert
-// text reports those directions instead, so the operator sees "opening
-// directions, producing no facts" rather than a vague "no progress". Nothing
-// here judges whether the work was useful; it only asks whether the evidence
-// grew. A round that only chatted, updated a note or failed a tool is a
-// no-progress round, which is exactly the silence this counter exists to expose.
+// RoundProgress records evidence and intent transitions since the previous counted round.
 type RoundProgress struct {
-	Rounds        int // consecutive no-progress rounds, including this one
+	Rounds        int
 	Escalate      bool
-	NewFacts      int // this round
-	NewIntents    int // this round; observed, not progress
-	ClosedIntents int // this round
-	// Directions is how many directions were opened during the current dry
-	// episode. At an escalation it is the number the operator-visible alert
-	// reports, and it is reset only by real progress.
-	Directions int
+	NewFacts      int
+	NewProofs     int
+	NewIntents    int
+	ClosedIntents int
+	// Intent changes accumulated across the current no-progress episode.
+	Opened       int
+	Parked       int
+	Failed       int
+	ReviewFailed int
 }
 
 // ObserveDecisionRound records one decision round against the journal watermark
 // the previous round consumed. The watermark and the counter live in Memory,
-// not in the runner: a restart must resume the count instead of starting from
-// zero and hiding a direction that has been idling for hours. It writes through
+// not in the runner, so a restart preserves the count. It writes through
 // flushNoRev because bookkeeping must not wake the commander (the same reason
 // ReviewCursors and the attention checkpoint use it).
 //
@@ -51,6 +39,24 @@ func (s *Store) ObserveDecisionRound(limit int) (RoundProgress, error) {
 		mem = *s.db.Memory
 	}
 	out := RoundProgress{}
+	firstProofs := make(map[string]struct{})
+	facts := make(map[string]model.Fact, len(s.db.Facts))
+	for _, f := range s.db.Facts {
+		facts[f.ID] = f
+	}
+	// Reviews are appended in ledger order. Find the first qualifying receipt
+	// for each current claim, even if it predates this round's watermark.
+	proved := make(map[string]bool)
+	for i := range s.db.Reviews {
+		review := s.db.Reviews[i]
+		if proved[review.FactID] {
+			continue
+		}
+		if _, ok := model.CurrentProof(facts[review.FactID], s.db.Reviews[i:i+1]); ok {
+			proved[review.FactID] = true
+			firstProofs[review.ID] = struct{}{}
+		}
+	}
 	for _, c := range mem.History {
 		if c.Seq <= mem.StallThrough {
 			continue
@@ -60,18 +66,32 @@ func (s *Store) ObserveDecisionRound(limit int) (RoundProgress, error) {
 			out.NewFacts++
 		case c.Kind == "intent" && c.Operation == "create":
 			out.NewIntents++
-		case c.Kind == "intent" && c.Operation == "update" && intentClosed(c):
-			out.ClosedIntents++
+		case c.Kind == "review" && c.Operation == "create":
+			if _, ok := firstProofs[c.ID]; ok {
+				out.NewProofs++
+			}
+		case c.Kind == "intent" && c.Operation == "update" && slices.Contains(c.Fields, "status"):
+			var row model.Intent
+			if json.Unmarshal(c.Value, &row) != nil {
+				continue
+			}
+			switch row.Status {
+			case model.StatusDone:
+				out.ClosedIntents++
+			case model.StatusParked:
+				mem.StallParked++
+			case model.StatusFailed:
+				mem.StallFailed++
+			case model.StatusReviewFailed:
+				mem.StallReviewFailed++
+			}
 		}
 	}
-	// A new direction is not progress: it moves work around without adding
-	// evidence, and in the live ledger it reset the counter during six-plus
-	// round stretches with no new fact. It is still counted so the alert can
-	// say how much reshuffling happened while the evidence stayed flat.
-	progressed := out.NewFacts+out.ClosedIntents > 0
+	progressed := out.NewFacts+out.NewProofs+out.ClosedIntents > 0
 	if progressed {
 		mem.StallRounds = 0
 		mem.StallDirections = 0
+		mem.StallParked, mem.StallFailed, mem.StallReviewFailed = 0, 0, 0
 		// A stall episode ends here: the next dry run starts a fresh episode
 		// and may escalate again once it has earned a full limit.
 		mem.StallEscalated = false
@@ -79,7 +99,8 @@ func (s *Store) ObserveDecisionRound(limit int) (RoundProgress, error) {
 		mem.StallRounds++
 		mem.StallDirections += out.NewIntents
 	}
-	out.Directions = mem.StallDirections
+	out.Opened = mem.StallDirections
+	out.Parked, out.Failed, out.ReviewFailed = mem.StallParked, mem.StallFailed, mem.StallReviewFailed
 	out.Rounds = mem.StallRounds
 	if !progressed && limit > 0 && mem.StallRounds >= limit && !mem.StallEscalated {
 		// One visible alert per stall episode: the flag is durable, so neither
@@ -102,27 +123,4 @@ func (s *Store) StallRounds() int {
 		return 0
 	}
 	return s.db.Memory.StallRounds
-}
-
-// intentClosed recognises the status transition itself, not a later edit of an
-// already-settled intent: only an update that changed "status" may count, so a
-// run-id fix on a finished direction does not fake progress for another round.
-func intentClosed(c Change) bool {
-	changed := false
-	for _, f := range c.Fields {
-		if f == "status" {
-			changed = true
-			break
-		}
-	}
-	if !changed {
-		return false
-	}
-	var row struct {
-		Status string `json:"status"`
-	}
-	if json.Unmarshal(c.Value, &row) != nil {
-		return false
-	}
-	return model.Settled(row.Status)
 }

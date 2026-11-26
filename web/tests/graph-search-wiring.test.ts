@@ -40,7 +40,7 @@ test('the canvas paints the active hit as a doubled ring', () => {
   assert.match(canvas, /activeMatch: state\.activeMatch/)
   assert.match(canvas, /focusNode: \(id: string, options/)
   assert.match(render, /const isActiveMatch = o\.activeMatch === n\.id/)
-  assert.match(render, /ACTIVE_MATCH_RING/)
+  assert.match(render, /rings\.activeMatch/)
 })
 
 test('the card is a combobox over a listbox and never searches a composing word', () => {

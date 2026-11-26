@@ -102,11 +102,12 @@ type hubConfig struct {
 // kit is one project's runtime: its server, its routes, its decider and the
 // switch that stops all of them when the project is deleted.
 type kit struct {
-	proj   *project.Project
-	srv    *api.Server
-	mux    *http.ServeMux
-	dec    *decider.Runner
-	cancel context.CancelFunc
+	recoveryErr error
+	proj        *project.Project
+	srv         *api.Server
+	mux         *http.ServeMux
+	dec         *decider.Runner
+	cancel      context.CancelFunc
 }
 
 type hub struct {
@@ -258,7 +259,9 @@ func (h *hub) attachBoot(p *project.Project) *kit {
 	// started" is itself the restart evidence, so classify the runtime first.
 	if !wasPaused || kind == project.PauseKindRestart {
 		k.srv.RestorePauseKind(project.PauseKindRestart)
-		k.srv.ResumeAfterRestart()
+		if k.recoveryErr == nil {
+			k.srv.ResumeAfterRestart()
+		}
 	}
 	return k
 }
@@ -621,14 +624,16 @@ func (h *hub) attachState(p *project.Project, paused bool, pauseReason string) *
 		k.dec = r
 	}
 
+	// Complete recovery before making the runtime available through hub routes.
+	if n, err := srv.Recover(); err != nil {
+		k.recoveryErr = err
+		log.Printf("project %s: 对账失败，已处理 %d 条运行：%v", p.ID, n, err)
+	} else if n > 0 {
+		log.Printf("project %s: 对账已处理 %d 条运行", p.ID, n)
+	}
 	h.mu.Lock()
 	h.kits[p.ID] = k
 	h.mu.Unlock()
-	// Recover owns the one crash sweep (message/handoff repair, run
-	// reconciliation, pump). Do not run a second reconcile here: attachState is
-	// also used for a newly created, imported or rebuilt runtime, and a future
-	// caller attaching a live project must not cancel its running rows.
-	srv.Recover()
 	go srv.Watch(ctx)
 	if k.dec != nil {
 		k.dec.Start(ctx)

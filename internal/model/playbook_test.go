@@ -13,8 +13,21 @@ func confirmedPlaybook(sources ...string) Playbook {
 	return Playbook{Title: "tactic", Status: PlaybookConfirmed, FromFactIDs: sources}
 }
 
+// boundPlaybook is the new-write shape: the confirmation records the claim
+// version it accepted from each cited source.
+func boundPlaybook(facts map[string]Fact, sources ...string) Playbook {
+	p := confirmedPlaybook(sources...)
+	p.FromFactClaims = map[string]uint64{}
+	for _, id := range sources {
+		if f, ok := facts[id]; ok {
+			p.FromFactClaims[id] = f.ClaimVersion
+		}
+	}
+	return p
+}
+
 func sourceFact(id, status string, evidence bool) Fact {
-	f := Fact{ID: id, Kind: "vuln", Title: id, Status: status}
+	f := Fact{ID: id, Kind: "vuln", Title: id, Status: status, ClaimVersion: 1}
 	if evidence {
 		f.EvidenceIDs = []string{"ev_" + id}
 	}
@@ -25,7 +38,7 @@ func sourceFact(id, status string, evidence bool) Fact {
 // be labelled confirmed just because the writer cited an id-shaped string.
 func TestSourceProblemNamesAMissingSourceFact(t *testing.T) {
 	facts := FactIndex([]Fact{sourceFact("f_present", "verified", true)})
-	p := confirmedPlaybook("f_present", "f_gone")
+	p := boundPlaybook(facts, "f_present", "f_gone")
 	problem := p.SourceProblem(facts)
 	if problem == "" || !strings.Contains(problem, "f_gone") {
 		t.Fatalf("missing source not named: %q", problem)
@@ -42,7 +55,7 @@ func TestSourceProblemRejectsEveryUnverifiedState(t *testing.T) {
 	for _, status := range []string{"unverified", "rejected", "withdrawn"} {
 		t.Run(status, func(t *testing.T) {
 			facts := FactIndex([]Fact{sourceFact("f_1", status, true)})
-			p := confirmedPlaybook("f_1")
+			p := boundPlaybook(facts, "f_1")
 			problem := p.SourceProblem(facts)
 			if problem == "" || !strings.Contains(problem, "f_1") {
 				t.Fatalf("status %s passed with evidence: %q", status, problem)
@@ -58,7 +71,7 @@ func TestSourceProblemRejectsEveryUnverifiedState(t *testing.T) {
 // only asserted it.
 func TestSourceProblemRequiresEvidenceOnAVerifiedSource(t *testing.T) {
 	facts := FactIndex([]Fact{sourceFact("f_1", "verified", false)})
-	p := confirmedPlaybook("f_1")
+	p := boundPlaybook(facts, "f_1")
 	problem := p.SourceProblem(facts)
 	if problem == "" || !strings.Contains(problem, "证据") {
 		t.Fatalf("evidence-free verified source passed: %q", problem)
@@ -75,7 +88,7 @@ func TestOneBadSourceDowngradesTheWholePlaybook(t *testing.T) {
 		sourceFact("f_good", "verified", true),
 		sourceFact("f_bad", "unverified", true),
 	})
-	p := confirmedPlaybook("f_good", "f_bad")
+	p := boundPlaybook(facts, "f_good", "f_bad")
 	if problem := p.SourceProblem(facts); problem == "" {
 		t.Fatal("a partial source set was accepted")
 	}
@@ -89,7 +102,7 @@ func TestConfirmedAcceptsOnlyVerifiedSourcesWithEvidence(t *testing.T) {
 		sourceFact("f_1", "verified", true),
 		sourceFact("f_2", "verified", true),
 	})
-	p := confirmedPlaybook("f_1", "f_2")
+	p := boundPlaybook(facts, "f_1", "f_2")
 	if problem := p.SourceProblem(facts); problem != "" {
 		t.Fatalf("qualified sources were rejected: %q", problem)
 	}

@@ -112,6 +112,14 @@ type GraphIntent struct {
 	DoneFactIDs    []string `json:"done_fact_ids,omitempty"`
 	DoneRunIDs     []string `json:"done_run_ids,omitempty"`
 	DoneAt         string   `json:"done_at,omitempty"`
+	// DoneFactClaims/DoneFactStatuses are the receipt's stamped versions and
+	// review statuses; DoneReceiptStale names a later change without rewriting
+	// the receipt. The node panel shows the stale marker beside 完成.
+	DoneFactClaims     map[string]uint64 `json:"done_fact_claims,omitempty"`
+	DoneFactStatuses   map[string]string `json:"done_fact_statuses,omitempty"`
+	DoneUnverified     bool              `json:"done_unverified,omitempty"`
+	DoneReceiptStale   bool              `json:"done_receipt_stale,omitempty"`
+	DoneReceiptChanged []string          `json:"done_receipt_changed,omitempty"`
 }
 
 // GraphFact is one compact fact: the summary layer plus evidence URIs. The doc
@@ -119,9 +127,9 @@ type GraphIntent struct {
 // is read by id (docs/17 §3.1). Shipping it made every snapshot carry pages of
 // prose that each new short-lived run had to pay for.
 type GraphFact struct {
-	ID     string `json:"id"`
-	Kind   string `json:"kind"`
-	Title  string `json:"title"`
+	ID    string `json:"id"`
+	Kind  string `json:"kind"`
+	Title string `json:"title"`
 	// Label is a read-time label for the row, never stored: currently only
 	// 假设（推断）, for an assertion its writer declared as inference. It sits
 	// beside Status on purpose — a verified row still says how it was obtained.
@@ -393,6 +401,11 @@ func graphIntentOf(in model.Intent, runs map[string]model.Run) GraphIntent {
 	g.DoneNote = graphClip(in.DoneNote, graphReasonRunes)
 	g.DoneFactIDs = append([]string(nil), in.DoneFactIDs...)
 	g.DoneRunIDs = append([]string(nil), in.DoneRunIDs...)
+	g.DoneFactClaims = in.DoneFactClaims
+	g.DoneFactStatuses = in.DoneFactStatuses
+	g.DoneUnverified = in.DoneUnverified
+	g.DoneReceiptStale = in.DoneReceiptStale
+	g.DoneReceiptChanged = append([]string(nil), in.DoneReceiptChanged...)
 	if in.DoneAt != nil {
 		g.DoneAt = in.DoneAt.Format(time.RFC3339)
 	}

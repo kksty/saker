@@ -320,9 +320,25 @@ type Intent struct {
 	DoneFactIDs    []string   `json:"done_fact_ids,omitempty"`
 	DoneRunIDs     []string   `json:"done_run_ids,omitempty"`
 	DoneAt         *time.Time `json:"done_at,omitempty"`
-	RunID          string     `json:"run_id,omitempty"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	// DoneFactClaims and DoneFactStatuses freeze what the settler actually
+	// accepted: the claim version and the review status each cited fact had at
+	// settlement time. They are written once and never moved by a later edit, so
+	// "what did we accept then" stays answerable after the assertion changes.
+	DoneFactClaims   map[string]uint64 `json:"done_fact_claims,omitempty"`
+	DoneFactStatuses map[string]string `json:"done_fact_statuses,omitempty"`
+	// DoneUnverified records the settlement-time verdict the response already
+	// returned (`done_unverified`); it belongs to the receipt, not to a per-read
+	// calculation.
+	DoneUnverified bool `json:"done_unverified,omitempty"`
+	// DoneReceiptStale and DoneReceiptChanged are read-side observations: the
+	// stored receipt is left as stamped, and a cited claim that has since been
+	// corrected, withdrawn or rejected is named here so the console can ask for
+	// re-confirmation.
+	DoneReceiptStale   bool      `json:"done_receipt_stale,omitempty"`
+	DoneReceiptChanged []string  `json:"done_receipt_changed,omitempty"`
+	RunID              string    `json:"run_id,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 // DoneDeclared reports a completion written by a person/commander judgement
@@ -340,6 +356,11 @@ func (in *Intent) ClearDoneDeclared() {
 	in.DoneFactIDs = nil
 	in.DoneRunIDs = nil
 	in.DoneAt = nil
+	in.DoneFactClaims = nil
+	in.DoneFactStatuses = nil
+	in.DoneUnverified = false
+	in.DoneReceiptStale = false
+	in.DoneReceiptChanged = nil
 }
 
 // Wait is the persisted condition a direction yielded on. Evaluation, the
@@ -629,13 +650,27 @@ const (
 // Doc is prompt text handed to a later executor. It is never executed, and it
 // is treated as untrusted: the brief says "核对再用".
 type Playbook struct {
-	Archived         bool               `json:"archived,omitempty"`
-	SourceRunID      string             `json:"source_run_id,omitempty"`
-	FromFactVersions map[string]uint64  `json:"from_fact_versions,omitempty"`
-	Pattern          *ExperiencePattern `json:"pattern,omitempty"`
-	RequiredTags     []string           `json:"required_tags,omitempty"`
-	ID               string             `json:"id"`
-	Title            string             `json:"title"`
+	Archived         bool              `json:"archived,omitempty"`
+	SourceRunID      string            `json:"source_run_id,omitempty"`
+	FromFactVersions map[string]uint64 `json:"from_fact_versions,omitempty"`
+	// FromFactClaims binds the confirmation to the assertion versions it was
+	// accepted from. A source fact can keep its id while its claim changes; the
+	// version check is what makes the old confirmation visibly stale instead of
+	// silently re-using a different assertion.
+	FromFactClaims map[string]uint64 `json:"from_fact_claims,omitempty"`
+	// Confirmations is the append-only receipt history: each explicit
+	// confirmation records when, by whom/what run, and which claim versions it
+	// accepted. A later re-confirmation appends; it never rewrites an older one.
+	Confirmations []PlaybookConfirmation `json:"confirmations,omitempty"`
+	// SourceChanged/SourceChange are computed on read. They say that a stored
+	// confirmation no longer rests on the current source claims; the row and its
+	// confirmation history are left exactly as written.
+	SourceChanged bool               `json:"source_changed,omitempty"`
+	SourceChange  string             `json:"source_change,omitempty"`
+	Pattern       *ExperiencePattern `json:"pattern,omitempty"`
+	RequiredTags  []string           `json:"required_tags,omitempty"`
+	ID            string             `json:"id"`
+	Title         string             `json:"title"`
 	// When is one line: what this buys you and when it applies.
 	When string `json:"when"`
 	// Doc is steps/commands/limits, written by whoever ran it.
@@ -655,6 +690,19 @@ type Playbook struct {
 	IntentID    string    `json:"intent_id,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// PlaybookConfirmation is one explicit confirmation of a reusable tactic. It
+// is a receipt, not a verdict: the row's confirmed label is re-derived from the
+// current sources, while this record says which assertion versions were
+// accepted at the time. An empty FromFactClaims means a legacy receipt that did
+// not bind versions.
+type PlaybookConfirmation struct {
+	At             time.Time         `json:"at"`
+	Origin         string            `json:"origin,omitempty"`
+	SourceRunID    string            `json:"source_run_id,omitempty"`
+	FromFactIDs    []string          `json:"from_fact_ids"`
+	FromFactClaims map[string]uint64 `json:"from_fact_claims,omitempty"`
 }
 
 // ExperiencePattern describes recorded relationships to look up. Variable
@@ -699,6 +747,18 @@ const (
 // stable across run generations); the ids are assigned by the control plane, not
 // supplied by the caller. Seq is the per-project read cursor; IdempotencyKey is
 // the caller's retry key and is unique per sender.
+// MessageDelivery is one attempt to hand a message to a receiving run. The list
+// keeps redelivery history separate from the current delivery fields, so a late
+// receipt can be checked against the attempt it belongs to instead of confirming
+// the newest one.
+type MessageDelivery struct {
+	DeliveryID string    `json:"delivery_id,omitempty"`
+	RunID      string    `json:"run_id,omitempty"`
+	Path       string    `json:"path,omitempty"`
+	At         time.Time `json:"at"`
+	Error      string    `json:"error,omitempty"`
+}
+
 type Message struct {
 	GoalInstruction     bool     `json:"goal_instruction,omitempty"`
 	DirectiveRecipients []string `json:"directive_recipients,omitempty"`
@@ -772,6 +832,14 @@ type Message struct {
 	// session's in-memory inbox, while a prompt message is already part of the
 	// session transcript and comes back with a resume.
 	DeliveryPath string `json:"delivery_path,omitempty"`
+	// CurrentDeliveryRunID is the run the in-flight delivery attempt is for.
+	// DeliveredRunID is the last confirmed target and may still point at the
+	// previous attempt until FinishMessageDelivery returns; a receipt is checked
+	// against this field so a late acknowledgement cannot confirm a redelivery.
+	CurrentDeliveryRunID string `json:"current_delivery_run_id,omitempty"`
+	// Deliveries is the append-only attempt history: each redelivery keeps its
+	// run, transport id, path and error, while the fields above stay current.
+	Deliveries []MessageDelivery `json:"deliveries,omitempty"`
 	// Redeliveries counts how many times the control plane put this message
 	// back on the queue after a failed run. >0 makes the injected text carry a
 	// [重投] marker so the model can dedupe by message_id instead of acting
@@ -783,6 +851,10 @@ type Message struct {
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 	AckedAt   *time.Time `json:"acked_at,omitempty"`
+	// AckedDeliveryID/AckedRunID bind the receipt to the attempt it confirmed.
+	// They are set once, with AckedAt, and never rewritten by a duplicate ack.
+	AckedDeliveryID string `json:"acked_delivery_id,omitempty"`
+	AckedRunID      string `json:"acked_run_id,omitempty"`
 }
 
 // Message delivery states. Sending is persisted before transport I/O; a crash
@@ -961,14 +1033,146 @@ type Handoff struct {
 // stop here, so this is the one number; do not restate it in either package.
 const MaxRunWarnings = 20
 
+// Ingest status values. They describe the handoff settlement separately from the
+// run's own outcome: a run can be done while its declared facts/evidence are
+// still pending.
+const (
+	// IngestSettled means every parsed declaration was persisted and the
+	// consumption cursor advanced: the next run reads only newer lines.
+	IngestSettled = "settled"
+	// IngestPartial means at least one parsed declaration could not be persisted;
+	// the cursor stayed where it was so a replay can retry exactly that batch.
+	IngestPartial = "partial"
+	// IngestUnavailable means the handoff itself could not be read (or no run
+	// row exists), so the ledger cannot even name what is pending.
+	IngestUnavailable = "unavailable"
+)
+
+// PendingDeclaration locates one handoff line whose ledger write did not commit.
+// DeclarationID is the writer's identity when it supplied one; Location is the
+// byte span in .saker/facts.jsonl, so an operator can open the exact line
+// without replaying the executor.
+type PendingDeclaration struct {
+	DeclarationID string   `json:"declaration_id,omitempty"`
+	SourceRef     string   `json:"source_ref,omitempty"`
+	Kind          string   `json:"kind,omitempty"`
+	Title         string   `json:"title,omitempty"`
+	Location      string   `json:"location,omitempty"`
+	Reasons       []string `json:"reasons,omitempty"`
+}
+
+// IngestOutcome is the structured result of settling one run's handoff. It is
+// persisted on the run row, so the console and the commander can tell "the run
+// finished" apart from "its delivery was written" without reading the log.
+type IngestOutcome struct {
+	Status string `json:"status"`
+	// Declared is the number of valid lines read, the same contract metric as
+	// the run's declared_facts. Facts and Playbooks split it by destination.
+	Declared  int `json:"declared"`
+	Facts     int `json:"facts"`
+	Playbooks int `json:"playbooks"`
+	// Persisted* count the writes this settlement committed (an idempotent
+	// replay of an already written row still counts as persisted).
+	PersistedFacts     int `json:"persisted_facts"`
+	PersistedEvidence  int `json:"persisted_evidence"`
+	PersistedPlaybooks int `json:"persisted_playbooks"`
+	// CursorBefore is the offset the batch started at; CursorAfter is the
+	// committed offset (equal to CursorBefore when the batch is incomplete).
+	CursorBefore int64 `json:"cursor_before"`
+	CursorAfter  int64 `json:"cursor_after"`
+	// Committed means the consumption cursor advanced past this batch. It is
+	// false while any Pending declaration remains.
+	Committed bool `json:"committed"`
+	// Truncated/Bad mirror the handoff reader: the cap stopped before the tail,
+	// or the named number of lines could not be parsed (those lines were
+	// consumed and are not pending — they need a fresh declaration).
+	Truncated bool `json:"truncated,omitempty"`
+	Bad       int  `json:"bad,omitempty"`
+	// Pending locates every declaration that kept the cursor from advancing.
+	Pending []PendingDeclaration `json:"pending,omitempty"`
+	// Reasons are batch-level failures that cannot be tied to one declaration
+	// (handoff unreadable, cursor write failed, evidence harvest failed).
+	Reasons []string `json:"reasons,omitempty"`
+	// RecordedAt is when the settlement attempted the write.
+	RecordedAt time.Time `json:"recorded_at"`
+}
+
+// Wait delivery status values. The result set moves through confirmable nodes;
+// an interrupted dispatch is retried from the last confirmed node without
+// redoing the external action that produced the result.
+const (
+	// WaitDeliveryReady means the satisfied wait's results are bound to the run
+	// together with its creation, before any prompt is built.
+	WaitDeliveryReady = "ready"
+	// WaitDeliveryArchived means the turn's input (including the results) has
+	// been archived at run.BriefPath.
+	WaitDeliveryArchived = "archived"
+	// WaitDeliveryReceived means the executor's session produced evidence that
+	// it started the turn; the result no longer needs redelivery.
+	WaitDeliveryReceived = "received"
+)
+
+// WaitDelivery is the durable hand-off of one satisfied wait into a run. The
+// wait itself is consumed by the claim, so without this copy a crash between
+// the claim commit and the executor receiving the prompt lost the results.
+type WaitDelivery struct {
+	Status string `json:"status"`
+	// Wait is the consumed condition: results, mode, reason and (for an
+	// operator handoff) the request/response. It is copied, not referenced, so
+	// later ledger edits cannot change what this run was promised.
+	Wait *Wait `json:"wait,omitempty"`
+	// BriefPath is the archived prompt that carried the results; set when
+	// Status is archived or received.
+	BriefPath string `json:"brief_path,omitempty"`
+	// ReadyAt/ArchivedAt/ReceivedAt are the observed delivery nodes. Nil means
+	// that node was never confirmed.
+	ReadyAt    *time.Time `json:"ready_at,omitempty"`
+	ArchivedAt *time.Time `json:"archived_at,omitempty"`
+	ReceivedAt *time.Time `json:"received_at,omitempty"`
+}
+
+// Settled reports whether the delivery has reached the executor.
+func (d *WaitDelivery) Settled() bool {
+	return d == nil || d.Status == WaitDeliveryReceived
+}
+
+// Brief archive states. They are recorded on the run itself, so an operator can
+// tell an unarchived run from a half-written archive without consulting the log.
+const (
+	// BriefArchivePending means the file may exist but the ledger path was not
+	// committed (the process stopped, or the run-row write failed). This is the
+	// "file written, path not written back" state.
+	BriefArchivePending = "pending"
+	// BriefArchiveArchived means the file was written, hashed and its path
+	// committed to the run in the same update.
+	BriefArchiveArchived = "archived"
+	// BriefArchiveWriteFailed means the archive file itself could not be written.
+	BriefArchiveWriteFailed = "write_failed"
+)
+
+// BriefArchive is the outcome of archiving one run's dispatch text. Path is the
+// stable case-relative reference to what the model was actually given; SHA256 is
+// the digest of the redacted bytes, so a later reader can tell whether the file
+// is still the one this run wrote.
+type BriefArchive struct {
+	Status string    `json:"status"`
+	Path   string    `json:"path,omitempty"`
+	SHA256 string    `json:"sha256,omitempty"`
+	Bytes  int       `json:"bytes,omitempty"`
+	Error  string    `json:"error,omitempty"`
+	At     time.Time `json:"at,omitempty"`
+}
+
 // Run is one executor invocation for one intent.
 type Run struct {
-	NativeSubagentCalls      int       `json:"native_subagent_calls,omitempty"`
-	NativeSubagentActive     int       `json:"native_subagent_active,omitempty"`
-	NativeSubagentDurationMS int64     `json:"native_subagent_duration_ms,omitempty"`
-	CommanderRound           int       `json:"commander_round,omitempty"`
-	NoteRead                 *NoteRef  `json:"note_read,omitempty"`
-	NoteWrites               []NoteRef `json:"note_writes,omitempty"`
+	NativeSubagentCalls      int             `json:"native_subagent_calls,omitempty"`
+	NativeSubagentActive     int             `json:"native_subagent_active,omitempty"`
+	OpenToolCalls            map[string]bool `json:"open_tool_calls,omitempty"`
+	HarnessTurnEnded         bool            `json:"harness_turn_ended,omitempty"`
+	NativeSubagentDurationMS int64           `json:"native_subagent_duration_ms,omitempty"`
+	CommanderRound           int             `json:"commander_round,omitempty"`
+	NoteRead                 *NoteRef        `json:"note_read,omitempty"`
+	NoteWrites               []NoteRef       `json:"note_writes,omitempty"`
 	// Queue time is distinct from execution; nil means it was not measured.
 	QueuedAt           *time.Time `json:"queued_at,omitempty"`
 	ExecutionStartedAt *time.Time `json:"execution_started_at,omitempty"`
@@ -1052,6 +1256,15 @@ type Run struct {
 	// never started a turn: nothing it carried could have been read.
 	LastTurnStartedAt *time.Time `json:"last_turn_started_at,omitempty"`
 	DeclaredFacts     int        `json:"declared_facts"`
+	// Ingest is the structured settlement of this run's handoff. A nil value is
+	// a run from before this field existed (or a purpose run with no handoff),
+	// not a claim that nothing was declared.
+	Ingest *IngestOutcome `json:"ingest,omitempty"`
+	// WaitDelivery is the satisfied wait this run was started to carry. It is
+	// written in the same claim transaction as the run row and advances through
+	// ready -> archived -> received, so a crash before the executor saw the
+	// prompt can redeliver exactly this result.
+	WaitDelivery *WaitDelivery `json:"wait_delivery,omitempty"`
 	// StopReason is the harness's own verdict on the turn (completed / canceled
 	// / error). It sits next to the exit code because a harness can exit 0 after
 	// a failed turn (docs/11-protocol.md).
@@ -1123,15 +1336,27 @@ type Run struct {
 	ContextWindow int    `json:"context_window,omitempty"`
 	LogPath       string `json:"log_path,omitempty"`
 	// BriefPath is the archived snapshot of the dispatch prompt, relative to the
-	// case root (`<case>/.saker/briefs/<runID>.md`). Every run that dispatches text
-	// to a model writes one — a fresh dispatch, a resume/wake, a steer
+	// case root (`<case>/.saker/briefs/<runID>.md`). Every run that dispatches
+	// text to a model writes one — a fresh dispatch, a resume/wake, a steer
 	// continuation and a handoff run alike — because "what did this run actually
 	// read" is the only evidence a later reader can trust, and a handoff is now
 	// refused when the run it replaces has none. Old rows have none (omitempty).
 	// Known credentials are redacted before the file is written.
 	BriefPath string `json:"brief_path,omitempty"`
+	// BriefArchive records how that archive was written. A nil value is a run
+	// from before this state existed; an explicit state keeps "file written but
+	// the ledger path was not committed" distinguishable from "the file write
+	// failed", instead of both looking like a run with no archive.
+	BriefArchive *BriefArchive `json:"brief_archive,omitempty"`
 	// ContinuedFrom is the run this one continues (a steer), "" for a fresh
 	// dispatch. Two runs on one intent are otherwise indistinguishable from two
 	// independent attempts in the ledger (D42).
-	ContinuedFrom string `json:"continued_from,omitempty"`
+	ContinuedFrom         string                 `json:"continued_from,omitempty"`
+	AutoRedispatchedFrom  string                 `json:"auto_redispatched_from,omitempty"`
+	RedispatchDisposition *RedispatchDisposition `json:"redispatch_disposition,omitempty"`
+}
+
+type RedispatchDisposition struct {
+	State  string `json:"state"`
+	Reason string `json:"reason"`
 }

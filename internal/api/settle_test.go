@@ -201,6 +201,62 @@ func TestSettleFieldsClearedOnReopen(t *testing.T) {
 	}
 }
 
+// A declared completion freezes the claim version and review status it accepted.
+// A later correction keeps the original receipt and marks it for re-confirmation;
+// a display-only edit neither bumps the claim nor makes the receipt look stale.
+func TestSettleReceiptBindsClaimVersionAndMarksOnlyClaimChanges(t *testing.T) {
+	s, in, fact := newSettleServer(t, model.StatusFailed, true, model.HoldActorCommander)
+	if _, err := s.Store.ReviewFact(model.Review{FactID: fact.ID, Verdict: "pass", VerifierRun: "run-proof"}); err != nil {
+		t.Fatal(err)
+	}
+	rec := call(t, s, http.MethodPost, "/api/intents/"+in.ID+"/settle", map[string]any{
+		"note": "按 v1 的 ssh 回显收口", "fact_ids": []string{fact.ID},
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("settle = %d %s", rec.Code, rec.Body.String())
+	}
+	settled, _ := s.Store.GetIntent(in.ID)
+	if settled.DoneFactClaims[fact.ID] != fact.ClaimVersion {
+		t.Fatalf("receipt claim = %v, want v%d", settled.DoneFactClaims, fact.ClaimVersion)
+	}
+	if settled.DoneFactStatuses[fact.ID] != "verified" || settled.DoneUnverified {
+		t.Fatalf("receipt status = %v unverified=%v", settled.DoneFactStatuses, settled.DoneUnverified)
+	}
+
+	// A display edit (title) is outside the claim hash: same version, same
+	// receipt, no false staleness.
+	if _, err := s.Store.UpdateFact(fact.ID, func(f *model.Fact) { f.Title = "10.0.0.5 已拿到命令执行" }); err != nil {
+		t.Fatal(err)
+	}
+	display, _ := s.Store.GetIntent(in.ID)
+	if display.DoneReceiptStale || len(display.DoneReceiptChanged) != 0 {
+		t.Fatalf("display edit marked the receipt stale: %+v", display)
+	}
+	if display.DoneNote != settled.DoneNote || display.DoneFactClaims[fact.ID] != fact.ClaimVersion {
+		t.Fatalf("display edit rewrote the receipt: %+v", display)
+	}
+
+	// A correction starts a new assertion version. The receipt keeps v1 and the
+	// settlement-time status, and the row asks for re-confirmation.
+	corrected, err := s.Store.UpdateFact(fact.ID, func(f *model.Fact) { f.Summary = "回显来自另一台主机" })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if corrected.ClaimVersion == fact.ClaimVersion {
+		t.Fatal("fixture did not bump the claim version")
+	}
+	changed, _ := s.Store.GetIntent(in.ID)
+	if !changed.DoneReceiptStale || len(changed.DoneReceiptChanged) != 1 || changed.DoneReceiptChanged[0] != fact.ID {
+		t.Fatalf("changed receipt = stale:%v changed:%v", changed.DoneReceiptStale, changed.DoneReceiptChanged)
+	}
+	if changed.DoneFactClaims[fact.ID] != fact.ClaimVersion || changed.DoneFactStatuses[fact.ID] != "verified" {
+		t.Fatalf("receipt was rewritten after the fact moved: %+v", changed)
+	}
+	if changed.DoneNote != "按 v1 的 ssh 回显收口" {
+		t.Fatalf("settle note lost: %q", changed.DoneNote)
+	}
+}
+
 func TestCommanderSettleStampsActorAndUnverified(t *testing.T) {
 	s, in, _ := newSettleServer(t, model.StatusFailed, true, model.HoldActorCommander)
 	// An unverified fact: reviews are on in this fixture, so the completion is

@@ -27,7 +27,7 @@ func TestHandoffSectionPutsVerbatimAuthorizationBeforeTheNote(t *testing.T) {
 		SourceRun:   "r_old",
 		SourceBrief: ".saker/briefs/r_old.md",
 	}
-	got := handoffSection(store.DB{}, in, h, auth)
+	got := handoffSection(store.DB{}, in, h, auth, false)
 
 	authAt := strings.Index(got, auth.Briefing)
 	noteAt := strings.Index(got, "### 交接说明")
@@ -56,7 +56,7 @@ func TestHandoffSectionPutsVerbatimAuthorizationBeforeTheNote(t *testing.T) {
 // above is what the previous run saw, when it is only what this task book says.
 func TestHandoffSectionNamesTheMissingArchive(t *testing.T) {
 	got := handoffSection(store.DB{}, model.Intent{ID: "in_1"}, model.Handoff{FromRun: "r_gone", Note: "旧的"},
-		handoffAuthorization{Briefing: "10.0.0.0/24", SourceRun: "r_gone"})
+		handoffAuthorization{Briefing: "10.0.0.0/24", SourceRun: "r_gone"}, false)
 	if !strings.Contains(got, "没有下发归档") {
 		t.Fatalf("a missing archive is not named:\n%s", got)
 	}
@@ -142,6 +142,28 @@ func TestHandoffDispatchCarriesAuthorizationVerbatim(t *testing.T) {
 
 }
 
+// A handoff must say whether the archived brief it names can actually be read.
+// A half-written archive (file exists, ledger path not committed) is not
+// "archived"; a failed write is not silently treated as a missing old feature.
+func TestHandoffNamesArchiveState(t *testing.T) {
+	base := handoffAuthorization{
+		Briefing: "范围", SourceRun: "r_old", SourceBrief: ".saker/briefs/r_old.md",
+		SourceArchiveStatus: model.BriefArchivePending,
+	}
+	got := handoffSection(store.DB{}, model.Intent{ID: "in_1"}, model.Handoff{FromRun: "r_old"},
+		base, false)
+	if !strings.Contains(got, "账本路径未写回") {
+		t.Fatalf("a pending archive was presented as readable:\n%s", got)
+	}
+	base.SourceArchiveStatus = model.BriefArchiveWriteFailed
+	base.SourceArchiveError = "磁盘只读"
+	got = handoffSection(store.DB{}, model.Intent{ID: "in_1"}, model.Handoff{FromRun: "r_old"},
+		base, false)
+	if !strings.Contains(got, "写入失败") || !strings.Contains(got, "磁盘只读") {
+		t.Fatalf("a failed archive did not name its reason:\n%s", got)
+	}
+}
+
 // Refusing at the gate is what makes the refusal recoverable: the direction does
 // not move, so the route the refusal names — re-dispatch to produce an archive,
 // then hand off — really exists. A refusal at dispatch time would have left the
@@ -202,6 +224,26 @@ func TestRefusedHandoffLeavesTheDirectionRunnable(t *testing.T) {
 	waitFor(t, 5*time.Second, func() bool { return ex.count() > 0 })
 	if r2, _ := p.Store.GetRun(run2); r2.BriefPath == "" {
 		t.Fatalf("the re-dispatched run archived nothing: %+v", r2)
+	}
+}
+
+// A stale handoff version is a machine-readable conflict, so the console can
+// refresh and keep the typed note instead of showing a generic failure.
+func TestHandoffVersionConflictCarriesCode(t *testing.T) {
+	s, p := newBindingServer(t)
+	in, err := p.Store.CreateIntent(model.Intent{Title: "换人", Description: "d"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := call(t, s, http.MethodPost, "/api/intents/"+in.ID+"/handoff", map[string]any{
+		"note": "换个人继续", "expected_version": 1,
+	})
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "handoff_conflict") {
+		t.Fatalf("stale handoff = %d %s", rec.Code, rec.Body.String())
+	}
+	cur, _ := p.Store.GetIntent(in.ID)
+	if cur.Handoff != nil || cur.HandoffOperation != "" || cur.Hold {
+		t.Fatalf("a refused stale handoff changed the direction: %+v", cur)
 	}
 }
 

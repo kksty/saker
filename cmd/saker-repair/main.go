@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/kksty/saker/internal/ledger"
+	"github.com/kksty/saker/internal/model"
 	"github.com/kksty/saker/internal/project"
 	"github.com/kksty/saker/internal/store"
 )
@@ -31,18 +32,26 @@ func run(args []string, stdout io.Writer) error {
 	dir := fs.String("project", "", "暂停项目的绝对目录（先停止 saker）")
 	intent := fs.String("intent", "", "精确的意图 ID")
 	confidence := fs.Bool("confidence", false, "校对全项目的有效置信度")
+	proposals := fs.Bool("proposals", false, "补记历史遗留的提议派发回执（只补归属明确的）")
+	ingest := fs.Bool("ingest", false, "幂等补写该意图最近一次未完成的事实/证据入账（不重跑执行者）")
 	commit := fs.Bool("commit", false, "执行已校对的修复；默认只预览")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	// The directory must be absolute because the fix edits it while saker is
 	// stopped; cursor repair takes a single direction directory name.
-	if *confidence {
+	if *confidence || *proposals {
 		if !filepath.IsAbs(*dir) || *intent != "" {
-			return fmt.Errorf("--confidence 需要 --project 的绝对目录，并且不能与 --intent 同用")
+			return fmt.Errorf("--confidence/--proposals 需要 --project 的绝对目录，并且不能与 --intent 同用")
+		}
+		if *confidence && *proposals {
+			return fmt.Errorf("--confidence 与 --proposals 不能同用")
 		}
 	} else if !filepath.IsAbs(*dir) || !filepath.IsLocal(*intent) || *intent == "." || filepath.Base(*intent) != *intent || strings.ContainsAny(*intent, "/\\") {
 		return fmt.Errorf("必须提供 --project 和精确的 --intent")
+	}
+	if *ingest && (*confidence || *proposals) {
+		return fmt.Errorf("--ingest 只与 --intent 同用")
 	}
 	raw, err := os.ReadFile(filepath.Join(*dir, project.ManifestFile))
 	if err != nil {
@@ -59,6 +68,40 @@ func run(args []string, stdout io.Writer) error {
 	db, err := store.ReadSnapshot(ledgerPath)
 	if err != nil {
 		return err
+	}
+	if *proposals {
+		plan := store.PlanProposalReceipts(db)
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(plan); err != nil || !*commit {
+			return err
+		}
+		if len(plan) == 0 {
+			return nil
+		}
+		st, err := store.OpenSQLite(ledgerPath)
+		if err != nil {
+			return err
+		}
+		defer st.Close()
+		backup := filepath.Join(*dir, "ledger-before-proposals-"+time.Now().Format("20060102-150405.000000000")+".sqlite")
+		if err := st.BackupTo(backup); err != nil {
+			return err
+		}
+		applied, err := st.ApplyProposalReceipts()
+		if err != nil {
+			return err
+		}
+		filled, unresolved := 0, 0
+		for _, p := range applied {
+			if p.Status == store.ProposalReceiptFill {
+				filled++
+			} else {
+				unresolved++
+			}
+		}
+		fmt.Fprintf(stdout, "提议派发回执已补记 %d 条，%d 条归属不明保留原因。修复前备份 %s\n", filled, unresolved, backup)
+		return nil
 	}
 	if *confidence {
 		plan := store.PlanConfidenceRepair(db)
@@ -99,6 +142,46 @@ func run(args []string, stdout io.Writer) error {
 		return fmt.Errorf("项目中没有意图 %s", *intent)
 	}
 	work := filepath.Join(*dir, "cases", *intent)
+	if *ingest {
+		var run model.Run
+		found := false
+		for _, r := range db.Runs {
+			if r.IntentID != *intent || r.Ingest == nil || r.Ingest.Committed {
+				continue
+			}
+			if !found || r.StartedAt.After(run.StartedAt) {
+				run, found = r, true
+			}
+		}
+		if !found {
+			return fmt.Errorf("意图 %s 没有未完成的事实/证据入账", *intent)
+		}
+		if now := ledger.Consumed(work); now != run.Ingest.CursorBefore {
+			return fmt.Errorf("消费游标已从 %d 变为 %d（后续运行已处理），不能用 run %s 补写；先核对最新运行", run.Ingest.CursorBefore, now, run.ID)
+		}
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(map[string]any{"run_id": run.ID, "ingest": run.Ingest}); err != nil || !*commit {
+			return err
+		}
+		st, err := store.OpenSQLite(ledgerPath)
+		if err != nil {
+			return err
+		}
+		defer st.Close()
+		backup := filepath.Join(*dir, "ledger-before-ingest-"+time.Now().Format("20060102-150405.000000000")+".sqlite")
+		if err := st.BackupTo(backup); err != nil {
+			return err
+		}
+		outcome := (&ledger.Ingestor{Store: st, MaxEvidence: 200}).Settle(run.ID, run.IntentID, filepath.Join(*dir, "cases"), work, run.StartedAt)
+		body, _ := json.MarshalIndent(outcome, "", "  ")
+		fmt.Fprintln(stdout, string(body))
+		fmt.Fprintln(stdout, "修复前备份", backup)
+		if !outcome.Committed {
+			return fmt.Errorf("仍有 %d 条声明未补写，原因见 ingest.pending/reasons", len(outcome.Pending))
+		}
+		return nil
+	}
 	plan, err := ledger.PlanCursorRepair(db, filepath.Join(*dir, "cases"), work, *intent)
 	if err != nil {
 		return err

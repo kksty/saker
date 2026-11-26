@@ -45,7 +45,10 @@ func Playbooks(s *store.Store, q PlaybookQuery) (PlaybookPage, error) {
 		}
 		// The stored Status is the writer's declaration; the list, its counts and
 		// its filter all use the same derived label so a row cannot be a candidate
-		// in the header and confirmed in the table (or the reverse).
+		// in the header and confirmed in the table (or the reverse). The source
+		// judgement is attached before the label moves: a stored confirmation
+		// whose claim changed is still shown as "来源已变", not silently relabelled.
+		p = p.WithSourceState(facts)
 		if !p.Confirmed(facts) && p.Status != model.PlaybookCandidate && p.Status != model.PlaybookRetired {
 			p.Status = model.PlaybookCandidate
 		}

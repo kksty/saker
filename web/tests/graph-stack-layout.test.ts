@@ -26,7 +26,7 @@ test('the stack is one bounded column with room for all three cards', () => {
 
 test('the commander card sits at the bottom, below the target and legend', () => {
   const goal = panel.indexOf('终点</span>')
-  const legendAt = panel.indexOf('<GraphLegend />')
+  const legendAt = panel.indexOf('<GraphLegend ')
   const commanderAt = panel.indexOf('<CommanderCard board={board}')
   assert.ok(goal >= 0 && legendAt > goal && commanderAt > legendAt, 'goal → legend → commander')
   assert.match(commander, /w-full shrink-0 overflow-hidden rounded-xl/)

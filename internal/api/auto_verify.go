@@ -7,6 +7,8 @@ package api
 
 import (
 	"context"
+	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -74,10 +76,17 @@ func (s *Server) SchedulePendingReviews() {
 	seen := map[string]bool{}
 	candidates, _ := s.Store.ReviewCandidates("", "", int(^uint(0)>>1), s.reviewPolicy())
 	for _, f := range candidates {
-		if !seen[f.IntentID] && f.IntentID != "" {
-			seen[f.IntentID] = true
-			s.scheduleAutoVerify(f.IntentID)
+		if seen[f.IntentID] || f.IntentID == "" {
+			continue
 		}
+		// A needs_evidence attempt is not a timer: scheduling it would only make
+		// the pump spend a wake to skip it again. It re-enters when the assertion
+		// or evidence set changes, which makes the attempt stale.
+		if _, blocked := s.reviewBlocked(f); blocked {
+			continue
+		}
+		seen[f.IntentID] = true
+		s.scheduleAutoVerify(f.IntentID)
 	}
 	// A fixed-review phase lives in a goroutine, so after a restart (or a pause
 	// that suspended it) nothing owns a direction left in reviewing. Re-arm those
@@ -122,20 +131,26 @@ func (s *Server) scheduleAutoVerify(intentID string) {
 // second queue.
 func (s *Server) rescheduleReview(id string) {
 	remaining, _ := s.Store.ReviewCandidates(id, "", int(^uint(0)>>1), s.reviewPolicy())
-	if len(remaining) == 0 {
-		return
-	}
-	next := time.Now().Add(reviewRetryCooldown)
+	now := time.Now()
+	var next time.Time
 	for _, f := range remaining {
-		at := time.Now()
+		if _, blocked := s.reviewBlocked(f); blocked {
+			continue
+		}
+		at := now
 		if s.Verifier.Busy(f.ID) {
 			at = at.Add(250 * time.Millisecond)
-		} else if delay, cooling := s.reviewCoolingDown(f, at); cooling {
+		} else if delay, cooling := s.reviewCoolingDown(f, now); cooling {
 			at = at.Add(delay)
 		}
-		if at.Before(next) {
+		if next.IsZero() || at.Before(next) {
 			next = at
 		}
+	}
+	// Every remaining candidate is blocked on material: leave the direction out
+	// of the due map. The next evidence/fact change re-schedules it.
+	if next.IsZero() {
+		return
 	}
 	s.reviewPumpMu.Lock()
 	if existing, ok := s.reviewPumpDue[id]; !ok || next.Before(existing) {
@@ -286,7 +301,35 @@ type reviewSummary struct {
 	Disabled   bool `json:"disabled"`
 	Pending    int  `json:"pending"`
 	Processing int  `json:"processing"`
-	Cooling    int  `json:"cooling"`
+	// Cooling is a run failure waiting for its automatic retry.
+	Cooling int `json:"cooling"`
+	// Blocked is a finished review that asked for evidence; it will not move
+	// until the assertion or its evidence set changes.
+	Blocked int `json:"blocked"`
+	// Rejected counts independent review vetoes. They are verdicts, not queue
+	// failures, and are shown apart from Cooling/Blocked.
+	Rejected int `json:"rejected"`
+	// Details carries the bounded operator view of those attempts, so "why is
+	// this not moving" is answerable without opening the ledger.
+	Details []reviewAttemptView `json:"details,omitempty"`
+}
+
+// reviewAttemptDetailLimit bounds the console's per-board attempt list. The
+// counts above are complete; details are a sample, not a second queue.
+const reviewAttemptDetailLimit = 5
+
+// reviewAttemptView is one durable review attempt as the operator sees it.
+type reviewAttemptView struct {
+	Fact         string `json:"fact"`
+	Title        string `json:"title,omitempty"`
+	ClaimVersion uint64 `json:"claim_version"`
+	Outcome      string `json:"outcome"`
+	Reason       string `json:"reason,omitempty"`
+	// MissingEvidence names the originals the fact cites (URI when the ledger
+	// has it, the id otherwise), so "needs evidence" says what to supplement.
+	MissingEvidence []string   `json:"missing_evidence,omitempty"`
+	RetryAt         *time.Time `json:"retry_at,omitempty"`
+	RunID           string     `json:"run_id,omitempty"`
 }
 
 func (s *Server) reviewSummary() reviewSummary {
@@ -296,17 +339,75 @@ func (s *Server) reviewSummary() reviewSummary {
 		Disabled:  s.ReviewsDisabled(),
 	}
 	rows, _ := s.Store.ReviewCandidates("", "", int(^uint(0)>>1), s.reviewPolicy())
+	db := s.Store.Snapshot()
+	evidenceURI := make(map[string]string, len(db.Evidence))
+	for _, e := range db.Evidence {
+		evidenceURI[e.ID] = e.URI
+	}
+	titles := make(map[string]string, len(db.Facts))
+	for _, f := range db.Facts {
+		titles[f.ID] = f.Title
+	}
+	addDetail := func(a store.ReviewAttempt) {
+		if len(out.Details) >= reviewAttemptDetailLimit {
+			return
+		}
+		out.Details = append(out.Details, reviewAttemptViewOf(a, titles[a.FactID], evidenceURI))
+	}
+	now := time.Now()
 	for _, f := range rows {
 		if s.Verifier != nil && s.Verifier.Busy(f.ID) {
 			out.Processing++
 			continue
 		}
-		out.Pending++
-		if _, cooling := s.reviewCoolingDown(f, time.Now()); cooling {
-			out.Cooling++
+		if a, ok := s.reviewAttemptOf(f); ok && a.Outcome == store.ReviewAttemptRejected {
+			// The rejected-attempt loop below owns this row; counting it as a
+			// queued candidate here would show it twice.
+			continue
 		}
+		if a, blocked := s.reviewBlocked(f); blocked {
+			out.Blocked++
+			addDetail(a)
+			continue
+		}
+		if _, cooling := s.reviewCoolingDown(f, now); cooling {
+			out.Cooling++
+			if a, ok := s.Store.ReviewAttemptFor(f.ID); ok {
+				addDetail(a)
+			}
+			continue
+		}
+		out.Pending++
+	}
+	// Rejected facts are no longer candidates, so the loop above cannot see
+	// their attempts. Count only a veto bound to the fact's current assertion.
+	for _, a := range s.Store.ReviewAttempts() {
+		if a.Outcome != store.ReviewAttemptRejected {
+			continue
+		}
+		f, ok := s.Store.FactByID(a.FactID)
+		if !ok || f.ClaimVersion != a.ClaimVersion {
+			continue
+		}
+		out.Rejected++
+		addDetail(a)
 	}
 	return out
+}
+
+func reviewAttemptViewOf(a store.ReviewAttempt, title string, evidenceURI map[string]string) reviewAttemptView {
+	v := reviewAttemptView{
+		Fact: a.FactID, Title: title, ClaimVersion: a.ClaimVersion,
+		Outcome: a.Outcome, Reason: a.Reason, RetryAt: a.RetryAt, RunID: a.RunID,
+	}
+	for _, id := range a.EvidenceIDs {
+		if uri := evidenceURI[id]; uri != "" {
+			v.MissingEvidence = append(v.MissingEvidence, uri)
+		} else {
+			v.MissingEvidence = append(v.MissingEvidence, id)
+		}
+	}
+	return v
 }
 
 // premiseReview projects the live review lifecycle for one blocked premise
@@ -327,7 +428,8 @@ func (s *Server) premiseReview(f model.Fact) *premiseReview {
 		// The automatic queue stops here (ReviewCandidates skips this version);
 		// the direction is not silently waiting forever: it needs a corrected
 		// assertion or an operator-triggered manual retry.
-		return &premiseReview{State: reviewStateFailed}
+		return &premiseReview{State: reviewStateFailed, Outcome: store.ReviewAttemptNeedsEvidence,
+			Reason: r.Notes, MissingEvidence: s.reviewEvidenceURIs(f)}
 	}
 	if s.reviewsOff() {
 		return &premiseReview{State: reviewStateDisabled}
@@ -338,8 +440,15 @@ func (s *Server) premiseReview(f model.Fact) *premiseReview {
 	if s.Verifier.Busy(f.ID) {
 		return &premiseReview{State: reviewStateRunning}
 	}
-	if _, cooling := s.reviewCoolingDown(f, time.Now()); cooling {
-		return &premiseReview{State: reviewStateCooling}
+	if a, blocked := s.reviewBlocked(f); blocked {
+		return &premiseReview{State: reviewStateFailed, Outcome: a.Outcome, Reason: a.Reason,
+			MissingEvidence: s.reviewEvidenceURIs(f), RetryAt: a.RetryAt}
+	}
+	if wait, cooling := s.reviewCoolingDown(f, time.Now()); cooling {
+		a, _ := s.Store.ReviewAttemptFor(f.ID)
+		retry := time.Now().Add(wait)
+		return &premiseReview{State: reviewStateCooling, Outcome: store.ReviewAttemptRunFailed,
+			Reason: a.Reason, RetryAt: &retry}
 	}
 	if !s.automaticReviewsEnabled() {
 		// A manual review can still be started by the operator; the session only
@@ -347,6 +456,18 @@ func (s *Server) premiseReview(f model.Fact) *premiseReview {
 		return &premiseReview{State: reviewStateDisabled}
 	}
 	return &premiseReview{State: reviewStateQueued}
+}
+
+func (s *Server) reviewEvidenceURIs(f model.Fact) []string {
+	out := make([]string, 0, len(f.EvidenceIDs))
+	for _, id := range f.EvidenceIDs {
+		if e, ok := s.Store.EvidenceByID(id); ok && e.URI != "" {
+			out = append(out, e.URI)
+			continue
+		}
+		out = append(out, id)
+	}
+	return out
 }
 
 const (
@@ -363,46 +484,85 @@ const (
 	reviewRetryCooldown = 5 * time.Minute
 )
 
-// reviewFailure is one fact's last failed automatic review. The assertion
-// version is part of the record: a corrected claim is a new assertion and gets a
-// fresh attempt immediately instead of inheriting the old failure's cooldown.
-type reviewFailure struct {
-	claimVersion uint64
-	at           time.Time
+// reviewAttemptOf returns the durable last attempt for this fact when it still
+// describes the same material. A corrected assertion or a changed evidence set
+// makes the old attempt history: the queue must be free to try again.
+func (s *Server) reviewAttemptOf(f model.Fact) (store.ReviewAttempt, bool) {
+	if s.Store == nil {
+		return store.ReviewAttempt{}, false
+	}
+	a, ok := s.Store.ReviewAttemptFor(f.ID)
+	if !ok || !a.SameMaterial(f.ClaimVersion, f.EvidenceIDs) {
+		return store.ReviewAttempt{}, false
+	}
+	return a, true
 }
 
 // reviewCoolingDown reports whether the automatic queue should leave this fact
-// alone for now, and how much of the cooldown is left. A cooldown that already
-// expired (or belonged to an older claim version) is cleared.
+// alone for now, and how much of the cooldown is left. Only a run failure cools
+// down; a needs_evidence verdict is blocked until material changes, not retried
+// on a timer.
 func (s *Server) reviewCoolingDown(f model.Fact, now time.Time) (time.Duration, bool) {
-	s.reviewFailMu.Lock()
-	defer s.reviewFailMu.Unlock()
-	fr, ok := s.reviewFailed[f.ID]
-	if !ok || fr.claimVersion != f.ClaimVersion {
+	a, ok := s.reviewAttemptOf(f)
+	if !ok || a.Outcome != store.ReviewAttemptRunFailed {
 		return 0, false
 	}
-	if now.Sub(fr.at) >= reviewRetryCooldown {
-		delete(s.reviewFailed, f.ID)
-		return 0, false
+	retryAt := a.FailedAt.Add(reviewRetryCooldown)
+	if a.RetryAt != nil {
+		retryAt = *a.RetryAt
 	}
-	return reviewRetryCooldown - now.Sub(fr.at), true
+	if now.Before(retryAt) {
+		return retryAt.Sub(now), true
+	}
+	return 0, false
 }
 
-// noteReviewFailure records a failed automatic review. The map holds at most one
-// entry per fact, so it cannot grow with retries.
+// reviewBlocked reports the durable attempt that keeps this fact out of the
+// automatic queue until its assertion or evidence set changes.
+func (s *Server) reviewBlocked(f model.Fact) (store.ReviewAttempt, bool) {
+	a, ok := s.reviewAttemptOf(f)
+	if !ok {
+		return store.ReviewAttempt{}, false
+	}
+	switch a.Outcome {
+	case store.ReviewAttemptNeedsEvidence:
+		return a, true
+	default:
+		return store.ReviewAttempt{}, false
+	}
+}
+
+// noteReviewFailure records a failed automatic review. It is the legacy entry
+// point used by tests: a run failure, cooled down by the standard interval.
 func (s *Server) noteReviewFailure(f model.Fact, now time.Time) {
-	s.reviewFailMu.Lock()
-	defer s.reviewFailMu.Unlock()
-	if s.reviewFailed == nil {
-		s.reviewFailed = map[string]reviewFailure{}
-	}
-	s.reviewFailed[f.ID] = reviewFailure{claimVersion: f.ClaimVersion, at: now}
+	retry := now.Add(reviewRetryCooldown)
+	s.recordReviewAttempt(f, store.ReviewAttemptRunFailed, "", "", now, &retry)
 }
 
-// clearReviewFailure forgets the failure record once the fact got a usable
-// verdict, so a later claim correction starts with a clean slate.
+// recordReviewAttempt persists why the automatic queue stopped moving this
+// fact. The map holds at most one entry per fact, keyed with the claim version
+// so a corrected assertion does not inherit the old attempt's state.
+func (s *Server) recordReviewAttempt(f model.Fact, outcome, reason, runID string, at time.Time, retryAt *time.Time) {
+	if s.Store == nil {
+		return
+	}
+	a := store.ReviewAttempt{
+		FactID: f.ID, ClaimVersion: f.ClaimVersion, ClaimHash: f.ClaimHash,
+		Outcome: outcome, Reason: clipRunes(strings.TrimSpace(reason), 500), RunID: runID,
+		EvidenceIDs: append([]string(nil), f.EvidenceIDs...), FailedAt: at, RetryAt: retryAt,
+	}
+	if err := s.Store.RecordReviewAttempt(a); err != nil {
+		log.Printf("自动复核 %s：记录复核尝试失败：%v", f.ID, err)
+	}
+}
+
+// clearReviewFailure forgets the attempt once the fact got a usable verdict, so
+// a later claim correction starts with a clean slate.
 func (s *Server) clearReviewFailure(f model.Fact) {
-	s.reviewFailMu.Lock()
-	defer s.reviewFailMu.Unlock()
-	delete(s.reviewFailed, f.ID)
+	if s.Store == nil {
+		return
+	}
+	if err := s.Store.ClearReviewAttempt(f.ID, f.ClaimVersion); err != nil {
+		log.Printf("自动复核 %s：清除复核尝试失败：%v", f.ID, err)
+	}
 }

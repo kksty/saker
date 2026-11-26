@@ -22,7 +22,9 @@ func (s *Server) getPlaybook(w http.ResponseWriter, r *http.Request) {
 	// The list derives the label from the sources; the detail must not hand back
 	// the raw writer declaration, or one row would read candidate in the table and
 	// confirmed in its own page. The stored row keeps its declaration.
-	if !p.Confirmed(model.FactIndex(s.Store.Snapshot().Facts)) && p.Status != model.PlaybookCandidate && p.Status != model.PlaybookRetired {
+	facts := model.FactIndex(s.Store.Snapshot().Facts)
+	p = p.WithSourceState(facts)
+	if !p.Confirmed(facts) && p.Status != model.PlaybookCandidate && p.Status != model.PlaybookRetired {
 		p.Status = model.PlaybookCandidate
 	}
 	writeJSON(w, 200, p)

@@ -743,7 +743,7 @@ func (s *Server) deliverMessage(ctx context.Context, target model.Intent, msg mo
 		// read it, and nothing silently starts an untracked harness turn.
 		return msg
 	}
-	claimed, acquired, claimErr := s.Store.BeginMessageDelivery(msg.ID)
+	claimed, acquired, claimErr := s.Store.BeginMessageDelivery(msg.ID, run.ID)
 	if claimErr != nil {
 		log.Printf("消息 %s 投递准入失败：%v", msg.ID, claimErr)
 		return msg
@@ -915,12 +915,18 @@ func (s *Server) agentAckMessage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusForbidden, "只能确认发给自己的消息")
 		return
 	}
-	updated, err := s.Store.AckMessage(msgID)
+	updated, err := s.Store.AckMessageDelivery(msgID, r.URL.Query().Get("delivery_id"), id.RunID)
 	if err != nil {
 		if errors.Is(err, store.ErrMessageNotDelivered) {
 			// 409, not 200: the row is still queued and the sender must not read
 			// a receipt for a message the model has not been given.
 			writeErr(w, http.StatusConflict, err.Error())
+			return
+		}
+		if errors.Is(err, store.ErrMessageDeliveryMismatch) {
+			// A late receipt from the previous session must not confirm the
+			// redelivery the current session has not necessarily read.
+			writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "message_delivery_mismatch"})
 			return
 		}
 		writeErr(w, http.StatusInternalServerError, err.Error())

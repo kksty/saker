@@ -320,7 +320,19 @@ func writeRuntimeDocument(dir, prefix string, root *yaml.Node) (string, error) {
 func (s *Store) SecretValues() []string {
 	values := []string{s.Effective().APIKey}
 	// Historic secrets still need redaction, even though they are never selected.
-	if root, _, err := s.readDocument(); err == nil {
+	if root, doc, err := s.readDocument(); err == nil {
+		// The harness marks upstream keys and subscription/download URLs as
+		// sensitive. Include them in the Saker journal redaction backstop too.
+		if gateway := sectionNode(doc, "gateway"); gateway != nil && gateway.Kind == yaml.MappingNode {
+			for i := 1; i < len(gateway.Content); i += 2 {
+				for _, field := range []string{"key", "url", "proxy"} {
+					value := mapGet(gateway.Content[i], field)
+					if value != nil && value.Tag == "!!str" && scalar(value) != "" {
+						values = append(values, scalar(value))
+					}
+				}
+			}
+		}
 		var walk func(*yaml.Node)
 		walk = func(node *yaml.Node) {
 			if node.Kind == yaml.MappingNode {

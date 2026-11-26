@@ -64,6 +64,17 @@ function button(label: string) {
   return renderer!.root.findAllByType('button').find((node) => node.children.includes(label))!
 }
 
+test('settings shows saved gateway and proxy configuration', async () => {
+  // Gateway settings already reached the host, but the page had no way to
+  // distinguish an enabled instance or a selected proxy from an empty file.
+  await mountSettings({ gateway: { instances: 2, enabled: 1, proxy_configured: true } })
+  const page = JSON.stringify(renderer!.toJSON())
+  assert.match(page, /工具 API 网关/)
+  assert.match(page, /2 个实例，1 个启用/)
+  assert.match(page, /Cyberhub 代理/)
+  assert.match(page, /已保存配置 · 只读/)
+})
+
 test('a detected model can be selected before explicitly saving it', async () => {
   const original = await mountSettings()
   api.checkModel = async () => ({ available: true, source: 'host', returned_model: 'route', models: ['route', 'gateway/second'] })

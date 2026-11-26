@@ -48,6 +48,8 @@ Linux / macOS 用 `scripts/build-harness.sh`，`bin/saker` 不带后缀。启动
 ## 使用流程
 
 1. **配置模型连接。** 启动前设置 `CYBER_BASE_URL`、`CYBER_API_KEY`、`CYBER_MODEL`，或在「设置 → 模型连接」中填写；保存结果会说明已在线应用，还是需要重启宿主。
+
+   同页的「工具 API 网关」显示 `cyber.yaml` 中已保存的网关实例数、启用数和 Cyberhub 代理配置状态。守门策略区显示 JEV 是否使用自定义端点，以及识别到的配置问题。两处状态均来自配置文件。
 2. **打开控制台。** 默认 `http://127.0.0.1:8080`，令牌在 `data/console.token`（首次启动生成）。令牌与账本、证据同在实例目录：一起备份、一起收紧权限，代价是执行者的文件工具也能读到（见[安全策略](SECURITY.md)）；需要隔离时用 `--console-token-file` 指到数据目录之外。
 3. **建项目。** 写三份文档：起点（范围与已有信息）、终点（验收标准）、内置约束（必须守住的东西）。三份原文就是授权边界，代码不另加规则；边界可随项目推进在控制台更新。
 4. **让它跑。** 启动项目后，指挥官按文档与图谱派意图，执行者接意图执行；「图谱」看待办、事实与证据，「项目状态」看谁在跑、为什么停。
@@ -64,7 +66,7 @@ Linux / macOS 用 `scripts/build-harness.sh`，`bin/saker` 不带后缀。启动
 | Go 测试（串行） | `go test ./cmd/... ./internal/... -p 1 -count=1` |
 | 前端检查 | `pnpm --dir web typecheck` 与 `pnpm --dir web test` |
 | 收一个 run 供复盘 | `pwsh -File scripts/collect-run.ps1 -Project <项目ID> -Out <out.zip>` |
-| 长跑外部看护（默认只观察） | `pwsh -File scripts/watchdog.ps1 -Project <项目ID>` |
+| 长跑外部状态观察 | `pwsh -File scripts/watchdog.ps1 -Project <项目ID>` |
 | 版本 | `./bin/saker.exe --version` |
 
 ## 架构与目录
@@ -86,17 +88,25 @@ data/       运行时实例目录（账本、项目、证据、console.token）�
 
 gate 的最后一步写 `.build/build-manifest.json`（步骤清单见 `cmd/saker-gate/main.go:10-25`）：源码身份（仓库根、commit、branch、dirty、工作树补丁 SHA-256）、harness 身份与提交、AOP 生成文件的聚合 fingerprint 与逐文件 SHA-256、协议版本、平台与工具链、模型连接与真实上游 model id、各二进制的 sha256 与 `--version` 输出。清单从不写 API key。
 
-## 离线修复交接游标
+## 离线修复交接与派发回执
 
-历史有效置信度、交接游标的修复都要求项目暂停且 `saker` 已停止，先预览、核对后再提交：
+历史有效置信度、交接游标、未完成入账和提议派发回执的修复都要求项目暂停且 `saker` 已停止，先预览、核对后再提交：
 
 ```powershell
 ./bin/saker-repair.exe --project <项目绝对目录> --confidence            # 预览
 ./bin/saker-repair.exe --project <项目绝对目录> --confidence --commit   # 先备份账本再写回
 ./bin/saker-repair.exe --project <项目绝对目录> --intent <精确意图ID>    # 预览该意图的交接游标
+./bin/saker-repair.exe --project <项目绝对目录> --intent <精确意图ID> --ingest          # 预览未完成入账
+./bin/saker-repair.exe --project <项目绝对目录> --intent <精确意图ID> --ingest --commit # 幂等补写该批声明
+./bin/saker-repair.exe --project <项目绝对目录> --proposals            # 预览历史缺回执的提议
+./bin/saker-repair.exe --project <项目绝对目录> --proposals --commit   # 只补归属明确的回执
 ```
 
-`--commit` 只写回能保留断言哈希的派生标签或与现存声明一致的游标，并保留修复前的游标、文件摘要与审计记录。
+意图预览的 `persisted` 是本批中已与账本核对的声明数。`pending` 给出待核对声明的 ID、文件字节范围及原因。`skipped` 和 `truncated` 分别标识解析时跳过的行数和是否还有超出本批读取上限的内容。预览只读账本和交接文件。
+
+`--ingest --commit` 从运行记录的结构化入账结果定位未提交批次，只重读 `facts.jsonl` 的同一批声明并幂等补写账本与消费游标，不启动执行者。`--proposals --commit` 只补「批准后该意图恰有一个可归属运行」的回执；多个候选或没有运行时保留原因，不改账本。
+
+`--commit` 只写回能保留断言哈希的派生标签、与现存声明一致的游标或已核对的入账批次，并保留修复前的备份与审计记录。
 
 ## 免责声明
 
