@@ -423,6 +423,7 @@ type View struct {
 	// operator edits those sections directly, and the console only reports
 	// whether admission is in effect, fail-open, or shadowing.
 	Guardrail GuardrailPolicyView `json:"guardrail"`
+	Gateway   GatewayView         `json:"gateway"`
 
 	// TrafficBodyRetentionBytes is the explicit scan capture-directory retention
 	// override in bytes, or 0 when the operator has not set one. GET reports 0 for
@@ -481,6 +482,7 @@ func (s *Store) View() View {
 		v.SearchKeyCount = product.SearchKeyCount
 	}
 	v.Guardrail = s.GuardrailPolicy()
+	v.Gateway = s.gatewayView()
 	retention := s.TrafficRetention()
 	// The wire value is the explicit override or 0: GET must not make the
 	// generated default look like an operator-set number.

@@ -17,7 +17,7 @@ import {
 import type { SettingsGuardrailSummary } from '@/lib/types'
 
 /**
- * Read-only summary of the operator's `extensions.guardrail` policy.
+ * Read-only summary of the operator's `guardrail` policy.
  *
  * The settings page does not edit the judge (the operator writes the section in
  * cyber.yaml directly), so this card only reports what is in effect — and, just
@@ -45,7 +45,7 @@ export function GuardrailPolicyCard({ guardrail }: { guardrail?: SettingsGuardra
   return (
     <Panel
       title="守门策略"
-      extra={<Badge variant="outline" size="sm">只读 · cyber.yaml extensions.guardrail</Badge>}
+      extra={<Badge variant="outline" size="sm">只读 · cyber.yaml guardrail</Badge>}
       bodyClassName="space-y-3"
       data-testid="guardrail-policy"
     >
@@ -60,11 +60,13 @@ export function GuardrailPolicyCard({ guardrail }: { guardrail?: SettingsGuardra
         <span className="text-[11px] text-ink-3">控制台只读展示，配置由操作员直接写在 cyber.yaml。</span>
       </div>
 
-      {!flags.enabled && (
+      {!flags.enabled && guardrail.reason && <Callout tone="info">{guardrail.reason}</Callout>}
+
+      {!flags.enabled && !guardrail.reason && (
         <p className="text-[12px] leading-relaxed text-ink-2">
           守门未启用：工具调用前不会经过自动判定，也不会进入人工审批流程。<code className="mx-1 rounded bg-surface-2 px-1 font-mono text-[11px]">provider=none</code>
           或未配置就是默认状态；只配置凭据不会启用策略。需要时可以在
-          <code className="mx-1 rounded bg-surface-2 px-1 font-mono text-[11px]">extensions.guardrail</code>
+          <code className="mx-1 rounded bg-surface-2 px-1 font-mono text-[11px]">guardrail</code>
           配 <code className="mx-1 rounded bg-surface-2 px-1 font-mono text-[11px]">provider: llm</code>（加 llm 子段，不需要 JEV）或 jev / hybrid，重启宿主后生效。
         </p>
       )}
@@ -95,9 +97,13 @@ export function GuardrailPolicyCard({ guardrail }: { guardrail?: SettingsGuardra
         <div className="flex min-w-0 items-baseline gap-1.5">
           <dt className="shrink-0 text-ink-3">异常处理（on_error）</dt>
           <dd className={`saker-break min-w-0 ${flags.failOpen ? 'font-medium text-warning' : 'text-ink-2'}`}>
-            {guardrail.on_error?.trim() || '未设置（默认 review）'}
+            {guardrail.on_error?.trim() || (usesLLM ? '未设置（默认 review）' : '不适用')}
             {flags.failOpen ? ' · 自动放行' : guardrail.on_error === 'review' ? ' · 转人工复核' : guardrail.on_error === 'block' ? ' · 直接拦截' : ''}
           </dd>
+        </div>
+        <div className="flex min-w-0 items-baseline gap-1.5">
+          <dt className="shrink-0 text-ink-3">JEV 端点</dt>
+          <dd className="text-ink-2">{guardrail.jev_custom_endpoint === undefined ? '未知' : guardrail.jev_custom_endpoint ? '自定义' : '默认'}</dd>
         </div>
         <div className="flex min-w-0 items-baseline gap-1.5">
           <dt className="shrink-0 text-ink-3">JEV 凭据（可选复核裁判）</dt>

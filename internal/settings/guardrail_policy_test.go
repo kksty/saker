@@ -30,7 +30,7 @@ func guardrailStore(t *testing.T, body string) *Store {
 func TestGuardrailPolicyNoneWhenSectionAbsent(t *testing.T) {
 	st := guardrailStore(t, "")
 	view := st.GuardrailPolicy()
-	if view.Configured || view.Provider != "none" || view.Mode != "auto" || view.OnError != "review" {
+	if view.Configured || view.Provider != "none" || view.Mode != "auto" || view.OnError != "" {
 		t.Fatalf("view = %+v", view)
 	}
 	if view.Scope == nil || len(view.Scope) != 0 {
@@ -52,14 +52,13 @@ func TestGuardrailPolicyParsesJudgeConfiguration(t *testing.T) {
   guardrail:
     provider: jev
     mode: safe
-    on_error: review
     scope: [bash, subagent]
     allow_prefixes: ["git status", "ls"]
   jev:
     api_key: jev-secret
 `,
 			want: GuardrailPolicyView{
-				Configured: true, Provider: "jev", Mode: "safe", OnError: "review",
+				Configured: true, Provider: "jev", Mode: "safe",
 				Scope: []string{"bash", "subagent"}, AllowPrefixesCount: 2, JEVConfigured: true,
 			},
 		},
@@ -69,7 +68,7 @@ func TestGuardrailPolicyParsesJudgeConfiguration(t *testing.T) {
     provider: llm
     on_error: block
     llm:
-      base_url: http://judge.test/v1
+      base_url: http://fixture:private-judge-url@judge.test/v1?token=private-judge-query
       model: judge-small
       api_key: judge-secret
 `,
@@ -87,11 +86,16 @@ func TestGuardrailPolicyParsesJudgeConfiguration(t *testing.T) {
     shadow: true
     on_error: allow
     llm:
+      base_url: http://judge.test/v1
       model: judge-small
+  jev:
+    api_key: jev-secret
+    base_url: https://judge.test/private-jev-prefix
 `,
 			want: GuardrailPolicyView{
 				Configured: true, Provider: "hybrid", Mode: "auto", OnError: "allow", Shadow: true,
-				Scope: []string{}, LLM: GuardrailLLMView{Configured: true, Model: "judge-small"},
+				Scope: []string{}, JEVConfigured: true, JEVCustomEndpoint: true,
+				LLM: GuardrailLLMView{Configured: true, Model: "judge-small", BaseURL: "http://judge.test/v1"},
 			},
 		},
 		"explicit none": {
@@ -99,7 +103,7 @@ func TestGuardrailPolicyParsesJudgeConfiguration(t *testing.T) {
   guardrail:
     provider: none
 `,
-			want: GuardrailPolicyView{Configured: true, Provider: "none", Mode: "auto", OnError: "review", Scope: []string{}},
+			want: GuardrailPolicyView{Configured: true, Provider: "none", Mode: "auto", Scope: []string{}},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -109,7 +113,7 @@ func TestGuardrailPolicyParsesJudgeConfiguration(t *testing.T) {
 			if string(got) != string(want) {
 				t.Fatalf("policy =\n%s\nwant\n%s", got, want)
 			}
-			for _, secret := range []string{"jev-secret", "judge-secret"} {
+			for _, secret := range []string{"jev-secret", "judge-secret", "private-jev-prefix", "private-judge-url", "private-judge-query"} {
 				if strings.Contains(string(got), secret) {
 					t.Fatalf("policy view leaked %q: %s", secret, got)
 				}
@@ -119,6 +123,8 @@ func TestGuardrailPolicyParsesJudgeConfiguration(t *testing.T) {
 }
 
 func TestGuardrailPolicyReportsInvalidConfiguration(t *testing.T) {
+	// The fork rejects incomplete bindings and top-level on_error for JEV.
+	// The console used to report these saved configurations as enabled.
 	for name, tc := range map[string]struct {
 		body string
 		want string
@@ -165,6 +171,26 @@ func TestGuardrailPolicyReportsInvalidConfiguration(t *testing.T) {
   guardrail:
     provider: llm
 `, "裁判无法生效"},
+		"llm model only": {`guardrail:
+  provider: llm
+  llm:
+    model: judge
+`, "base_url"},
+		"jev without credentials": {`guardrail:
+  provider: jev
+`, "缺少 JEV 凭据"},
+		"jev with llm error policy": {`guardrail:
+  provider: jev
+  on_error: allow
+jev:
+  api_key: fixture
+`, "仅适用于"},
+		"jev with invalid endpoint": {`guardrail:
+  provider: jev
+jev:
+  api_key: fixture
+  base_url: https://judge.test/?token=private
+`, "jev.base_url"},
 		"unknown field": {`extensions:
   guardrail:
     provider: jev

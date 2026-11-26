@@ -65,7 +65,10 @@ export function SettingsPage() {
      <h2 className="text-h4 font-semibold text-ink">模型与扩展</h2>
      <div className="grid items-start gap-4 @min-[70rem]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <ModelConnection settings={settings} />
-      <ExtensionsPanel settings={settings} />
+      <div className="min-w-0 space-y-4">
+       <ExtensionsPanel settings={settings} />
+       {settings.data?.gateway && <GatewayStatus gateway={settings.data.gateway} />}
+      </div>
      </div>
     </section>
     <section aria-label="运行默认值" className="space-y-3">
@@ -90,6 +93,25 @@ export function SettingsPage() {
    </div>
   </div>
  </Page>
+}
+
+function GatewayStatus({ gateway }: { gateway: NonNullable<SettingsView['gateway']> }) {
+ return (
+  <Panel title="工具 API 网关" extra={<Badge variant="outline" size="sm">已保存配置 · 只读</Badge>}>
+   {gateway.reason ? <Callout tone="warning">{gateway.reason}</Callout> : (
+    <dl className="grid grid-cols-1 gap-3 text-[12px] sm:grid-cols-2">
+     <div>
+      <dt className="text-ink-3">网关实例</dt>
+      <dd className="text-ink-2">{gateway.instances === 0 ? '未配置' : `${gateway.instances} 个实例，${gateway.enabled} 个启用`}</dd>
+     </div>
+     <div>
+      <dt className="text-ink-3">Cyberhub 代理</dt>
+      <dd className="text-ink-2">{gateway.proxy_configured ? '已配置' : '未指定'}</dd>
+     </div>
+    </dl>
+   )}
+  </Panel>
+ )
 }
 
 /**

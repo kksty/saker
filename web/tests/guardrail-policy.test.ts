@@ -128,11 +128,18 @@ test('guardrail policy card renders not-enabled, fail-open+shadow and normal LLM
     assert.ok(none.includes('可选复核裁判'), none)
     assert.ok(none.includes('未配置（llm 模式不需要）'), none)
 
+    // The old card rendered only its generic enablement instructions when the
+    // saved binding was rejected, leaving the actual failure hidden.
+    const invalid = await render({ configured: false, provider: 'jev', reason: '当前裁判缺少 JEV 凭据' })
+    assert.ok(invalid.includes('当前裁判缺少 JEV 凭据'), invalid)
+    assert.ok(!invalid.includes('extensions.guardrail'), invalid)
+
     // 2) on_error=allow + shadow: fail-open callout and shadow badge are both
     //    required, plus the scope/prefix summary and LLM semantics.
     const failOpen = await render({
       configured: true, provider: 'hybrid', mode: 'safe', on_error: 'allow', shadow: true,
       scope: ['bash', 'subagent'], allow_prefixes_count: 2, jev_configured: true,
+      jev_custom_endpoint: true,
       llm: { configured: true, model: 'judge-1', base_url: 'http://llm/v1' },
     })
     assert.ok(failOpen.includes('守门已启用'), failOpen)
@@ -145,6 +152,7 @@ test('guardrail policy card renders not-enabled, fail-open+shadow and normal LLM
     assert.ok(failOpen.includes('不确定或没把握时允许'), failOpen)
     assert.ok(failOpen.includes('judge-1'), failOpen)
     assert.ok(failOpen.includes('已配置'), failOpen)
+    assert.ok(failOpen.includes('自定义'), failOpen)
 
     // 3) a normal llm-only judge: no fail-open, no shadow, JEV not needed.
     const normal = await render({

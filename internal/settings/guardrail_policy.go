@@ -27,6 +27,7 @@ package settings
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -52,6 +53,7 @@ type GuardrailPolicyView struct {
 	// count is exposed: the prefixes themselves can describe target commands.
 	AllowPrefixesCount int              `json:"allow_prefixes_count"`
 	JEVConfigured      bool             `json:"jev_configured"`
+	JEVCustomEndpoint  bool             `json:"jev_custom_endpoint"`
 	LLM                GuardrailLLMView `json:"llm"`
 	Reason             string           `json:"reason,omitempty"`
 }
@@ -80,7 +82,7 @@ var guardrailSectionKeys = map[string]bool{
 // out of the returned value.
 func (s *Store) GuardrailPolicy() GuardrailPolicyView {
 	view := GuardrailPolicyView{
-		Provider: "none", Mode: "auto", OnError: "review", Scope: []string{},
+		Provider: "none", Mode: "auto", Scope: []string{},
 		JEVConfigured: jevKeyConfigured(nil),
 	}
 	_, doc, err := s.readDocument()
@@ -89,7 +91,12 @@ func (s *Store) GuardrailPolicy() GuardrailPolicyView {
 		return view
 	}
 	guardrailNode := sectionNode(doc, "guardrail")
-	view.JEVConfigured = jevKeyConfigured(sectionNode(doc, "jev"))
+	jevNode := sectionNode(doc, "jev")
+	view.JEVConfigured = jevKeyConfigured(jevNode)
+	jevBase := scalar(mapGet(jevNode, "base_url"))
+	u, err := url.Parse(jevBase)
+	invalidJEVEndpoint := jevBase != "" && (err != nil || u.Hostname() == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "")
+	view.JEVCustomEndpoint = jevBase != ""
 	if guardrailNode == nil {
 		view.Reason = "未配置 guardrail：工具审批未启用（默认 provider=none）"
 		return view
@@ -105,7 +112,7 @@ func (s *Store) GuardrailPolicy() GuardrailPolicyView {
 			return view
 		}
 	}
-	provider := strings.ToLower(scalar(mapGet(guardrailNode, "provider")))
+	provider := scalar(mapGet(guardrailNode, "provider"))
 	switch provider {
 	case "":
 		view.Reason = "guardrail.provider 为空（默认 none）：工具审批未启用"
@@ -113,24 +120,29 @@ func (s *Store) GuardrailPolicy() GuardrailPolicyView {
 	case "none", "jev", "llm", "hybrid":
 		view.Provider = provider
 	default:
-		view.Reason = fmt.Sprintf("guardrail.provider=%q 不合法（只允许 none/jev/llm/hybrid）", provider)
+		view.Reason = "guardrail.provider 不合法（只允许 none/jev/llm/hybrid）"
 		return view
 	}
-	mode := strings.ToLower(scalar(mapGet(guardrailNode, "mode")))
+	mode := scalar(mapGet(guardrailNode, "mode"))
 	if mode == "" {
 		mode = "auto"
 	}
 	if mode != "auto" && mode != "safe" {
-		view.Reason = fmt.Sprintf("guardrail.mode=%q 不合法（只允许 auto/safe）", mode)
+		view.Reason = "guardrail.mode 不合法（只允许 auto/safe）"
 		return view
 	}
 	view.Mode = mode
-	onError := strings.ToLower(scalar(mapGet(guardrailNode, "on_error")))
-	if onError == "" {
+	usesLLM := provider == "llm" || provider == "hybrid"
+	onError := scalar(mapGet(guardrailNode, "on_error"))
+	if onError != "" && !usesLLM {
+		view.Reason = "guardrail.on_error 仅适用于 provider=llm 或 hybrid"
+		return view
+	}
+	if onError == "" && usesLLM {
 		onError = "review"
 	}
-	if onError != "allow" && onError != "review" && onError != "block" {
-		view.Reason = fmt.Sprintf("guardrail.on_error=%q 不合法（只允许 allow/review/block）", onError)
+	if onError != "" && onError != "allow" && onError != "review" && onError != "block" {
+		view.Reason = "guardrail.on_error 不合法（只允许 allow/review/block）"
 		return view
 	}
 	view.OnError = onError
@@ -159,22 +171,34 @@ func (s *Store) GuardrailPolicy() GuardrailPolicyView {
 			return view
 		}
 		view.AllowPrefixesCount = len(items)
+		if len(items) > 0 && mode != "safe" {
+			view.Reason = "guardrail.allow_prefixes 仅适用于 mode=safe"
+			return view
+		}
 	}
 	if llm := mapGet(guardrailNode, "llm"); llm != nil {
 		if llm.Kind != yaml.MappingNode {
 			view.Reason = "guardrail.llm 必须是映射"
 			return view
 		}
-		view.LLM = GuardrailLLMView{
-			Model:   scalar(mapGet(llm, "model")),
-			BaseURL: scalar(mapGet(llm, "base_url")),
+		view.LLM.Model = scalar(mapGet(llm, "model"))
+		endpoint, err := url.Parse(strings.TrimRight(scalar(mapGet(llm, "base_url")), "/"))
+		if err == nil && endpoint.Host != "" && (endpoint.Scheme == "http" || endpoint.Scheme == "https") {
+			view.LLM.Configured = view.LLM.Model != ""
+			publicEndpoint := url.URL{Scheme: endpoint.Scheme, Host: endpoint.Host, Path: endpoint.Path, RawPath: endpoint.RawPath}
+			view.LLM.BaseURL = publicEndpoint.String()
 		}
-		view.LLM.Configured = view.LLM.Model != "" || view.LLM.BaseURL != ""
 	}
-	// A judge provider with no dedicated llm binding is still "configured" for
-	// the jev path; for llm/hybrid the console needs to know it cannot run.
-	if (view.Provider == "llm" || view.Provider == "hybrid") && !view.LLM.Configured {
-		view.Reason = fmt.Sprintf("provider=%s 但 guardrail.llm 未配置 base_url/model：裁判无法生效", view.Provider)
+	if usesLLM && !view.LLM.Configured {
+		view.Reason = "guardrail.llm 需要有效的 base_url 和 model，裁判无法生效"
+		return view
+	}
+	if invalidJEVEndpoint {
+		view.Reason = "jev.base_url 必须是有效的 HTTP(S) 地址"
+		return view
+	}
+	if (provider == "jev" || provider == "hybrid") && !view.JEVConfigured {
+		view.Reason = "当前裁判缺少 JEV 凭据"
 		return view
 	}
 	view.Configured = true
