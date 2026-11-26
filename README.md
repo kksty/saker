@@ -23,6 +23,7 @@
 - Node.js 24 或更高（前端测试用 `node --test` 直接执行 `.ts`）与 pnpm（锁文件 `pnpm-lock.yaml`）。
 - Git。
 - Windows 上还需要 Git for Windows 提供的 Bash 与常用 POSIX 工具：宿主的 shell 工具依赖它们。
+- （可选）浏览器工具（页面交互、headless 模板执行）需要本机 Chrome、Chromium 或 Edge；也可以用 `CYBER_BROWSER_PATH` 指定浏览器可执行文件。没有浏览器时这些工具不可用，控制台与命令执行不受影响。
 
 本地 gate 已在 Go 1.27.3、Node.js 26.9.0 上通过（2026-11-25）；前端检查另需 pnpm。
 
