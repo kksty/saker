@@ -16,8 +16,12 @@ export function EgressChip() {
   const status = usePoll(() => api.egress('cached'), 30_000, [])
   const data = status.data
   const probe = data?.probe
-  const failed = !!(data?.invalid || data?.probe_error || (probe && !probe.ok))
-  const dot = failed ? 'bg-destructive' : probe?.ok ? 'bg-success' : 'bg-ink-3'
+  // A red dot is only for a measured failure. A selection the scan will not
+  // load, and a check that could not run, are warnings: neither is a verdict
+  // about the network.
+  const unreachable = Boolean(probe && !probe.ok)
+  const warning = Boolean(data?.invalid || data?.probe_error)
+  const dot = unreachable ? 'bg-destructive' : warning ? 'bg-warning' : probe?.ok ? 'bg-success' : 'bg-ink-3'
   const label = !data ? '出口 读取中'
     : data.mode === 'direct' ? '出口 直连'
     : data.mode === 'single' ? '出口 单节点'
@@ -29,6 +33,7 @@ export function EgressChip() {
     : probe.ok ? `${probe.duration_ms}ms`
     : '不通'
   const title = !data ? '正在读取出口状态'
+    : data.invalid ? `${label} · ${data.invalid}`
     : data.probe_error ? `检测无法运行：${data.probe_error}`
     : probe ? `${label}${detail ? ` · ${detail}` : ''} · ${probe.target}` : `${label} · 尚未检测`
   return <button

@@ -32,6 +32,11 @@ type EgressView struct {
 	// instance the scan will not load, so the console does not report
 	// "configured" as if it were working.
 	Invalid string `json:"invalid,omitempty"`
+	// Refused marks the subset of Invalid shapes that make the scan exit before
+	// it can dial (a named instance that does not exist, or an omitted selection
+	// matching several). A probe cannot run there, so the console reports a
+	// failed check instead of measuring the network.
+	Refused bool `json:"refused,omitempty"`
 }
 
 func (s *Store) EgressView() EgressView {
@@ -63,7 +68,7 @@ func egressViewOf(doc *yaml.Node) EgressView {
 		instance, found := findClash(instances, proxy)
 		switch {
 		case !found:
-			view.Mode, view.Egress = "subscription", proxy
+			view.Mode, view.Egress, view.Refused = "subscription", proxy, true
 			view.Invalid = fmt.Sprintf("cyberhub.proxy 指向 %q，但 gateway 段里没有同名 clash 实例", proxy)
 		case !instance.enabled:
 			// The scan accepts the name, then loads nothing for a disabled
@@ -78,7 +83,7 @@ func egressViewOf(doc *yaml.Node) EgressView {
 	case len(instances) > 1:
 		// Every instance of the kind counts, enabled or not: an omitted selection
 		// with more than one match is refused when the scan loads the gateway.
-		view.Mode = "subscription"
+		view.Mode, view.Refused = "subscription", true
 		view.Invalid = fmt.Sprintf("有 %d 个 clash 实例（%s）但 cyberhub.proxy 未指定：scan 启动会拒绝", len(instances), clashNames(instances))
 	}
 	return view

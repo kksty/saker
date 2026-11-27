@@ -104,6 +104,9 @@ func TestEgressViewReportsAmbiguousClashSelection(t *testing.T) {
 	if view.Invalid == "" || !strings.Contains(view.Invalid, "cyberhub.proxy") {
 		t.Fatalf("view = %+v, want an ambiguity reason", view)
 	}
+	if !view.Refused {
+		t.Fatalf("view = %+v, want Refused: the scan exits before it can dial", view)
+	}
 }
 
 // A disabled instance is still a match for the gateway's "at most one service"
@@ -124,6 +127,9 @@ func TestEgressViewCountsDisabledClashInstancesAsSelectionCandidates(t *testing.
 	view := st.EgressView()
 	if view.Invalid == "" || !strings.Contains(view.Invalid, "a、b") {
 		t.Fatalf("view = %+v, want both instances named in the ambiguity", view)
+	}
+	if !view.Refused {
+		t.Fatalf("view = %+v, want Refused for the ambiguous selection", view)
 	}
 	doc, err := st.EgressProbeDocument()
 	if err != nil {
@@ -154,6 +160,9 @@ cyberhub:
 	if !strings.Contains(view.Invalid, "停用") || !strings.Contains(view.Invalid, "office") {
 		t.Fatalf("invalid = %q, want the disabled selection named", view.Invalid)
 	}
+	if view.Refused {
+		t.Fatalf("view = %+v, a disabled selection starts the scan (no proxy) and is still measurable", view)
+	}
 }
 
 // The single auto-selected instance being disabled is not an error: the scan
@@ -169,5 +178,8 @@ func TestEgressViewSingleDisabledInstanceIsDirect(t *testing.T) {
 	view := st.EgressView()
 	if view.Mode != "direct" || view.Configured || view.Invalid != "" {
 		t.Fatalf("view = %+v, want a plain direct egress", view)
+	}
+	if view.Refused {
+		t.Fatalf("view = %+v, the scan starts with a single disabled instance", view)
 	}
 }

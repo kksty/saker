@@ -237,10 +237,16 @@ func (h *hub) serveEgress(w http.ResponseWriter, r *http.Request) {
 	report := egressReport{EgressView: view}
 	var probe *egressProbe
 	var err error
-	if r.URL.Query().Get("probe") == "1" {
-		probe, err = h.egress.Probe(r.Context(), true, view.Mode)
-	} else {
+	switch {
+	case r.URL.Query().Get("probe") != "1":
 		probe = h.egress.Cached()
+	case view.Refused:
+		// The scan exits before it can dial, so a probe would report a red
+		// measurement for a configuration that never reached the network. That
+		// is a check that cannot run, not an unreachable target.
+		report.ProbeError = "配置会被 scan 拒绝（" + view.Invalid + "），先修正后再检测"
+	default:
+		probe, err = h.egress.Probe(r.Context(), true, view.Mode)
 	}
 	switch {
 	case err != nil:

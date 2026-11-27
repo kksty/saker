@@ -2164,6 +2164,9 @@ export interface EgressStatus {
   /** A saved shape the scan refuses at startup, or a selected instance it will
    *  not load (a disabled clash instance is accepted by name and then skipped). */
   invalid?: string
+  /** The subset of `invalid` that makes the scan exit before it can dial; a
+   *  probe cannot run, so the console reports a failed check, not a red probe. */
+  refused?: boolean
   probe?: EgressProbe
   probe_error?: string
 }

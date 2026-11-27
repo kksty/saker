@@ -2,7 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -58,6 +62,79 @@ func TestEgressProberReportsUnavailableDocument(t *testing.T) {
 func TestEgressRouteStaysOperatorOnly(t *testing.T) {
 	if !agentRouteHidden("/api/egress") {
 		t.Fatal("/api/egress is visible to harness sessions")
+	}
+}
+
+// A saved shape the scan refuses would fail the probe process before it dials.
+// That is a check that cannot run, not a red measurement: no process is started
+// and the reason comes back as probe_error (the console disables 检测 too).
+func TestEgressProbeIsSkippedForAConfigTheScanRefuses(t *testing.T) {
+	h := settingsHubWith(t, "gateway:\n  a:\n    kind: clash\n    url: https://a.example/sub\n  b:\n    kind: clash\n    url: https://b.example/sub\n")
+	runs := 0
+	p := newEgressProber("", func() ([]byte, error) { return []byte("cyberhub: {}\n"), nil })
+	p.run = func(context.Context, []byte) (egressProbe, error) {
+		runs++
+		return egressProbe{OK: true, HTTPCode: 200}, nil
+	}
+	h.egress = p
+
+	rec := httptest.NewRecorder()
+	h.serveEgress(rec, httptest.NewRequest(http.MethodGet, "/api/egress?probe=1", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("/api/egress = %d: %s", rec.Code, rec.Body.String())
+	}
+	var out struct {
+		Mode       string       `json:"mode"`
+		Refused    bool         `json:"refused"`
+		Probe      *egressProbe `json:"probe"`
+		ProbeError string       `json:"probe_error"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode: %v (%s)", err, rec.Body.String())
+	}
+	if !out.Refused || out.Probe != nil {
+		t.Fatalf("report = %+v, want refused with no probe", out)
+	}
+	if !strings.Contains(out.ProbeError, "先修正") || !strings.Contains(out.ProbeError, "clash") {
+		t.Fatalf("probe_error = %q, want the refusal reason", out.ProbeError)
+	}
+	if runs != 0 {
+		t.Fatalf("a refused config started %d probe processes", runs)
+	}
+}
+
+// The accepted shape still probes exactly once, and the cached read after it
+// never starts another process.
+func TestEgressProbeRunsForAnAcceptedConfig(t *testing.T) {
+	h := settingsHubWith(t, "cyberhub:\n  proxy: http://127.0.0.1:7890\n")
+	runs := 0
+	p := newEgressProber("", func() ([]byte, error) { return []byte("cyberhub: {}\n"), nil })
+	p.run = func(context.Context, []byte) (egressProbe, error) {
+		runs++
+		return egressProbe{OK: true, HTTPCode: 200, DurationMS: 12, Target: egressProbeTarget}, nil
+	}
+	h.egress = p
+
+	rec := httptest.NewRecorder()
+	h.serveEgress(rec, httptest.NewRequest(http.MethodGet, "/api/egress?probe=1", nil))
+	var out struct {
+		Refused bool         `json:"refused"`
+		Probe   *egressProbe `json:"probe"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode: %v (%s)", err, rec.Body.String())
+	}
+	if out.Refused || out.Probe == nil || !out.Probe.OK {
+		t.Fatalf("report = %+v, want a measured probe", out)
+	}
+	if runs != 1 {
+		t.Fatalf("probe runs = %d, want 1", runs)
+	}
+
+	rec = httptest.NewRecorder()
+	h.serveEgress(rec, httptest.NewRequest(http.MethodGet, "/api/egress", nil))
+	if runs != 1 {
+		t.Fatalf("cached read started another probe (%d runs)", runs)
 	}
 }
 

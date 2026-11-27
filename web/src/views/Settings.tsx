@@ -273,8 +273,12 @@ function EgressStatusPanel() {
     : data.mode === 'single' ? `单节点 · ${data.egress || '未指定'}`
     : data.mode === 'subscription' ? `订阅 · ${data.egress || '未指定实例'}`
     : '未知'
-  const failed = !!(data?.invalid || data?.probe_error || (probe && !probe.ok))
-  const tone: 'success' | 'destructive' | 'info' = failed ? 'destructive' : probe?.ok ? 'success' : 'info'
+  const failed = !!(probe && !probe.ok)
+  // A check that could not run is not a verdict about the network: it gets a
+  // warning, while a measured failure is the only destructive state. A saved
+  // shape the scan refuses has its own warning line below.
+  const tone: 'success' | 'destructive' | 'warning' | 'info' =
+    data?.probe_error ? 'warning' : failed ? 'destructive' : probe?.ok ? 'success' : 'info'
   const summary = !data ? '正在读取出口配置'
     : data.probe_error ? `检测无法运行：${data.probe_error}`
     : !probe ? '尚未检测'
@@ -321,7 +325,14 @@ function EgressStatusPanel() {
     {probe && <p className="text-caption text-ink-3">最近检测 {new Date(probe.at).toLocaleString()} · 目标 {probe.target}</p>}
     {error && <Callout tone="destructive">检测请求失败：{error}</Callout>}
     <div className="flex flex-wrap items-center gap-2">
-      <Button size="sm" variant="outline" onClick={() => void probeNow()} disabled={probing} aria-busy={probing}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => void probeNow()}
+        disabled={probing || Boolean(data?.refused)}
+        aria-busy={probing}
+        title={data?.refused ? '配置会被 scan 拒绝：先修正上方问题再检测' : '按当前配置启动一次临时 scan 并发起真实外连'}
+      >
         {probing ? <Spinner /> : null}检测
       </Button>
       <span className="text-caption text-ink-3">

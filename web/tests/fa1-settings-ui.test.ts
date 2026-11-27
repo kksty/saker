@@ -11,7 +11,7 @@ import { installFormElementShim } from './helpers/dom.ts'
 
 let server: Awaited<ReturnType<typeof createTestServer>>
 let renderer: ReactTestRenderer | undefined
-let SettingsPage: any, ConfirmProvider: any, api: any, ApiError: any
+let SettingsPage: any, ConfirmProvider: any, api: any, ApiError: any, Callout: any
 const storage = new Map<string, string>()
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
 const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document')
@@ -23,6 +23,7 @@ before(async () => {
   server = await createTestServer({ root: fileURLToPath(new URL('..', import.meta.url)) })
   SettingsPage = (await server.ssrLoadModule('/src/views/Settings.tsx')).SettingsPage
   ConfirmProvider = (await server.ssrLoadModule('@cyber/ui')).ConfirmProvider
+  ;({ Callout } = await server.ssrLoadModule('@cyber/ui'))
   ;({ api, ApiError } = await server.ssrLoadModule('/src/lib/api.ts'))
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
@@ -59,6 +60,12 @@ async function mountSettings(saved: Record<string, unknown> = {}, egress: Record
   api.egress = async () => egress
   await act(async () => { renderer = create(React.createElement(ConfirmProvider, null, React.createElement(SettingsPage))) })
   return settings
+}
+
+/** Text under one rendered component, for finding a callout by its sentence. */
+function renderedText(node: any): string {
+  if (typeof node === 'string') return node
+  return ((node?.children ?? []) as any[]).map(renderedText).join('')
 }
 
 function button(label: string) {
@@ -321,6 +328,29 @@ test('the egress panel separates the saved selection from the probe', async () =
 test('the egress panel flags a selection the scan would reject', async () => {
   await mountSettings({}, { mode: 'subscription', configured: true, capture: true, invalid: '有 2 个 clash 实例（a、b）但 cyberhub.proxy 未指定' })
   assert.match(JSON.stringify(renderer!.toJSON()), /有 2 个 clash 实例/)
+})
+
+test('a check that cannot run is a warning, not a red egress', async () => {
+  // The distinction is the point of probe_error: the check did not reach the
+  // network, so a destructive callout would claim a measurement nobody made.
+  await mountSettings({}, {
+    mode: 'direct', configured: false, capture: true,
+    probe_error: '本机宿主没有可用的 scan 二进制',
+  })
+  assert.match(JSON.stringify(renderer!.toJSON()), /检测无法运行：本机宿主没有可用的 scan 二进制/)
+  const summary = renderer!.root.findAllByType(Callout)
+    .find((node) => renderedText(node).includes('检测无法运行'))
+  assert.equal(summary?.props.tone, 'warning')
+})
+
+test('a config the scan refuses cannot be probed from the panel', async () => {
+  await mountSettings({}, {
+    mode: 'subscription', configured: false, capture: true, refused: true,
+    invalid: '有 2 个 clash 实例（a、b）但 cyberhub.proxy 未指定：scan 启动会拒绝',
+  })
+  const probeButton = renderer!.root.findAllByType('button')
+    .find((node) => String(node.children.join('')) === '检测')
+  assert.equal(probeButton?.props.disabled, true, '检测 would start a scan that exits before dialing')
 })
 
 test('the model protocol is a choice, not free text', async () => {
