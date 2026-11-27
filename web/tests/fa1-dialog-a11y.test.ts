@@ -141,8 +141,10 @@ test('a complete new-project form submits trimmed values and closes on success',
   await click('创建并开始')
   assert.equal(created.length, 1)
   assert.deepEqual(created[0].slice(0, 3), ['NX 门户', '门户登录口', '拿到越权证据'])
+  assert.deepEqual(created[0][4], { start: true }, '创建并开始 asks the server for the first round')
   assert.deepEqual(changes, [false])
   assert.ok(assigned[0].startsWith('/p/p_new/'))
+  assert.ok(!assigned[0].includes('autorun'), 'the round is the server create action, not a page flag')
 })
 
 test('a project scenario fills 起点 and 终点 and leaves the constraint document to the operator', async () => {
@@ -169,7 +171,7 @@ test('a project scenario fills 起点 and 终点 and leaves the constraint docum
   await act(async () => { renderer!.root.findByProps({ 'aria-label': '项目名称' }).props.onChange({ target: { value: ' 测评示例 ' } }) })
   await click('只创建')
   assert.equal(created.length, 1)
-  assert.deepEqual(created[0], ['测评示例', foothold.start, foothold.statement, defaults, {}])
+  assert.deepEqual(created[0], ['测评示例', foothold.start, foothold.statement, defaults, { start: false }])
   assert.deepEqual(changes, [false])
 })
 
@@ -328,7 +330,7 @@ test('project options are sent with creation, before the first round', async () 
   await act(async () => { renderer!.root.findByProps({ 'aria-label': '新项目的指挥官单轮时限' }).props.onChange({ target: { value: ' 15m ' } }) })
   await click('只创建')
   assert.equal(created.length, 1)
-  assert.deepEqual(created[0][4], { reviews_disabled: true, max_runs: 8, round_timeout: '15m' })
+  assert.deepEqual(created[0][4], { start: false, reviews_disabled: true, max_runs: 8, round_timeout: '15m' })
 })
 
 test('an empty option field inherits the instance instead of sending a value', async () => {
@@ -342,9 +344,10 @@ test('an empty option field inherits the instance instead of sending a value', a
   await act(async () => { textareas[0].props.onChange({ target: { value: '起点' } }) })
   await act(async () => { textareas[1].props.onChange({ target: { value: '终点' } }) })
   await click('只创建')
-  // The default is 跟随实例 for all three, so nothing is sent. An absent key is
+  // The default is 跟随实例 for all three, so none is sent. An absent key is
   // exactly "inherit" on the server, and reviews keep following later changes.
-  assert.deepEqual(created[0][4], {})
+  // `start` is not an option: it is the create/start choice, always explicit.
+  assert.deepEqual(created[0][4], { start: false })
 })
 
 test('pinning reviews open is sent as false, not as a follow-the-instance default', async () => {
@@ -359,7 +362,7 @@ test('pinning reviews open is sent as false, not as a follow-the-instance defaul
   await act(async () => { textareas[1].props.onChange({ target: { value: '终点' } }) })
   await act(async () => { renderer!.root.findByProps({ 'data-review-choice': 'on' }).props.onClick() })
   await click('只创建')
-  assert.deepEqual(created[0][4], { reviews_disabled: false })
+  assert.deepEqual(created[0][4], { start: false, reviews_disabled: false })
 })
 
 test('an invalid concurrency blocks creation and marks the field', async () => {

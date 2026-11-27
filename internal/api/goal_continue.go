@@ -31,6 +31,7 @@ const (
 	pauseKindManualPause       = project.PauseKindManualPause
 	pauseKindCommanderStandby  = project.PauseKindCommanderStandby
 	pauseKindRestart           = project.PauseKindRestart
+	pauseKindNotStarted        = project.PauseKindNotStarted
 	pauseKindProviderFault     = "provider_fault"
 	// pauseKindUnrecorded is a paused project whose manifest carries no cause: a
 	// pause written before the codes existed. It is not manual_pause — nobody
@@ -60,6 +61,10 @@ const (
 	// pauseCauseRestart is the boot path's forced pause of a project that was
 	// running. Recorded so a restart is never reported as a manual pause.
 	pauseCauseRestart = "restart"
+	// pauseCauseNotStarted is the creation path's pause of a project the operator
+	// explicitly did not start (只创建). It is a decision like the operator's own
+	// pause, not a crash marker: nothing clears it automatically.
+	pauseCauseNotStarted = "not_started"
 )
 
 // projectState is the classified parking state of an engagement. Reason is the
@@ -84,9 +89,9 @@ func (s *Server) projectState() projectState {
 // projectStateLocked classifies the current pause without guessing from prose
 // where a structured cause exists:
 //
-//   - a completion stand-by, a manual pause, a commander stop request and the
-//     boot path's forced pause are recorded in pauseCause by the paths that apply
-//     them;
+//   - a completion stand-by, a manual pause, a commander stop request, the boot
+//     path's forced pause and a project created without starting are recorded in
+//     pauseCause by the paths that apply them;
 //   - a paused project whose manifest carries no cause is reported as
 //     "unrecorded", not as a manual pause: the manifest does not say who paused
 //     it (a pause written before the codes existed), and inventing the operator's
@@ -111,6 +116,8 @@ func (s *Server) projectStateLocked() projectState {
 			st.Kind = pauseKindManualPause
 		case pauseCauseRestart:
 			st.Kind = pauseKindRestart
+		case pauseCauseNotStarted:
+			st.Kind = pauseKindNotStarted
 		default:
 			if s.Project != nil && !s.Project.IsPaused() {
 				st.Kind = pauseKindProviderFault
@@ -379,7 +386,10 @@ func (s *Server) appendGoalAndContinue(w http.ResponseWriter, r *http.Request) {
 		//     did not finish. It records no intent to stop, so there is nothing to
 		//     override, and leaving it out would make an operator's "append a goal
 		//     and continue" silently do half its job for a reason nobody chose.
-		case pauseKindCompletionStandby, pauseKindManualPause, pauseKindCommanderStandby, pauseKindRestart:
+		//   - not started: the project was created with 只创建. "Append a goal and
+		//     continue" is the operator's explicit start, so the same request that
+		//     adds work also ends the dormant pause.
+		case pauseKindNotStarted, pauseKindCompletionStandby, pauseKindManualPause, pauseKindCommanderStandby, pauseKindRestart:
 			resumedFrom = current.Kind
 		}
 		// unrecorded stays paused on purpose: the manifest does not say who
@@ -433,6 +443,8 @@ func (s *Server) appendGoalAndContinue(w http.ResponseWriter, r *http.Request) {
 		note = "项目此前由指挥官请求停止，已按本次显式操作追加目标并恢复派发；指挥官请求停止的原因仍在它的暂停说明里。"
 	case resumed && resumedFrom == pauseKindRestart:
 		note = "项目此前因控制面重启而暂停、自动恢复未完成，已按本次显式操作追加目标并恢复派发；旧目标的完成收据保持不变。"
+	case resumed && resumedFrom == pauseKindNotStarted:
+		note = "项目此前尚未开始，已按本次显式操作追加目标并开始；旧目标的完成收据保持不变。"
 	case resumed:
 		note = "项目此前是人工暂停，已按本次显式操作恢复；旧目标的完成收据保持不变。"
 	case !created:

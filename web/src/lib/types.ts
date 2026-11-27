@@ -599,6 +599,9 @@ export type PauseKind =
   | 'manual_pause'
   | 'commander_standby'
   | 'restart_pause'
+  /** Created with 只创建: chartered, never started. Only an explicit start ends
+   *  it; the watchdog does not clear it. */
+  | 'not_started'
   | 'unrecorded'
   | 'provider_fault'
   | string
@@ -1950,6 +1953,10 @@ export interface ProjectInfo {
  *  operator never has to "create → pause → edit settings → resume". Every key is
  *  optional: an absent key keeps the instance default for that project. */
 export interface CreateProjectOptions {
+  /** The 创建并开始 / 只创建 choice. `true` creates a live project and asks the
+   *  commander for its first round; `false` creates it paused as not_started, so
+   *  nothing runs until the operator starts it. */
+  start?: boolean
   /** `true` starts the project with no review runs at all (live reviews cannot
    *  exist yet, so nothing is canceled); `false` opens them even when the
    *  instance booted with reviews off. */
@@ -2141,6 +2148,33 @@ export interface SettingsGatewayView {
 
 export interface SettingsGatewayInput {
   document: string
+}
+
+/**
+ * The tool egress as the settings page reports it: the saved selection plus one
+ * probe through a throwaway scan process. `probe` is a measurement (green/red);
+ * `probe_error` means the check itself could not run and is not a verdict.
+ */
+export interface EgressStatus {
+  mode: 'direct' | 'single' | 'subscription' | 'unknown'
+  configured: boolean
+  /** An instance name, or a proxy URL with userinfo removed. */
+  egress?: string
+  capture: boolean
+  /** A saved shape the scan refuses at startup, or a selected instance it will
+   *  not load (a disabled clash instance is accepted by name and then skipped). */
+  invalid?: string
+  probe?: EgressProbe
+  probe_error?: string
+}
+
+export interface EgressProbe {
+  ok: boolean
+  http_code?: number
+  duration_ms: number
+  error?: string
+  at: string
+  target: string
 }
 
 /** Instance-level knobs that live beside the model profile: the auxiliary gate

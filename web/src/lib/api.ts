@@ -79,6 +79,7 @@ import type {
   NoteRef,
   RunContext,
   RuntimeSettings,
+  EgressStatus,
   SettingsCheck,
   SettingsView,
   SettingsGuardrailInput,
@@ -404,6 +405,11 @@ export const api = {
   // The tool API gateway: the `gateway` section plus `cyberhub.proxy` as YAML.
   // Secrets read back masked; a changed save needs the host restart.
   saveGateway: (body: SettingsGatewayInput) => put<SettingsView>('/api/settings/gateway', body),
+  // The tool egress: saved selection plus the last probe through a throwaway
+  // scan process. `cached` never starts work (the rail chip polls it on every
+  // page); `probe` runs one now (the settings panel's mount and 检测 button).
+  // Operator-only; a harness session gets 404.
+  egress: (mode: 'cached' | 'probe' = 'cached') => get<EgressStatus>(`/api/egress${mode === 'probe' ? '?probe=1' : ''}`),
   // The instance-level gate shared by verifier and report runs. It is not a
   // project setting: one value bounds every project's auxiliary calls.
   runtimeSettings: () => get<RuntimeSettings>('/api/runtime-settings'),
@@ -447,6 +453,10 @@ export const api = {
   fleet: () => get<FleetResponse>('/api/fleet'),
   // An operator-authored engagement: 起点 becomes the project brief (scope),
   // 终点 becomes the single endpoint goal. The commander does not derive either.
+  //
+  // `start` is the 创建并开始 / 只创建 choice: true asks the control plane for the
+  // first commander round as part of creation; false creates the engagement
+  // paused as not_started, so nothing runs until the operator starts it.
   //
   // The options are applied before the first dispatch, so a project can start with
   // reviews closed or with its own concurrency/timeout instead of "create, pause,

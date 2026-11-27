@@ -184,7 +184,10 @@ export function NewProjectDialog({
     try {
       // Only the keys the operator actually changed are sent: an empty field
       // means "inherit the instance", which is what an absent key already does.
-      const options: CreateProjectOptions = {}
+      // `start` always rides along: it is the 创建并开始 / 只创建 choice, and the
+      // server creates a dormant project for false so no watchdog sweep can run a
+      // round the operator did not ask for.
+      const options: CreateProjectOptions = { start: run }
       if (review === 'on') options.reviews_disabled = false
       else if (review === 'off') options.reviews_disabled = true
       if (runs) options.max_runs = Number(runs)
@@ -208,9 +211,7 @@ export function NewProjectDialog({
       setMaxRunsError('')
       onOpenChange(false)
       onCreated?.()
-      window.location.assign(
-        `/p/${encodeURIComponent(created.id)}/?view=overview${run ? '&autorun=1' : ''}`,
-      )
+      window.location.assign(`/p/${encodeURIComponent(created.id)}/?view=overview`)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -425,7 +426,7 @@ export function NewProjectDialog({
             </div>
           )}
           <Callout tone="info">
-            「创建并开始」会立刻让指挥官跑一轮（需要已配置模型）；失败会在概览页提示，不会静默重试。只想先建项目就选「只创建」。
+            「创建并开始」由服务端在创建时直接让指挥官跑第一轮（需要已配置模型）；失败会在概览页提示，不会静默重试。只想先建项目就选「只创建」：项目停在「尚未开始」，进去后点「继续项目」才跑第一轮。
           </Callout>
         </div>
         <DialogFooter className="gap-2">

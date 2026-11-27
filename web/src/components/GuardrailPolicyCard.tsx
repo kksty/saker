@@ -197,7 +197,7 @@ function GuardrailConnection({ guardrail, onSaved }: {
     <fieldset disabled={busy} className="grid gap-2 sm:grid-cols-2">
       {!activeProvider && <label className="grid gap-1 text-xs text-ink-2 sm:col-span-2">
         审批裁判
-        <select value={selected} onChange={event => setSelected(event.target.value)} className="h-9 rounded-md border border-hairline bg-surface-2 px-2 text-ink">
+        <select value={selected} aria-label="审批裁判" onChange={event => setSelected(event.target.value)} className="h-9 rounded-md border border-hairline bg-surface-2 px-2 text-ink">
           <option value="">请选择</option>
           <option value="llm">LLM</option>
           <option value="jev">JEV</option>

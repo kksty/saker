@@ -51,11 +51,12 @@ after(async () => {
   await server?.close()
 })
 
-async function mountSettings(saved: Record<string, unknown> = {}) {
+async function mountSettings(saved: Record<string, unknown> = {}, egress: Record<string, unknown> = { mode: 'direct', configured: false, capture: true }) {
   const settings = { base_url: 'http://gateway.test/v1', model: 'route', provider: 'openai', api_key_set: true, configured: true, ...saved }
   api.settings = async () => settings
   api.projectIndex = async () => ({ projects: [] })
   api.runtimeSettings = async () => ({ auxiliary_concurrency: 1, max_auxiliary_concurrency: 8, reviews_disabled: false })
+  api.egress = async () => egress
   await act(async () => { renderer = create(React.createElement(ConfirmProvider, null, React.createElement(SettingsPage))) })
   return settings
 }
@@ -124,7 +125,7 @@ test('guardrail settings can save a judge and display the saved outcome', async 
   // The settings page previously exposed only the read-only summary even when
   // the operator needed to enable a judge. Exercise the form and API boundary.
   const original = await mountSettings({ guardrail_editable: true, guardrail: { provider: 'none', configured: false } })
-  await act(async () => renderer!.root.findByType('select').props.onChange({ target: { value: 'llm' } }))
+  await act(async () => renderer!.root.findAllByType('select').find(node => node.props['aria-label'] === '审批裁判')!.props.onChange({ target: { value: 'llm' } }))
   assert.ok(renderer!.root.findAllByType('input').some(node => node.props.name === 'llm_model'))
   const writes: unknown[] = []
   api.saveGuardrail = async (body: unknown) => {
@@ -297,4 +298,37 @@ test('runtime concurrency rejects an out-of-range value and focuses the field', 
   await act(async () => { field().props.onChange({ target: { value: '3' } }) })
   await act(async () => { await button('保存并发').props.onClick() })
   assert.deepEqual(writes, [{ auxiliary_concurrency: 3 }])
+})
+
+test('the egress panel separates the saved selection from the probe', async () => {
+  // Two different questions: what is configured (an instance or a URL) and
+  // whether this machine can still get out through it. A failed probe is a
+  // measurement, not a configuration error.
+  await mountSettings(
+    { gateway: { instances: 1, enabled: 1, proxy_configured: true, editable: true, document: "gateway:\n  office:\n    kind: clash\n    url: '***'\ncyberhub:\n  proxy: office\n" } },
+    {
+      mode: 'subscription', configured: true, egress: 'office', capture: true,
+      probe: { ok: false, duration_ms: 183, error: 'dial tcp 127.0.0.1:7890: connectex: refused', at: '2026-11-27T06:00:00Z', target: 'https://example.com/' },
+    },
+  )
+  const page = JSON.stringify(renderer!.toJSON())
+  assert.match(page, /出口状态/)
+  assert.match(page, /订阅 · office/)
+  assert.match(page, /不通/)
+  assert.match(page, /dial tcp 127\.0\.0\.1:7890/)
+})
+
+test('the egress panel flags a selection the scan would reject', async () => {
+  await mountSettings({}, { mode: 'subscription', configured: true, capture: true, invalid: '有 2 个 clash 实例（a、b）但 cyberhub.proxy 未指定' })
+  assert.match(JSON.stringify(renderer!.toJSON()), /有 2 个 clash 实例/)
+})
+
+test('the model protocol is a choice, not free text', async () => {
+  // A typed protocol let a typo reach the harness; the supported protocols are
+  // openai and anthropic, and the field is now a select with an explicit name.
+  await mountSettings({ provider: 'anthropic' })
+  const inputs = renderer!.root.findAllByType('input')
+  assert.equal(inputs.some(node => node.props['aria-label'] === '模型接口协议'), false, 'protocol must not be a text input')
+  const trigger = renderer!.root.findAllByType('button').find(node => node.props['aria-label'] === '模型接口协议')
+  assert.ok(trigger, 'protocol select trigger is missing')
 })

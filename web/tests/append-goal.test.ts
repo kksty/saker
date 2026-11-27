@@ -153,6 +153,7 @@ test('pause kinds map to explicit labels and unknown codes stay literal', () => 
   assert.equal(pauseKindLabel('waiting_human'), '等待人工')
   assert.equal(pauseKindLabel('provider_fault'), '模型/凭据故障暂停')
   assert.equal(pauseKindLabel('restart_pause'), '平台重启后自动恢复未完成')
+  assert.equal(pauseKindLabel('not_started'), '新建后尚未开始')
   assert.equal(pauseKindLabel('unrecorded'), '暂停原因未记录')
   assert.equal(pauseKindLabel('some_new_state'), 'some_new_state')
   assert.equal(pauseKindLabel(undefined), '未知状态')

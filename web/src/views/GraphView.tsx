@@ -53,6 +53,7 @@ import {
 } from '@cyber/ui'
 import { BoardCounters } from '@/components/BoardCounters'
 import { ConsoleRail } from '@/components/ConsoleRail'
+import { EgressChip } from '@/components/EgressChip'
 import { FreshnessPill } from '@/components/FreshnessPill'
 import { AppendGoalDialog } from '@/components/AppendGoalDialog'
 import { CreateIntentDialog } from '@/components/CreateIntentDialog'
@@ -510,8 +511,8 @@ export function GraphView({ current, projects, board, boardState, onRefresh, loa
         GROUP_TABS[target].default)
       : ''
 
-    // Keep the operator's unrelated params (`case=`, `autorun=1`, …); every
-    // record param is rebuilt below from the target's point of view.
+    // Keep the operator's unrelated params (`case=` …); every record param is
+    // rebuilt below from the target's point of view.
     const params = new URLSearchParams(window.location.search)
     for (const key of RECORD_KEYS) params.delete(key)
 
@@ -912,6 +913,7 @@ export function GraphView({ current, projects, board, boardState, onRefresh, loa
         footer={
           <div className="space-y-1.5">
             <FreshnessPill state={boardState} intervalMs={5000} label="项目数据" />
+            <EgressChip />
             <Button
               size="sm"
               variant="ghost"

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { Button, Callout } from '@cyber/ui'
 import { ConsoleRail } from '@/components/ConsoleRail'
+import { EgressChip } from '@/components/EgressChip'
 import { PageSkeleton } from '@/components/PageSkeleton'
 import { SideNav } from '@/components/SideNav'
 import { api, gotoProject } from '@/lib/api'
@@ -103,7 +104,9 @@ export function GlobalShell() {
       <span className="sr-only" role="status" aria-live="polite">
         已打开{GLOBAL_NAV.find((item) => item.id === view)?.label}页面
       </span>
-      <ConsoleRail title="全局控制台" active={view} footer={first ? (
+      <ConsoleRail title="全局控制台" active={view} footer={<div className="space-y-1.5">
+        <EgressChip />
+        {first ? (
         <Button variant="outline" className="h-auto w-full justify-start gap-2 px-2.5 py-2 text-left" aria-label={`进入项目 · ${first.name}`} title={first.name} onClick={() => gotoProject(first.id)}>
           <Waypoints aria-hidden="true" className="size-4 shrink-0 text-ink-3" />
           <span className="grid min-w-0 flex-1">
@@ -112,7 +115,8 @@ export function GlobalShell() {
           </span>
           <ArrowUpRight aria-hidden="true" className="size-3.5 shrink-0 text-ink-3" />
         </Button>
-      ) : <div className="px-1 py-1 text-[12px] text-ink-3">还没有项目</div>}>
+        ) : <div className="px-1 py-1 text-[12px] text-ink-3">还没有项目</div>}
+      </div>}>
         <nav aria-label="全局导航" className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 pb-4">
           {GLOBAL_NAV.map((item) => (
             <SideNav

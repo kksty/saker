@@ -47,6 +47,8 @@ export const PAUSE_KIND_LABEL: Readonly<Record<string, string>> = {
   // A pause whose cause the manifest does not carry (written before the codes
   // existed). Say so: an invented 人工暂停 is a claim about a person.
   unrecorded: '暂停原因未记录',
+  // 只创建: the engagement was chartered but never started, so no round has run.
+  not_started: '新建后尚未开始',
   provider_fault: '模型/凭据故障暂停',
 }
 

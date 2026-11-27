@@ -98,6 +98,9 @@ func TestBootKeepsExplicitPauses(t *testing.T) {
 		{"operator", project.PauseKindManualPause},
 		{"commander", project.PauseKindCommanderStandby},
 		{"completion", project.PauseKindCompletionStandby},
+		// 只创建: the operator chartered the project and never started it. A restart
+		// must not hand it a round either; only an explicit 继续项目 starts it.
+		{"not started", project.PauseKindNotStarted},
 		{"cause-less", ""},
 	}
 	for _, tc := range cases {

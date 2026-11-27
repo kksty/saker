@@ -35,6 +35,7 @@ const (
 	reasonPausedCompletion    = "paused_completion"
 	reasonPausedCommander     = "paused_commander"
 	reasonPausedRestart       = "paused_restart"
+	reasonPausedNotStarted    = "paused_not_started"
 	reasonPausedUnrecorded    = "paused_unrecorded"
 	reasonProviderFaultResume = "provider_fault_recovery"
 	reasonGoalMetPendingWork  = "goal_met_pending_work"
@@ -160,6 +161,8 @@ func (s *Server) resumeActionLocked(st projectState, facts ProjectFacts) Project
 		// seeing it here means that recovery did not finish (for example the
 		// manifest write failed), so it is the operator's fallback.
 		return ProjectAction{ID: actionResume, Enabled: true, ReasonCode: reasonPausedRestart, Reason: "控制面重启后自动恢复未完成：确认现场后继续"}
+	case pauseKindNotStarted:
+		return ProjectAction{ID: actionResume, Enabled: true, ReasonCode: reasonPausedNotStarted, Reason: "新建项目尚未开始：继续会让指挥官跑第一轮"}
 	case pauseKindUnrecorded:
 		return ProjectAction{ID: actionResume, Enabled: true, ReasonCode: reasonPausedUnrecorded, Reason: "暂停原因未记录：继续会重新派发待办意图"}
 	default:

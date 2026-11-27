@@ -126,6 +126,11 @@ type hub struct {
 	// probe answers "is this node actually reachable" for the 态势 page; it is
 	// cached for a few seconds.
 	probe *nodeProber
+	// egress answers "can this machine still get out through the saved tool
+	// egress" for the settings page. It runs a throwaway scan process with a
+	// probe-only document and caches the result; nil means every probe is an
+	// error the page reports, never a red light.
+	egress *egressProber
 
 	mu         sync.RWMutex
 	kits       map[string]*kit
@@ -172,10 +177,20 @@ func newHub(ctx context.Context, cfg hubConfig, mgr *project.Manager,
 		vulns:         vulns,
 		static:        web.Static(),
 		probe:         newNodeProber(cfg.Nodes),
+		egress:        newEgressProber(egressBinary(cfg.LocalHost), egressDocument(st)),
 		kits:          map[string]*kit{},
 		ioaClients:    map[string]*ioa.Client{},
 		modelLimits:   map[string]int{},
 	}
+}
+
+// egressDocument guards the nil store: a hub built without settings (tests,
+// fleet-only starts) still serves a page that reports the probe as unavailable.
+func egressDocument(st *settings.Store) func() ([]byte, error) {
+	if st == nil {
+		return nil
+	}
+	return st.EgressProbeDocument
 }
 
 // rememberModelLimits merges one /models catalogue into the cache.
@@ -286,6 +301,10 @@ func pauseKindReason(kind string) string {
 		// the sentence stays because a failed manifest write can leave it behind
 		// for the operator to resolve.
 		return "控制面重启：对账后自动恢复；若仍暂停，确认现场后点「继续项目」"
+	case project.PauseKindNotStarted:
+		// 只创建: nobody stopped a running engagement — it was chartered and
+		// deliberately left dormant. The way out is the explicit start.
+		return "新建项目尚未开始：点「继续项目」让指挥官跑第一轮"
 	case "", "unrecorded":
 		// No stored cause: a manifest written before the codes existed. Saying
 		// "the operator paused it" would invent the one fact we do not have.
@@ -873,6 +892,8 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.serveGuardrailSettings(w, r)
 	case r.URL.Path == "/api/settings/gateway":
 		h.serveGatewaySettings(w, r)
+	case r.URL.Path == "/api/egress":
+		h.serveEgress(w, r)
 	case r.URL.Path == "/api/runtime-settings":
 		h.serveRuntimeSettings(w, r)
 	case r.URL.Path == "/api/models":
@@ -920,9 +941,17 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// The landing page is the instance view; a project is entered from it.
 		http.Redirect(w, r, "/g/", http.StatusFound)
 	default:
-		writeJSON(w, http.StatusNotFound, map[string]any{
-			"error": "接口在项目下：/p/<项目>/api/...；跨项目接口是 /api/projects 和 /api/vulns",
-		})
+		// A project-scoped path reached the instance base. Naming the base beats
+		// a bare 404 that reads like "missing project", but the hint only makes
+		// sense for an /api/ path: an unknown page or asset is not a routing
+		// mistake the caller fixes by adding /p/<id>.
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			writeJSON(w, http.StatusNotFound, map[string]any{
+				"error": "项目接口在 /p/<项目>/api/... 下；实例级接口有 /api/projects、/api/vulns、/api/settings、/api/fleet、/api/kb 等",
+			})
+			return
+		}
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "未找到该路径"})
 	}
 }
 
@@ -1678,6 +1707,14 @@ type createProjectRequest struct {
 	// creating, pausing, opening settings and resuming. Omitted fields
 	// write nothing: the project keeps the instance defaults exactly as
 	// a project created before these fields existed.
+	//
+	// Start is the console's 创建并开始 / 只创建 choice, and the only field here
+	// that changes what the project is allowed to do. true creates a live project
+	// and queues its first operator round; false creates the engagement paused as
+	// not_started, so no watchdog sweep can turn the freshly written endpoint goal
+	// into a round the operator did not ask for. Absent keeps the historical live
+	// creation for programmatic callers that predate the field.
+	Start           *bool           `json:"start"`
 	ReviewsDisabled *bool           `json:"reviews_disabled"`
 	MaxRuns         json.RawMessage `json:"max_runs"`
 	RoundTimeout    *string         `json:"round_timeout"`
@@ -1755,11 +1792,11 @@ func (h *hub) serveProjects(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Creation is one unit: the project documents (premise policy, the
-		// operator's prose), the dispatch options and the endpoint goal are all
-		// committed before the project is attached or reported. A 201 project
-		// without its goal would look healthy while having nothing to judge
-		// "done" against, so a failed commit rolls the whole creation back and
-		// says nothing was created.
+		// operator's prose), the dispatch options, the initial pause and the
+		// endpoint goal are all committed before the project is attached or
+		// reported. A 201 project without its goal would look healthy while having
+		// nothing to judge "done" against, so a failed commit rolls the whole
+		// creation back and says nothing was created.
 		if err := h.commitCreatedProject(p, func() error {
 			return h.applyCreateCommit(p, req, limit)
 		}); err != nil {
@@ -1770,8 +1807,16 @@ func (h *hub) serveProjects(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
-		h.attach(p)
+		k := h.attach(p)
 		log.Printf("project: 新建 %s（%s）", p.ID, p.Name)
+		// 创建并开始 asks for its one round here, in the request that created the
+		// project. The console used to append ?autorun=1 and let the browser POST
+		// /api/decide, which made "started" depend on the page that received the
+		// 201; a closed tab created a project the operator believed was running.
+		// 只创建 sends start=false, so it never reaches this branch.
+		if req.Start != nil && *req.Start && k != nil && k.dec != nil {
+			k.dec.Wake("operator")
+		}
 		writeJSON(w, http.StatusCreated, h.info(p))
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "只支持 GET / POST"})
@@ -1829,9 +1874,10 @@ func (h *hub) commitCreatedProject(p *project.Project, commit func() error) erro
 
 // applyCreateCommit writes everything a new project is created with besides the
 // manager's own manifest: the single admission mode, the operator's prose, the
-// dispatch options and the endpoint goal. Any failure is returned so the whole
-// creation can be rolled back instead of reporting a project the operator did
-// not get. Input was validated before Create, so a failure here is a write.
+// dispatch options, the initial pause and the endpoint goal. Any failure is
+// returned so the whole creation can be rolled back instead of reporting a
+// project the operator did not get. Input was validated before Create, so a
+// failure here is a write.
 func (h *hub) applyCreateCommit(p *project.Project, req createProjectRequest, maxRuns *int) error {
 	// New engagements are always proof-first: the standard mode is legacy
 	// read-only for projects created before this rule and can only migrate
@@ -1846,6 +1892,16 @@ func (h *hub) applyCreateCommit(p *project.Project, req createProjectRequest, ma
 	}
 	if err := h.applyCreateOptions(p, req.ReviewsDisabled, maxRuns, req.RoundTimeout); err != nil {
 		return err
+	}
+	// 只创建: the project and its charter are written, but nothing may run until
+	// the operator starts it. The endpoint goal below is otherwise an
+	// unacknowledged journal change, and the watchdog's first sweep would wake a
+	// commander round within seconds — the operator's "create only" silently
+	// became "create and run".
+	if req.Start != nil && !*req.Start {
+		if err := p.SetPausedWithKind(true, project.PauseKindNotStarted); err != nil {
+			return fmt.Errorf("paused: %w", err)
+		}
 	}
 	if goal := strings.TrimSpace(req.Goal); goal != "" {
 		if _, err := p.Store.AddGoal(model.Goal{

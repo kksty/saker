@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/kksty/saker/internal/model"
+	"github.com/kksty/saker/internal/project"
 )
 
 // decodeActions reads the action contract out of a board response.
@@ -246,6 +247,52 @@ func TestProjectActionsHiddenFromHarnessSession(t *testing.T) {
 	}
 	if strings.Contains(rec.Body.String(), "project_actions") {
 		t.Fatalf("harness board carries the operator action contract: %s", rec.Body.String())
+	}
+}
+
+// A project created with 只创建 is parked as not_started, not as an operator
+// pause and not as "cause unrecorded". The contract and the handler must agree:
+// the button is enabled under that code, and 继续 is the one explicit action that
+// buys the first round.
+func TestProjectActionsCreatedWithoutStartResumesExplicitly(t *testing.T) {
+	s, p := newBindingServer(t)
+	runner, commander := startAppendGoalDecider(t, s.Store)
+	s.Decider = runner
+	if _, err := s.Store.AddGoal(model.Goal{Statement: "拿到边界主机"}); err != nil {
+		t.Fatal(err)
+	}
+	// Exactly what the creation path writes before attach: the manifest flag plus
+	// the runtime classification of that cause.
+	if err := p.SetPausedWithKind(true, project.PauseKindNotStarted); err != nil {
+		t.Fatal(err)
+	}
+	s.SetPaused(true)
+	s.RestorePauseKind(project.PauseKindNotStarted)
+	runner.PauseFor("新建项目尚未开始：点「继续项目」让指挥官跑第一轮")
+
+	acts := decodeActions(t, call(t, s, http.MethodGet, "/api/board", nil))
+	if !acts.State.Paused || acts.State.Kind != pauseKindNotStarted {
+		t.Fatalf("state = %+v, want paused/not_started", acts.State)
+	}
+	resume := actionByID(t, acts, actionResume)
+	if !resume.Enabled || resume.ReasonCode != reasonPausedNotStarted {
+		t.Fatalf("resume = %+v, want an enabled %s", resume, reasonPausedNotStarted)
+	}
+	if resume.ReasonCode == reasonPausedUnrecorded || resume.ReasonCode == reasonPausedManual {
+		t.Fatalf("resume = %+v, the creation pause was attributed to a cause it does not have", resume)
+	}
+	// Nothing is due while the project is parked, even with an open endpoint.
+	time.Sleep(50 * time.Millisecond)
+	if got := commander.count(); got != 0 {
+		t.Fatalf("commander rounds = %d while the project is not started, want 0", got)
+	}
+
+	if rec := call(t, s, http.MethodPost, "/api/project/resume", nil); rec.Code != http.StatusOK {
+		t.Fatalf("resume = %d: %s", rec.Code, rec.Body.String())
+	}
+	waitFor(t, 5*time.Second, func() bool { return commander.count() == 1 })
+	if p.IsPaused() {
+		t.Fatal("resume left the manifest paused")
 	}
 }
 

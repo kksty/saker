@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { Cable, Check, Eye, EyeOff, FolderCog, KeyRound, TriangleAlert } from 'lucide-react'
-import { Badge, Button, Callout, EmptyState, Input, Skeleton, Spinner, Switch, Textarea } from '@cyber/ui'
+import { Badge, Button, Callout, EmptyState, Input, Select, SelectContent, SelectItem, SelectLabel, SelectTrigger, SelectValue, Skeleton, Spinner, Switch, Textarea } from '@cyber/ui'
 import { Page, Panel } from '@/components/Page'
 import { GuardrailPolicyCard } from '@/components/GuardrailPolicyCard'
 import { ProjectSettingsCard } from '@/components/ProjectSettingsCard'
 import { ApiError, api } from '@/lib/api'
-import { useLoad, type AsyncState } from '@/lib/hooks'
+import { useLoad, usePoll, type AsyncState } from '@/lib/hooks'
 import {
   checkProbeSummary,
   concurrencyProblem,
@@ -23,12 +23,39 @@ import {
   TRAFFIC_RETENTION_MIN_MIB,
   type ConnectionNumberField,
 } from '@/lib/settings'
-import type { RuntimeSettings, SettingsCheck, SettingsView } from '@/lib/types'
+import type { EgressStatus, RuntimeSettings, SettingsCheck, SettingsView } from '@/lib/types'
 
 const SETTINGS_TABS = [
   { id: 'model', label: '模型连接', icon: Cable },
   { id: 'projects', label: '项目设置', icon: FolderCog },
 ] as const
+
+/**
+ * Vendor aliases the harness resolves to the OpenAI wire protocol with their own
+ * default endpoint (agent/provider/protocol.go). They are not protocols: the
+ * alias only names a default base_url, so the interface address above still
+ * wins when it is filled in.
+ */
+const MODEL_VENDOR_PRESETS = [
+  { value: 'deepseek', label: 'DeepSeek' },
+  { value: 'moonshot', label: 'Moonshot / Kimi' },
+  { value: 'glm', label: '智谱 GLM' },
+  { value: 'qwen', label: '通义千问' },
+  { value: 'openrouter', label: 'OpenRouter' },
+  { value: 'groq', label: 'Groq' },
+  { value: 'xai', label: 'xAI Grok' },
+  { value: 'mistral', label: 'Mistral' },
+  { value: 'together', label: 'Together' },
+  { value: 'siliconflow', label: '硅基流动' },
+  { value: 'ollama', label: '本地 Ollama' },
+] as const
+
+const MODEL_PROTOCOLS = ['openai', 'anthropic']
+const MODEL_PROVIDER_VALUES = new Set<string>([...MODEL_PROTOCOLS, ...MODEL_VENDOR_PRESETS.map((preset) => preset.value)])
+// A saved empty provider means "let the harness infer the protocol from the
+// base URL" (agent/provider: InferFromBaseURL). Radix cannot hold an empty item
+// value, so the select carries this sentinel and maps it back to "".
+const MODEL_PROVIDER_AUTO = '__auto__'
 
 type SettingsTab = (typeof SETTINGS_TABS)[number]['id']
 
@@ -63,13 +90,14 @@ export function SettingsPage() {
    <div role="tabpanel" id="settings-panel-model" aria-labelledby="settings-tab-model" hidden={tab !== 'model'} className="space-y-7">
     <section aria-label="模型与扩展" className="space-y-3">
      <h2 className="text-h4 font-semibold text-ink">模型与扩展</h2>
-     <div className="grid items-start gap-4 @min-[70rem]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <ModelConnection settings={settings} />
-      <div className="min-w-0 space-y-4">
-       <ExtensionsPanel settings={settings} />
-       {settings.data?.gateway && <GatewayPanel settings={settings} />}
-      </div>
+     {/* Full-width connection card: pairing it beside the taller extension and
+         gateway cards left a dead column under the model form. */}
+     <ModelConnection settings={settings} />
+     <div className="grid items-start gap-4 @min-[70rem]:grid-cols-2">
+      <ExtensionsPanel settings={settings} />
+      {settings.data?.gateway && <GatewayPanel settings={settings} />}
      </div>
+     <EgressStatusPanel />
     </section>
     <section aria-label="运行默认值" className="space-y-3">
      <h2 className="text-h4 font-semibold text-ink">运行默认值</h2>
@@ -221,6 +249,86 @@ function GatewayPanel({ settings }: { settings: AsyncState<SettingsView> }) {
    {settings.error && <Callout tone="destructive">读取设置失败：{settings.error}</Callout>}
   </div>
  </Panel>
+}
+
+/**
+ * 出口状态: the saved tool egress plus one probe through a throwaway scan
+ * process. It answers the operator's question ("can this machine still get out
+ * through this egress?") without touching the running host: a settings read must
+ * not depend on run state, and the node has no "test the current egress" command.
+ *
+ * The probe is a measurement, not a verdict about the target: a red light means
+ * this machine cannot reach the probe target through the saved egress. A check
+ * that cannot run (`probe_error`) is reported separately, never as red.
+ */
+function EgressStatusPanel() {
+  const status = usePoll(() => api.egress('cached'), 30_000, [])
+  const [probing, setProbing] = useState(false)
+  const [error, setError] = useState('')
+  const probedOnMount = useRef(false)
+  const data: EgressStatus | undefined = status.data
+  const probe = data?.probe
+  const mode = !data ? '读取中…'
+    : data.mode === 'direct' ? '直连 · 本机网络'
+    : data.mode === 'single' ? `单节点 · ${data.egress || '未指定'}`
+    : data.mode === 'subscription' ? `订阅 · ${data.egress || '未指定实例'}`
+    : '未知'
+  const failed = !!(data?.invalid || data?.probe_error || (probe && !probe.ok))
+  const tone: 'success' | 'destructive' | 'info' = failed ? 'destructive' : probe?.ok ? 'success' : 'info'
+  const summary = !data ? '正在读取出口配置'
+    : data.probe_error ? `检测无法运行：${data.probe_error}`
+    : !probe ? '尚未检测'
+    : probe.ok ? `通 · HTTP ${probe.http_code} · ${probe.duration_ms}ms`
+    : `不通 · ${probe.error || `HTTP ${probe.http_code}`}`
+  async function probeNow() {
+    if (probing) return
+    setProbing(true)
+    setError('')
+    try {
+      status.setData(await api.egress('probe'))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setProbing(false)
+    }
+  }
+  // One measure when the operator opens settings, then cache-only reads: the
+  // page must not turn a 30-second poll into continuous outbound traffic.
+  useEffect(() => {
+    if (probedOnMount.current) return
+    probedOnMount.current = true
+    void probeNow()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return <Panel
+    title="出口状态"
+    extra={<Badge variant="outline" size="sm">操作员视图</Badge>}
+    bodyClassName="@container space-y-3"
+    data-testid="egress-status"
+  >
+    <dl className="grid grid-cols-1 gap-2 text-[12px] sm:grid-cols-2">
+      <div>
+        <dt className="text-ink-3">当前出口</dt>
+        <dd className="saker-break text-ink-2">{mode}</dd>
+      </div>
+      <div>
+        <dt className="text-ink-3">流量捕获</dt>
+        <dd className="text-ink-2">{data ? (data.capture ? '开启（HTTPS 解密后记录）' : '关闭（纯路由，不解密）') : '—'}</dd>
+      </div>
+    </dl>
+    {data?.invalid && <Callout tone="warning">{data.invalid}</Callout>}
+    <Callout tone={tone}>{summary}</Callout>
+    {probe && <p className="text-caption text-ink-3">最近检测 {new Date(probe.at).toLocaleString()} · 目标 {probe.target}</p>}
+    {error && <Callout tone="destructive">检测请求失败：{error}</Callout>}
+    <div className="flex flex-wrap items-center gap-2">
+      <Button size="sm" variant="outline" onClick={() => void probeNow()} disabled={probing} aria-busy={probing}>
+        {probing ? <Spinner /> : null}检测
+      </Button>
+      <span className="text-caption text-ink-3">
+        打开本页时检测一次；之后只取回上次结果，不会自动重探。点「检测」才会再发一次真实外连（默认 {probe?.target ?? 'https://example.com/'}）。
+      </span>
+    </div>
+  </Panel>
 }
 
 /**
@@ -415,8 +523,24 @@ function ModelConnection({settings}:{settings:AsyncState<SettingsView>}) {
       </Button>
      </div>
     </SettingsField>
-    <SettingsField id={id('provider')} label="协议" hintID={id('provider-hint')} hint="网关的接口协议：openai / anthropic。">
-     <Input id={id('provider')} aria-label="协议" aria-describedby={describedBy('provider')} type="text" inputMode="text" autoComplete="off" spellCheck={false} autoCapitalize="none" enterKeyHint="next" value={draft.provider} onChange={e=>change('provider',e.target.value)} placeholder="openai / anthropic" />
+    <SettingsField id={id('provider')} label="模型接口协议" hintID={id('provider-hint')} hint="选「自动」时按接口地址推断（Anthropic 官方或其兼容端点识别为 anthropic，其余按 OpenAI）；厂商预设是 OpenAI 兼容别名，只决定默认地址，实际地址以上面的接口地址为准。">
+     <Select value={draft.provider || MODEL_PROVIDER_AUTO} onValueChange={(value) => change('provider', value === MODEL_PROVIDER_AUTO ? '' : value)}>
+      <SelectTrigger id={id('provider')} aria-label="模型接口协议" aria-describedby={describedBy('provider')} className="w-full">
+       <SelectValue placeholder="选择接口协议" />
+      </SelectTrigger>
+      <SelectContent>
+       <SelectItem value={MODEL_PROVIDER_AUTO}>自动（按接口地址推断）</SelectItem>
+       <SelectItem value="openai">openai（Chat Completions）</SelectItem>
+       <SelectItem value="anthropic">anthropic（Messages）</SelectItem>
+       <SelectLabel>厂商预设（OpenAI 兼容）</SelectLabel>
+       {MODEL_VENDOR_PRESETS.map((preset) => (
+        <SelectItem key={preset.value} value={preset.value}>{preset.value} · {preset.label}</SelectItem>
+       ))}
+       {draft.provider && !MODEL_PROVIDER_VALUES.has(draft.provider) && (
+        <SelectItem value={draft.provider}>{draft.provider}（已保存）</SelectItem>
+       )}
+      </SelectContent>
+     </Select>
     </SettingsField>
     <SettingsField id={id('context_window')} label="上下文窗口（可选）" hintID={id('context_window-hint')} hint="留空交给网关；填写时必须是非负整数。" errorID={id('context_window-error')} error={fieldErrors.context_window}>
      <Input id={id('context_window')} ref={contextRef} aria-label="上下文窗口" aria-describedby={numberDescribedBy('context_window')} aria-invalid={fieldErrors.context_window?true:undefined} data-user-invalid={(fieldErrors.context_window?true:undefined) ? 'true' : undefined} type="number" min={0} step={1} inputMode="numeric" enterKeyHint="next" value={draft.context_window} onChange={e=>change('context_window',e.target.value)} />

@@ -313,6 +313,44 @@ func TestAppendGoalAndContinueResumesRestartPause(t *testing.T) {
 	waitFor(t, 5*time.Second, func() bool { return commander.count() == 1 })
 }
 
+// A project created with 只创建 is parked, not stopped mid-engagement. "Append a
+// goal and continue" is the operator's explicit start, so the request that adds
+// the work also ends the dormant pause and names what it did.
+func TestAppendGoalAndContinueStartsANotStartedProject(t *testing.T) {
+	s, p := newBindingServer(t)
+	dec, commander := startAppendGoalDecider(t, s.Store)
+	s.Decider = dec
+	// The shape the creation path leaves behind.
+	if err := p.SetPausedWithKind(true, project.PauseKindNotStarted); err != nil {
+		t.Fatal(err)
+	}
+	s.RestorePauseKind(project.PauseKindNotStarted)
+	s.SetPaused(true)
+	dec.PauseFor("新建项目尚未开始：点「继续项目」让指挥官跑第一轮")
+	if got := s.projectState().Kind; got != pauseKindNotStarted {
+		t.Fatalf("fixture kind = %q, want %q", got, pauseKindNotStarted)
+	}
+
+	rec := call(t, s, http.MethodPost, "/api/project/append-goal", map[string]any{
+		"statement": "尚未开始时追加的目标", "idempotency_key": "append-not-started-1",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("append = %d: %s", rec.Code, rec.Body.String())
+	}
+	out := decodeAppendGoal(t, rec)
+	if !out.Created || !out.Resumed || out.ResumedFrom != pauseKindNotStarted ||
+		out.PauseKindBefore != pauseKindNotStarted || out.PauseKindAfter != pauseKindRunning || out.PausedAfter {
+		t.Fatalf("outcome = %+v, want the not-started pause cleared", out)
+	}
+	if !strings.Contains(out.Note, "尚未开始") || !strings.Contains(out.Note, "显式") {
+		t.Fatalf("resume note = %q, want it to acknowledge the explicit start", out.Note)
+	}
+	if s.paused.Load() || dec.Paused() || p.IsPaused() {
+		t.Fatal("not-started pause was not cleared")
+	}
+	waitFor(t, 5*time.Second, func() bool { return commander.count() == 1 })
+}
+
 // The opposite case stays parked. A manifest that says "paused" and carries no
 // cause may be a commander's deliberate stop, which only the operator may
 // override; auto-resuming it would overwrite a decision nobody can read. The goal

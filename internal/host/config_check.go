@@ -10,6 +10,16 @@ import (
 	"strings"
 )
 
+// NodeBinary is the scan binary this host runs. The console uses it for offline
+// config checks and for the egress probe, which is a throwaway process: probing
+// through this host's live hub would make a settings read depend on run state.
+func (h *Host) NodeBinary() string {
+	if h == nil {
+		return ""
+	}
+	return h.cfg.NodeBin
+}
+
 // ScanConfigCheck runs the local scan binary's offline config command against
 // one candidate document. ok=false means the scan rejected it and detail is the
 // scan's own one-line explanation (empty when it printed none); a non-nil error

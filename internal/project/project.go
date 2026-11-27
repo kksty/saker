@@ -47,6 +47,15 @@ const (
 	// once the boot crash sweep has converged the orphan rows, the watchdog
 	// recovery clears it and continues the project on its own.
 	PauseKindRestart = "restart_pause"
+	// PauseKindNotStarted is written once by the creation path when the operator
+	// chose 只创建: the engagement exists with its 起点/终点, but nothing may be
+	// dispatched until an explicit start. Creating the project is not a change the
+	// commander has to react to, so without this pause the first watchdog sweep
+	// read the freshly written endpoint goal as an unacknowledged event and ran a
+	// round the operator never asked for. It is neither a crash marker nor a
+	// mid-engagement pause: the watchdog leaves it alone and only the operator's
+	// 继续项目 (or a creation with start=true) ends it.
+	PauseKindNotStarted = "not_started"
 )
 
 type Manifest struct {
@@ -72,11 +81,12 @@ type Manifest struct {
 	ScopeUpdatedAt time.Time `json:"scope_updated_at,omitempty"`
 	Paused         bool      `json:"paused,omitempty"`
 	// PauseKind is the structured cause of Paused: manual_pause,
-	// completion_standby or commander_standby. It is written by the control plane
-	// (the project package does not import api), only meaningful while Paused, and
-	// cleared on resume. Persisting it is what keeps a commander stop from coming
-	// back as "the operator paused the project" after a restart (types.ts
-	// project_pause_kind is the machine code the console classifies from).
+	// completion_standby, commander_standby, restart_pause or not_started. It is
+	// written by the control plane (the project package does not import api), only
+	// meaningful while Paused, and cleared on resume. Persisting it is what keeps a
+	// commander stop from coming back as "the operator paused the project" after a
+	// restart (types.ts project_pause_kind is the machine code the console
+	// classifies from).
 	PauseKind string `json:"pause_kind,omitempty"`
 	// MaxRuns overrides the instance --max-runs for this engagement. Nil means
 	// "inherit the instance default"; a pointer is what distinguishes that from

@@ -179,8 +179,6 @@ export function Overview({
   // itself (POST /api/goals). A bound local execution host is the only gate.
   const canStart = bound.length > 0
 
-  const autorun = useRef(new URLSearchParams(window.location.search).get('autorun') === '1')
-
   async function startRound() {
     setStarting(true)
     setStartNote('')
@@ -193,19 +191,6 @@ export function Overview({
       setStarting(false)
     }
   }
-
-  // "创建并开始" lands here with ?autorun=1: one round, once, then the flag is
-  // removed so a refresh does not dispatch again.
-  useEffect(() => {
-    if (!autorun.current) return
-    autorun.current = false
-    const params = new URLSearchParams(window.location.search)
-    params.delete('autorun')
-    const qs = params.toString()
-    window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`)
-    void startRound()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   function refreshAll() {
     goals.reload()
