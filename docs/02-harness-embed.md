@@ -117,6 +117,8 @@ flowchart TB
 
 ## 4. 装配
 
+### 4.1 组合根
+
 组合根在 `internal/hostapp`。副本以 git submodule 形式放在 `third_party/cyber`
 （形态、pin 与门禁见 §14）。装配形态仿 `cmd/cyber-scan/profile.go`——该文件是 `package main`，
 不能 import，只能复制清单：
@@ -140,6 +142,43 @@ saker 工具集、`exts/otel`（可选）。
 
 **不装**：`webext`（控制台是 saker 的）、`inboxext`（第二套投递状态）、`tui`、`ioaclient`
 （消息走账本），`nodeext`（阶段 B 若保留远端再议）。
+
+### 4.2 与 `cyber-scan.exe` 的能力对齐
+
+目标不是「二进制一样」，是「工具面一样」。四件事必须同时对齐，漏任何一件都是编译通过、能力悄悄变少：
+
+| # | 对齐项 | 做法 | 漏了会怎样 |
+| --- | --- | --- | --- |
+| 1 | **import 集合** | `internal/hostapp/imports.go` 镜像 `cmd/cyber-scan` 对 `tools/*` 的 blank import | `gogo`/`neutron`/`spray`/`katana`/`passive` 等命令不出现在 `bash` 里，编译不报错 |
+| 2 | **装配函数** | 复制 `cmd/cyber-scan/extensions.go:31` 的 `extensions(config, loop, workDir, proxy, guardrail)` 与 `profile.go` 的增量：`nativeext.New()`（:257）、`ptyext.New()`（:272）、`sessionext.New(agentConfig)`（:277）、`subagentext.NewTools()`（:281）、observer/otel、guardrail、jev | 工具/命令在，但少了 scanner 注册、pty、otel 或子代理工具 |
+| 3 | **build tags** | 与 `scripts/build-harness.ps1` 同一套：`forceposix emptytemplates noembed osusergo sqlite`（scan 节点；hub 另加 `full`）。`go build` 与 `go test` 都带 | 见下：tag 作用在依赖上，编译形态不同 |
+| 4 | **配置来源** | `appConfig` 是 CLI 自己的类型，不能复用；按字段映射 `scan`/`search`/`gateway`/`proxy`/`guardrail`/`mcp`/`llm`，从 settings 取同值 | 装配相同但配置为空，等于少能力（例如 search 没有 key） |
+
+去掉的部分：`nodeext`、`inboxext`、`ioaclient`、`tuiext`、`sessionext.NewProtocol`/`NewConsole`、
+`guardrail.NewProtocol`、`router` —— 这些是进程/传输/界面层，嵌入后 saker 自己就是宿主（§4.4）。
+
+tag 为什么不能省（实测作用在依赖上）：
+
+- `gogo/pkg/templates.go` 的构建条件是 `!emptytemplates`，带 `emptytemplates` 时**不内嵌模板**；
+- `fingers/resources/embed.go` 的条件是 `!noembed && go1.16`，带 `noembed` 时**不内嵌资源库**；
+- `sqlite` 选纯 Go 驱动（不带会退回 CGO 路径），`osusergo` 关掉 cgo 的 user 查找。
+
+saker 验证过的能力基线来自那个带 tag 的 exe；不带同一套 tag，二进制更大、默认模板行为也不同。
+
+### 4.3 怎么证明一样
+
+| 层 | 做法 | 何时跑 |
+| --- | --- | --- |
+| 命令面 | AOP `ListCommands`（节点上报的命令清单）与进程内 `CommandRegistry` 的命令名集合做 diff | 阶段 A 一次，之后每次升级 |
+| 工具面 | `TestEmbeddedToolSurface` golden（`bash`/`read`/`edit`/`subagent`/`web_search`/扫描命令） | CI |
+| 行为面 | 同一个命令两边各跑一次（`gogo -h`、一条只打本机回环的小扫描），比参数表与输出 | 升级冒烟（§14.5） |
+
+只有第 2 道能自动判失败；第 1 道发现的是「集合差异」，第 3 道发现的是「同名但行为不同」。三道都要。
+
+### 4.4 不对齐的部分
+
+`node`、`inbox`、`IOA`、`TUI`、`session protocol`、`web` 是进程、传输与界面层。嵌入后 saker 自己就是宿主，
+装了只会多一套状态（§2 第 1 条、§12）。
 
 **维护代价**：复制装配清单会随上游漂移，而它不在 fork 的补丁 diff 里，漂移时编译不会失败。对策在 §14.6。
 
@@ -439,6 +478,8 @@ journal 只加可选字段，不升 `JournalSchemaVersion`（理由见 §6.1）�
    这是 fork 前缀缓存的前提，不成立就不要在文档里写「缓存可复用」。
 8. `UPSTREAM.commit` 与 submodule gitlink 不一致时，构建门禁是否真的失败（先写门禁，再造一个不一致验它）。
 9. 冷构建时间与 `go test ./...` 时长（嵌入后 1756 包）：从分钟级变十分钟级就先解决测试组织，不接受。
+10. 带 exe 的 tag 集（`forceposix emptytemplates noembed osusergo sqlite`）能否编过、`go test` 能否跑；
+    再比一次 `ListCommands`（节点上报）与进程内 `CommandRegistry` 的 diff 是否为空（§4.3）。
 
 ---
 
@@ -558,6 +599,8 @@ go test ./internal/... ./cmd/saker/...
   `git -C third_party/cyber rev-parse HEAD:cmd/cyber-scan/profile.go` 必须与它相等；
 - 复制体文件头写同一个 hash；两者不等 → 门禁失败 → 人读 `profile.go` 的 diff → 更新复制体与 hash。
 - 每次升级都要读一遍 `profile.go` 的变更，这是唯一无法自动化的部分。
+- 另外两处漂移点不在这个 hash 里：`tools/*` 的 import 集合与 build tags（§4.2 第 1、3 项）。
+  它们靠 §4.3 的命令面 / 工具面检查兜住，不靠人读。
 
 ### 14.7 许可与声明
 
