@@ -296,7 +296,7 @@ func TestHarnessCommanderNoteReceiptRoundTrip(t *testing.T) {
 	defer cancel()
 	h, err := host.Start(ctx, host.Config{
 		Bin: bin, NodeBin: scan, Dir: dir, Args: []string{"--config", config},
-		DropEnvPrefixes: []string{"CYBER_"}, ExcludeTools: "subagent",
+		DropEnvPrefixes: []string{"CYBER_"}, Env: []string{"CYBER_EXCLUDE_TOOLS=subagent"},
 		ReadyTimeout: 45 * time.Second, RequireProvider: true, Logf: t.Logf,
 	})
 	if err != nil {

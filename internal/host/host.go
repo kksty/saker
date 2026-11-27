@@ -79,12 +79,6 @@ type Config struct {
 	// full document for the scan. Empty HubArgs reuses Args (one document for
 	// both, which is what tests and older callers expect).
 	HubArgs []string
-	// ExcludeTools is the harness's CYBER_EXCLUDE_TOOLS value for this host
-	// (for example "subagent"). Empty leaves the variable alone. Saker sets it
-	// by default so the harness does not expose delegation tools that create
-	// sessions outside the ledger (docs/17 §3.2; `--allow-native-subagent` is
-	// the operator's escape hatch).
-	ExcludeTools string
 	// Persist writes <Dir>/host/local.json (endpoint, PID, …) whenever the host
 	// becomes ready and removes it on a clean stop.
 	Persist bool
@@ -739,7 +733,7 @@ func (h *Host) execLaunch() (*process, error) {
 		hubExtra = extra
 	}
 	h.mu.Unlock()
-	childEnv := withExcludeTools(h.childEnv(env), h.cfg.ExcludeTools)
+	childEnv := h.childEnv(env)
 	start := func(bin, name string, args []string) (*exec.Cmd, error) {
 		cmd := exec.Command(bin, args...)
 		cmd.Dir, cmd.Env = h.cfg.Dir, childEnv
@@ -853,19 +847,6 @@ func (h *Host) childEnv(extra []string) []string {
 	// C:\Windows\System32\bash.exe, or the agent sees /mnt/c paths.
 	setEnv(&env, "PATH", dir+string(os.PathListSeparator)+path)
 	h.cfg.Logf("host: PATH 里没有 ls，已把 %s 加进宿主 PATH（agent 的 shell 需要 coreutils）", dir)
-	return env
-}
-
-// withExcludeTools pins CYBER_EXCLUDE_TOOLS in the child environment. The
-// control plane's own environment may already carry the variable; setEnv keeps
-// exactly one definition, so the instance's decision (default "subagent", or
-// nothing with --allow-native-subagent) wins over a stale inherited value.
-func withExcludeTools(env []string, value string) []string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return env
-	}
-	setEnv(&env, "CYBER_EXCLUDE_TOOLS", value)
 	return env
 }
 

@@ -1,659 +1,162 @@
-# 嵌入式运行架构（02）
+# Harness 适配实施方案（02）
 
-本文是**开发文档**：目标形态、归属模型、落地顺序与验收。`docs/01-architecture.md` 仍是**当前实现**的
-事实来源，本文与它冲突时，现状以 01 为准，方向以本文为准。每节标题后的标记表示该节是否已有实现：
+本轮实施期间以本文为统一入口，开发顺序、采用决策、验收结果和待办集中记录在这里。[01 核心架构](01-architecture.md)继续描述已发布的行为。整批实施收尾时按第 5 节一次回写。
 
-- `[现状]` 今天就是这样，改代码不需要动它。
-- `[未实现]` 还没有，按 §9 的顺序落地。
-- `[已实现]` 落地后回写标记；全部落地后按本文重写 01，并删除本文的计划性内容。
+## 1. 架构决策
 
-## 0. 摘要与决策
+Saker 保留现有的独立 Hub、独立执行节点部署。Saker 持有意图、认领、事实、证据和交付状态；Hub 持有节点连接、运行事件归档和回放；harness Runtime 持有会话、回合和工具调用。Hub 可用 `pkg/web/host.Serve` 单独托管，作为本地打包选项。该方式仍使用 TCP，执行节点和客户端仍走现有协议。
 
-要做的：把 harness 整棵树作为子模块编进 saker，本地执行改在进程内跑；账本、认领、交接、看门狗仍在
-saker 的 Go 代码里。
+本轮要改变的是**运行状态与计量的归属**。Saker run 是账本里的一次运行，harness session 持有对话，harness turn 执行一次输入。一个长会话可以跨多个 Saker run，一个 Saker run 也可以关联多个子会话。Saker run 结算和观测补齐各有状态。独立复核继续绑定断言版本与证据，交接继续使用账本快照。
 
-| 决策 | 取值 | 落点 |
+运行节点装配原生 `subagent` 工具时，执行者可以在同一个 run 内按需使用三种模式。工具可用性由 harness 节点配置决定。每个子会话单独运行，通过父工具调用归属到发起回合。
+
+| 模式 | 初始上下文 | 工具调用何时返回 |
 | --- | --- | --- |
-| 嵌入范围 | 本地全进程内；远端节点保留 AOP | §3、§9 |
-| 权限 | 指挥官与执行者同工具面，差异只在 system prompt 与工作目录 | §3 |
-| 编排 | 调度权留在 decider（门在账本前），投递走会话 Inbox；派发打账本事务，不把意图做成 subagent | §3 |
-| 成本 | 不设 token 上限闸，只逐会话记账 | §2、§6.2 |
-| 自持副本 | git submodule + 构建前 pin 校验 | §14 |
+| `sync` | 新对话 | 等待结果 |
+| `async` | 新对话 | 启动后返回，结果送回父会话 |
+| `fork` | 继承父对话截至最近完整工具批次边界的历史 | 启动后返回，结果送回父会话 |
 
-**为什么嵌入**：不是「不嵌入没法 fork」，而是 fork 的分支要能被看见、算清、追溯（§1）。这三件事共用
-一条链：分支事件要同总线 → 执行者与账本同进程 → 扫描工具集编进 saker。
+父会话关闭时，harness 取消并等待仍运行的附属子会话。父回合结束、子会话结束和 Saker run 结算各自记录。子会话的独立对话和收件箱可以与父会话共享工具环境。部署环境决定工作目录、进程和网络隔离。
 
-**先做什么**：阶段 A 只加分——执行者先进进程、开 fork、事实带来源，commander 与 Hub 不动；拿到收益后
-再删进程与 AOP（§9）。
+## 2. 已验证的基线
 
----
+验证使用本地 harness `ee4fd48a`、Linux amd64、临时 SQLite 和本地假模型或协议夹具。Saker 的独立 fork 构建仍需按实际发布的 pin 验收。
 
-## 1. 为什么嵌入
-
-嵌入买的是三样，而且这三样在同一条链上：
-
-| 要的东西 | 为什么只有同进程能给 | 今天的断点 |
-| --- | --- | --- |
-| **看得见** | `Runtime.Observe` 是全运行时事件总线，父会话与 fork 子会话的事件在同一条流上 | AOP 的 `WatchEvents` 按单个 session 订阅（`pkg/web/api/session.go:654`），`belongsToTurn` 会把 session 不匹配的事件丢掉（`internal/aopexec/executor.go:338-345`） |
-| **算得清** | 每个子会话有自己的 `turn_ended.usage` 和自己的 `session_id`，可以逐会话记账 | 子会话用量落不进总账，三条分支的 token 是黑箱 |
-| **追得到** | 事实在工具调用里声明，`ctx` 带 session/turn/call 身份，来源可以结构化 | 三条分支并发 append `.saker/facts.jsonl`，只有行序，没有身份 |
-
-目标链是硬的：三条路径并行且每条要完整现场 → 必须 fork → 分支要进账本 → 事件必须同总线 →
-执行者必须与账本同进程 → 扫描工具集必须编进 saker。中间路线（执行者留节点、saker 另订阅子会话）
-技术上成立，但要把可见性建在「从 `Started subagent … (session=xxx)` 里抠 id」或
-「轮询 `ListSessions` 找 `parent_session_id`」上，比嵌入脏，而且是长期维护成本。
-
-**代价（实测，2026-11-27）**
-
-| 指标 | 今天 | 嵌入后 |
-| --- | --- | --- |
-| saker 构建包数 | 317（非标准库 102） | 再叠加 `pkg/harness` 463（非标准库 230）；装扫描工具集时 `cmd/cyber-scan` 入口 1756（非标准库 1487） |
-| 依赖 | `go.sum` 58 行、约 20 个 require | 1744 行、354 个 require |
-| 二进制 | `saker.exe` 33.7 MB | 最小嵌入探针 35.4 MB（只装一个工具），再叠加 saker 自身与扫描工具集 |
-| 交叉编译 | 纯标准库，一条命令 | **失去**（扫描工具集带 cgo 与平台相关依赖） |
-
-口径：包数与二进制由 `go list -deps` 与实编测得；冷构建时间与 `go test ./...` 时长未测（§13 第 9 条）。
-
----
-
-## 2. 不变量
-
-1. **账本是唯一真值**。harness 侧持久状态一律为空：不装 `inbox` Router（它只拥有 `inbox_route`，
-   拿不到任何工具，承担不了账本决定——`docs/architecture.md:60`；装了就是第二份投递状态；
-   若将来要装，`StateDir` 必须为空），不落 `active.sqlite`，不把 subagent 的完成回执当业务事实。
-2. **run 的生命周期仍由 `internal/lifecycle` 决定**。子会话不产生 run；派生的分支只属于父 run。
-3. **重启对账保持可用**。进程死亡时所有 live run 收敛为 `canceled/restart`
-   （`lifecycle.ReconcileAfterRestart`），意图 Hold 保留，由指挥官决定重派。
-4. **不设 token 上限闸**。成本靠计量，不靠截断：上限会砍掉正在推进的工作，而且是固定配额。
-   防线是时间闸（§8.3）、回合上限与重启对账。
-5. **不改账本模型**。意图/事实/线索/复核/证据的语义不动；只加来源字段与一张会话表（§10）。
-6. **工具是唯一动作面**。写账本只有一条路径，控制台 handler 与工具调同一个函数。
-
----
-
-## 3. 目标形态
-
-```mermaid
-flowchart TB
-    subgraph P["saker.exe（唯一进程）"]
-        CMD["commander 会话<br/>（阶段 B 起）"]
-        EX["executor 会话：一次 run 一条"]
-        BR["fork 分支子会话 ×N<br/>同一前缀，各自 WorkDir"]
-        RT["harness Runtime<br/>Observe = 全总线"]
-        T["saker 工具集（原生）<br/>board·intent·dispatch·fact·message·note"]
-        L[("账本 SQLite<br/>intents·runs·facts·evidence·run_sessions")]
-        J["runs 目录的 run journal<br/>含子会话行"]
-        RT --- CMD
-        RT --- EX
-        EX --> BR
-        CMD --> T
-        EX --> T
-        BR --> T
-        T --> L
-        RT --> J
-    end
-    L -.->|"阶段 A：commander 仍走 AOP"| H["cyber-harness Hub + 节点进程"]
-    L -.->|"远端节点（保留）"| R["远端 harness"]
-```
-
-**角色 = 同一套工具上的不同会话配置**（决策：指挥官与执行者同权限）：
-
-| | 指挥官 | 执行者 |
-| --- | --- | --- |
-| 会话 | 每项目一条长会话，交接时轮换 | 一次 run 一条；`continue` 复用、`handoff` 换 |
-| 工具 | 与执行者完全相同 | 与指挥官完全相同 |
-| 差异 | `SystemPrompt`、`WorkDir=<data>/<project>/commander` | `SystemPrompt`（本次意图）、`WorkDir=<case>` |
-| 派生 | 不派生执行者（派发是工具 + 账本事务，不是 subagent 调用） | 可用 `fork`/`sync` 派生分支（同一现场分叉） |
-
-派发仍走账本：`intent_dispatch` 工具里完成认领事务与 run 行，再起执行者会话。
-**不把「意图」做成 subagent**：subagent 是一次 run 内部的派活方式，不是账本实体（01 §6）。
-
-**唤醒与投递**：调度权仍在 `internal/decider`——暂停、注意力、模型、宿主健康、退避、交接压力这些门
-在账本前面，不在 agent 循环里（`internal/decider/runner.go:1041-1130`）。它阶段 B 之后不再拼 prompt、
-不再管「一次一轮 AOP 会话」，只决定「什么时候给指挥官投递一条输入」；投递走会话 Inbox
-（`Runtime.Deliver`），子代理完成与操作员消息也进同一个 Inbox。删掉的是一轮一次的会话载体，不是这些门。
-
----
-
-## 4. 装配
-
-### 4.1 组合根
-
-组合根在 `internal/hostapp`。副本以 git submodule 形式放在 `third_party/cyber`
-（形态、pin 与门禁见 §14）。装配形态仿 `cmd/cyber-scan/profile.go`——该文件是 `package main`，
-不能 import，只能复制清单：
-
-```
-harness.New(harness.Config{
-    Base: harness.BaseConfig{Directory, SkillPaths, Provider, Guardrail, Egress, Logger},
-    Extensions: []extension.Extension{
-        // 扫描能力（照 cmd/cyber-scan/profile.go 的清单，只取执行需要的）
-        // subagent：
-        subagentext.New(), subagentext.NewTools(),
-        // saker 自有：
-        sakertools.New(store, lifecycle, ...),
-    },
-    Session: &agentsession.Config{PrimarySessionID: "saker"},
-})
-```
-
-**装**：`subagent`（fork 的入口）、扫描/代理/passive/浏览器、文件与 bash、skills、guardrail、
-saker 工具集、`exts/otel`（可选）。
-
-**不装**：`webext`（控制台是 saker 的）、`inboxext`（第二套投递状态）、`tui`、`ioaclient`
-（消息走账本），`nodeext`（阶段 B 若保留远端再议）。
-
-### 4.2 与 `cyber-scan.exe` 的能力对齐
-
-目标不是「二进制一样」，是「工具面一样」。四件事必须同时对齐，漏任何一件都是编译通过、能力悄悄变少：
-
-| # | 对齐项 | 做法 | 漏了会怎样 |
-| --- | --- | --- | --- |
-| 1 | **import 集合** | `internal/hostapp/imports.go` 镜像 `cmd/cyber-scan` 对 `tools/*` 的 blank import | `gogo`/`neutron`/`spray`/`katana`/`passive` 等命令不出现在 `bash` 里，编译不报错 |
-| 2 | **装配函数** | 复制 `cmd/cyber-scan/extensions.go:31` 的 `extensions(config, loop, workDir, proxy, guardrail)` 与 `profile.go` 的增量：`nativeext.New()`（:257）、`ptyext.New()`（:272）、`sessionext.New(agentConfig)`（:277）、`subagentext.NewTools()`（:281）、observer/otel、guardrail、jev | 工具/命令在，但少了 scanner 注册、pty、otel 或子代理工具 |
-| 3 | **build tags** | 与 `scripts/build-harness.ps1` 同一套：`forceposix emptytemplates noembed osusergo sqlite`（scan 节点；hub 另加 `full`）。`go build` 与 `go test` 都带 | 见下：tag 作用在依赖上，编译形态不同 |
-| 4 | **配置来源** | `appConfig` 是 CLI 自己的类型，不能复用；按字段映射 `scan`/`search`/`gateway`/`proxy`/`guardrail`/`mcp`/`llm`，从 settings 取同值 | 装配相同但配置为空，等于少能力（例如 search 没有 key） |
-
-去掉的部分：`nodeext`、`inboxext`、`ioaclient`、`tuiext`、`sessionext.NewProtocol`/`NewConsole`、
-`guardrail.NewProtocol`、`router` —— 这些是进程/传输/界面层，嵌入后 saker 自己就是宿主（§4.4）。
-
-tag 为什么不能省（实测作用在依赖上）：
-
-- `gogo/pkg/templates.go` 的构建条件是 `!emptytemplates`，带 `emptytemplates` 时**不内嵌模板**；
-- `fingers/resources/embed.go` 的条件是 `!noembed && go1.16`，带 `noembed` 时**不内嵌资源库**；
-- `sqlite` 选纯 Go 驱动（不带会退回 CGO 路径），`osusergo` 关掉 cgo 的 user 查找。
-
-saker 验证过的能力基线来自那个带 tag 的 exe；不带同一套 tag，二进制更大、默认模板行为也不同。
-
-### 4.3 怎么证明一样
-
-| 层 | 做法 | 何时跑 |
-| --- | --- | --- |
-| 命令面 | AOP `ListCommands`（节点上报的命令清单）与进程内 `CommandRegistry` 的命令名集合做 diff | 阶段 A 一次，之后每次升级 |
-| 工具面 | `TestEmbeddedToolSurface` golden（`bash`/`read`/`edit`/`subagent`/`web_search`/扫描命令） | CI |
-| 行为面 | 同一个命令两边各跑一次（`gogo -h`、一条只打本机回环的小扫描），比参数表与输出 | 升级冒烟（§14.5） |
-
-只有第 2 道能自动判失败；第 1 道发现的是「集合差异」，第 3 道发现的是「同名但行为不同」。三道都要。
-
-### 4.4 不对齐的部分
-
-`node`、`inbox`、`IOA`、`TUI`、`session protocol`、`web` 是进程、传输与界面层。嵌入后 saker 自己就是宿主，
-装了只会多一套状态（§2 第 1 条、§12）。
-
-**维护代价**：复制装配清单会随上游漂移，而它不在 fork 的补丁 diff 里，漂移时编译不会失败。对策在 §14.6。
-
----
-
-## 5. 归属模型
-
-三层身份，缺一不可：
-
-| 身份 | 来源 | 用途 |
-| --- | --- | --- |
-| `run_id` | 账本（`Store.StartIntentRun`） | 一次意图执行 |
-| `session_id` | harness（`SessionOptions.ID`），**由 saker 生成并写入账本**：意图 run 用 `<run_id>`，commander 长会话用 `<project>`，fork 分支由 harness 分配后回填 | 一次会话；父会话与每个 fork 分支各一个 |
-| `call_id` | harness（`operation.InvocationFromContext`） | 父会话里那次 `subagent` 工具调用 |
-
-父会话 id 由 saker 决定，这样重启后能从账本找回会话与其中断点，而不是从磁盘 marker 猜。
-
-**分支身份 = `label` + `parent_call_id`**。`DelegationDetail` 只带 `agent_id/agent_name/agent_type/
-context_mode/run_mode/task`（`proto/types/agent.proto:51-58`），没有 `label`；`label` 是父工具调用的参数，
-用 `Subagent` 工具调用记录里的 `label` 与子会话 `session_started.parent_tool_call_id` 连接。
-
-派生关系落成一张表，不改账本既有表（§10）：
-
-```
-run_sessions(session_id, run_id, parent_session_id, parent_call_id, agent_name, agent_type,
-             context_mode, run_mode, label, state, stop_reason, 用量四列, started_at, ended_at)
-```
-
-子会话 `state=closed` 时父 run 不一定结束（父轮可能还在等其它分支）；父 run 结算只认账本，
-不认子会话状态。
-
----
-
-## 6. 三条链路
-
-### 6.1 看得见 `[未实现]`
-
-1. `Runtime.Observe` 装一个观察器，把**所有** `*aop.Event` 交给 journal 写入器（今天只有一个
-   `runs/<id>.jsonl` 写入器，输入来自 AOP 单会话流）。
-2. 归属：`session_id == run.session_id` → 父行；`parent_session_id` 指向父会话 → 子行，`parent_call_id`
-   从 `session_started` 取。`event.session_id` 为空的事件按今天的规则归当前 run。
-3. journal 行加**可选**字段 `parent_session_id`、`branch`（label）。**不升 schema 版本**：新增可选字段
-   不改变既有字段的含义，`V=1` 的旧日志仍然可读；只有字段含义变化时才升版并拒读旧日志
-   （`internal/executor/executor.go:24-29`）。
-4. 子会话的 `tool_call` / `tool_result` 也进 journal：三条分支各自跑了什么，与父 run 同一条时间线。
-
-### 6.2 算得清 `[未实现]`
-
-- 每个 `turn_ended` 的 `usage` 落到 `run_sessions` 对应行；`usage_missing`/`usage_requests` 一并落，
-  缺报不补零（沿用今天的口径：`internal/aopexec/executor.go:577-601`）。
-- 父 run 的 `Result.Tokens` 只统计父会话；`run_sessions` 的和才是这次 run 的真实开销。
-  控制台在 run 详情里同时显示「父会话」与「分支小计」。
-- **不设上限**。不做 `TokenBudget` 闸；`budget` 停止原因保留，但不会因为配额触发。
-- **要改写一条旧立场**：`internal/api/journal.go` 的 `nativeSubagentInfo` 写着「临时助手归父会话管理，
-  Saker 账本不单独登记其 run/usage 或取消」，`Run.NativeSubagentCalls/Active/DurationMS` 也只按工具名
-  计数。子会话仍然不产生 run，但用量要按会话登记——文案与计数一起改成「不产生 run，登记会话与用量」。
-
-### 6.3 追得到 `[未实现]`
-
-工具拿执行身份：
-
-```
-cfg, ok := agent.ToolAgentConfig(ctx)        // SessionID / TurnID / ParentSessionID
-inv := operation.InvocationFromContext(ctx)  // CallID
-```
-
-现状已经有一半：`Fact.SourceRunID` 已在用，`DeclarationID` 目前**默认取 facts.jsonl 的字节区间**
-（`internal/model` 的 Fact 注释），这是「由文件位置定义观察身份」。原生工具之后它必须换成
-工具调用的稳定身份（`call_id`，或 `session_id + call_id`），否则丢掉 JSONL 就丢了幂等键。
-
-新增两个 **bookkeeping** 字段 `SourceSessionID`、`SourceCallID`。它们**不进 claim 指纹**：
-`claimHash` 只序列化一个显式字段结构（`internal/store` 的 `claimHash`，字段顺序即哈希契约），
-所以加来源字段不会把所有事实的断言版本推高、不会让既有复核失效。既有测试
-`TestClaimHashCoversTheAssertionNotTheBookkeeping` 要扩一条：来源字段变化不改变指纹。
-
-**阶段 A 先验证一件事**：工具 `ctx` 里的 `agent.Config` 是否真的带 `SessionID`/`ParentSessionID`
-（`agent/tool_context.go:7-23` 只保证带的是本次执行的 Config）。不带就退化为「由工具自己从
-`Operation.InvocationFromContext` 取 call_id，再用 call_id 反查 `run_sessions`」，不猜。
-
----
-
-## 7. 复用清单
-
-分四类。「何时用」指 §9 的阶段；没有阶段的表示与嵌入无关或明确不用。
-
-### 7.1 已在用，可以吃更深
-
-| 机制 | 现状 | 建议 |
-| --- | --- | --- |
-| AOP 事件 oneof 与 `Kind*` | 一一对应（`internal/executor/executor.go:31-62`） | 已对齐，保持 |
-| typed 扩展 `CompactDetail`/`EvalDetail`/`BudgetWarning`/`DelegationDetail`/`LLMRequestDetail`（`proto/types/agent.proto:39,51,60,68,73`） | `rawJSON` 主动丢弃 `Extensions`（`internal/aopexec/executor.go:821-823`），压缩靠 `IsCompactionState` 匹配字符串 | 阶段 A：嵌入式实现直接读 typed payload，删字符串判定 |
-| `usage.detail`（`cache_read`/`cache_write`/`requests`/`usage_missing`/`context_window`） | 已在读（`executor.go:800-811`） | 阶段 A：`context_window` 作唯一来源，删 128000 兜底 |
-| Goal Evaluation（`EvalCriteria`/`EvalRounds`，`pass/continue/reason/feedback`，上限 20） | 只在意图显式设 `Eval` 时传 | 建议：意图的验收标准默认作为 eval 标准传入；它只做运行内自查，不替代复核回执 |
-| Guardrail 判定 | 读 `Decision`/`Review` 事件；控制台只改 YAML | 阶段 B：用 `Pending`/`Resolve` 闭环 |
-| Skills | 物化到磁盘 + 绝对路径 + `/skill:` 前缀 | 阶段 B：改 `skills.Bundle` 贡献，删物化与前缀 |
-| 流量事件（`traffic.Flow` → `Kind:"http"`） | 已在用（`executor.go:655-675`） | 出口与 CA 交给 `egress.Endpoint`/proxy 扩展，saker 只读 |
-
-### 7.2 关着或没用
-
-| 机制 | 现状 | 何时用 |
-| --- | --- | --- |
-| `subagent` sync/async/fork | 默认关（`CYBER_EXCLUDE_TOOLS`，`internal/host/host.go:82-87`） | 阶段 A：嵌入式执行者默认开 |
-| `SessionOptions.OnClosed`/`Attached`/`SingleTask` | 没用（`SingleTask` 上游已有字段） | 阶段 A：run 结算与父子生命周期挂这里 |
-| `Runtime.Deliver`/`Session.Deliver` | 走 IOA HTTP（`internal/ioa/client.go:139-169`） | 阶段 B：直投 |
-| `agent.RunTask` | 没用 | 阶段 B：复核/报告一次性运行 |
-| `prompt.Contribution`/`prompt.Resolver` | Go 拼字符串 + 锚点 | 阶段 B：稳定段进贡献 |
-| `hooks.ModelPolicy{DisableTools,Purpose}` | 没用 | 阶段 B：给压缩/评估/judge 打标，用量归因更干净 |
-| `operation.InvocationFromContext` | 没用 | 阶段 A：工具里拿 `CallID`（§6.3） |
-| `MaxParallelTools`/`MaxResultSize`/`CacheRetention`/`Compaction` | 没用 | 阶段 B：按角色调 |
-| `mcp` 扩展 | 没用 | 本方案不需要；执行者若仍在外进程才考虑 |
-| `exts/otel` | 自有 `internal/metrics` | 阶段 C：模型/工具 span 交给它 |
-| `TokenBudget`/`stop_reason=budget` | 没有预算闸 | **不采用**（§2 第 4 条） |
-
-### 7.3 重复实现，应让位
-
-- `modelContext()` 的 128000 窗口兜底（`cmd/saker/hub.go:861-868`）；
-- 两份 `absorb` 与两份 delta 折叠（`internal/aopexec/executor.go:543-622` 与
-  `internal/executor/process.go:193-234`）；
-- skills 物化；
-- `internal/metrics` 与 `exts/otel` 各一套观测；
-- `internal/executor/session.go`（旧 stream-json 切片合并，无生产调用方）；
-- 进程监管（嵌入后整层消失）。
-
-### 7.4 明确不采用
-
-| 机制 | 为什么 |
+| 验证 | 结果 |
 | --- | --- |
-| inbox Router | 只拥有 `inbox_route`，当不了指挥官；再加就是第二套投递状态 |
-| `verify`/`sniper` 做复核 | 复核不能由被复核会话派生 |
-| IOA outbox 当业务真值 | 内置 IOA 是内存存储，重启重建（`docs/user/web.md:19`） |
-| fork 当交接 | fork 是并行分叉，不是换人 |
-| token 上限闸 | 固定配额会砍断正在推进的工作（§2 第 4 条） |
+| 最小 Go Runtime | `pkg/harness.New` 配置 Session 后已装配原生子代理。在一个根回合中各调用一次 `sync`、`async`、`fork`，观察到四个会话的终态。三个子会话都携带父会话 ID、父工具调用 ID 和模式。只有 `fork` 继承了父历史标记。 |
+| 进程内样本用量 | 根会话 69 tokens，三个子会话分别为 11、13、17，小计 41，合计 110。数值来自假模型。 |
+| Hub 归档边界 | 生产转发代码收到三个带结构化父关系的子会话及其回合终态。SQLite 父时间线只保存根终态，子回合用量未持久化。 |
+| Saker 消费边界 | 假 Hub 通过回环 WebSocket 在父终态前送达三个子终态。执行器只交付父终态，样本 run 保留父用量 5715 tokens，三个子会话共 33 tokens 未计入。 |
+| 现有回归 | 父回合游标续跑、审批 Pending/Resolve、入账和恢复的定向测试通过。远端子会话归档、补读到 Saker 持久入账的全链路仍待修复验收。 |
+| Hub 单独托管 | `webhost.Serve` 在回环启动，无本地执行 profile，接受独立节点协议客户端并下发配置，关闭时结束连接。Linux 默认构建中 `pkg/web/host` 入口有 282 个非标准库依赖包，Saker 入口有 93 个，数字分别计数。 |
 
----
+## 3. 实施顺序
 
-## 8. 边界
+### 第一步 · 修复 Hub 的子会话事件归档
 
-### 8.1 崩溃 `[必须保持]`
+在 harness fork 修复通用归档行为，接缝位于 `pkg/web/service/agents_mux.go` 的事件转发。
+使用 `SessionStarted` 中的父会话和父工具调用关联子会话。Hub 时间线用于归档、订阅和补读，归档事件保留原始会话、回合和事件 ID。
+关联按节点、来源会话和父工具调用核对，父链缺失时保留观测缺口。会话轮换与子代理派生分别依据已有结构化信息处理。
+优先复用现有 AOP 字段与 `WatchEvents`；差距若在现有协议无法表达的行为，先补最小兼容测试再改契约。
 
-- 工具 panic：harness 把 panic 转成工具结果交回模型（`docs/architecture.md:56`）。加一条测试锁住这个前提。
-- 进程崩溃 / OOM：整个控制面一起死。防线只有重启对账——`ReconcileAfterRestart` 把 live run 收敛为
-  `canceled/restart`（`internal/lifecycle/lifecycle.go:792-842`），**子会话行也要一起收敛**，
-  不能留下 `state=open` 的孤儿行。这条要有测试（§11）。
-- 子进程：bash/PTY 由 harness 的 `proc.Manager` 管，取消会话时停掉；saker 崩溃时它们可能成为孤儿。
-  阶段 B 需要一条「按账本里 live run 的 case 目录清扫遗留进程」的检查，或依赖 Job Object。
+验收用本地假模型或节点夹具。按父时间线订阅并断线重连，三种模式的生命周期和最终用量均可回放，能追到父工具调用；
+同一终态重复交付仍只归档一次。覆盖父回合之后到达的子终态、会话轮换和互相独立的两个根会话。
+同一父会话复用回合 ID 后，上一代执行的迟到子终态仍可追溯到原父工具调用，并由 Saker 计入原 run。
+Hub 的 `delivery_cursor` 用于补读，瞬时 delta 仍按现有协议处理。产品账本和项目入账由 Saker 管理。
 
-### 8.2 取消 `[未实现]`
+### 第二步 · Saker 投影会话归属与用量
 
-`ctx` 取消 → `Runtime.CancelSessionRun(sessionID, turnID)`；父会话关闭会取消并等待子会话
-（`docs/architecture.md:96`）。停止项目 = 取消该项目的全部 live run 及其子会话。
-终态仍由 lifecycle 落：`SettleIntentForRun` 的入参不变。
+从 `internal/aopexec` 的父回合结果处理里分出观测消费，沿父工具调用把子会话归到发起回合及其 Saker run。
+观察窗口可延续到子会话终态或后续补读。晚到子终态更新原 run 的观测与用量，原 run 的业务结算照常保留。
+持久事件按事件身份去重，游标随成功入账推进。并发、重放和进程中断要保持投影与游标一致。
 
-### 8.3 时间 `[未实现]`
-
-每次 run 必须有 deadline：取项目级 `run_timeout`，其次取实例 `--timeout`。两者都为 0 时
-**不伪造默认值**：run 行记录「未设时间闸」并在控制台显示，同时照常执行。
-
----
-
-## 9. 落地顺序
-
-### 阶段 A：子会话可见 + 原生事实工具（只加分，不改现有路径）
-
-范围：`third_party/cyber` submodule + `UPSTREAM` + 构建前三项门禁（§14.3）、`internal/hostapp`（装配）、
-`internal/hostrunner`（`executor.Executor` 的进程内实现，只接 `Purpose == ""` 的意图 run）、
-`internal/tools/ledger` 的 `fact_submit`/`evidence_attach`、`run_sessions` 表、journal 子会话行。
-
-不动：commander 仍走 AOP；Hub 与节点进程照旧；HTTP 动作面照旧。
-
-验收场景固定为你的目标场景：主线已经积累代理配置、账号与拓扑，**同一现场同时试越权 / 提权 /
-数据外带三条互不依赖的路径**。三个具名 fork 定义，同一段 system prompt，各自 `WorkDir` 与验收，
-`DefaultMode: fork`；三条分支从同一前缀起跑，父轮等它们回来后才结束。
-
-行为对等项（不能比 `aopexec` 少）：媒体与 artifact 落盘、usage 聚合（含缺报）、取消、
-续跑、`belongsToTurn` 的等价规则（改成「按会话归属」而不是「按单一 session 过滤」）。
-
-退出标准：
-
-1. 一次真实意图 run 里，三条 fork 分支在 `runs/<id>.jsonl` 中各有一组行，`run_sessions` 三行 + 父行。
-2. 每个子会话的 `turn_ended.usage` 落库，缺口计入 `usage_missing`，不补零。
-3. `fact_submit` 写的事实带 `(source_session_id, source_call_id)`，能查到是哪条分支。
-4. 工具 panic 不带走进程。
-5. `kill` 进程后重启：live run 与子会话全部 `canceled/restart`，无 `state=open` 残留。
-6. 远端节点与 commander 的 AOP 测试仍全过。
-
-回滚：`--runtime=embedded|aop` 开关；默认先 `aop`，逐项目打开。
-
-### 阶段 B：切主路径、删本地进程
-
-范围：commander 进进程；`purpose` 全部走嵌入式（远端节点除外）；删本地 AOP 路径——`internal/host`
-的本地进程监管、`internal/aopexec` 的 marker/游标、`cmd/saker/session_env.go`、会话令牌与
-「路由可见性即权限」、`/skill:commander` 前缀与 prompt 锚点；事实改为声明时入账。
-
-退出标准：一次真实项目的完整流程（派发 → 执行 → 事实 → 复核 → 报告）全进程内；远端节点仍可用；
-续跑/取消/交接/插话四条各有复现测试。
-
-### 阶段 C：收口
-
-- 协议改 import：删 `internal/aop/{pb,pty,traffic,tool,command,operation,guardrail}` 下的生成副本，
-  改 import 副本模块的 `aop/...`；`internal/buildinfo/aopproto.go` 的 drift gate 与
-  `cmd/saker-gate -check-aop-protos` 同时删除（同一份协议不再有两个来源）。
-- 文档与声明：按本文重写 01、更新 `NOTICE`（嵌入来源、commit、AGPL、补丁清单位置）、
-  更新 `UPSTREAM`（`base`/`commit`/`synced`）。
-- 删死代码：`internal/executor/session.go`（旧 stream-json 切片合并，无生产调用方）、
-  `internal/host` 的本地进程监管。
-- 补齐 `Transport = embedded|aop|audit`。
-
----
-
-## 10. 数据模型增量
-
-账本不是「一实体一张表」，而是 `objects(kind,id,version,payload)` + `versions` + `relations` 的文档存储
-（`internal/store/sqlite.go` 的 `CREATE TABLE` 清单）。因此：
-
-- **会话归属与用量**新增一张表（`run_sessions`），与会话生命周期同事务写入；
-- **事实来源**是两个 payload 字段，不是 `ALTER TABLE`。
-
-```sql
--- 会话归属与用量；run_id 外键指向账本既有 runs
-CREATE TABLE run_sessions (
-  session_id        TEXT PRIMARY KEY,
-  run_id            TEXT NOT NULL,
-  parent_session_id TEXT NOT NULL DEFAULT '',
-  parent_call_id    TEXT NOT NULL DEFAULT '',
-  agent_name        TEXT NOT NULL DEFAULT '',
-  agent_type        TEXT NOT NULL DEFAULT '',
-  context_mode      TEXT NOT NULL DEFAULT '',  -- fork / fresh
-  run_mode          TEXT NOT NULL DEFAULT '',  -- background / foreground
-  label             TEXT NOT NULL DEFAULT '',
-  state             TEXT NOT NULL,             -- open / closed
-  stop_reason       TEXT NOT NULL DEFAULT '',
-  tokens            INTEGER NOT NULL DEFAULT 0,
-  input_tokens      INTEGER NOT NULL DEFAULT 0,
-  output_tokens     INTEGER NOT NULL DEFAULT 0,
-  cached_input_tokens INTEGER NOT NULL DEFAULT 0,
-  usage_requests    INTEGER NOT NULL DEFAULT 0,
-  usage_missing     INTEGER NOT NULL DEFAULT 0,
-  started_at        TEXT NOT NULL,
-  ended_at          TEXT NOT NULL DEFAULT ''
-);
-```
-
-事实来源改为 `model.Fact` 的两个 bookkeeping 字段（payload 内，可选，不进 claim 指纹）：
-
-```
-SourceSessionID string `json:"source_session_id,omitempty"`
-SourceCallID    string `json:"source_call_id,omitempty"`
-```
-
-`DeclarationID` 的取值同时换掉：从「facts.jsonl 字节区间」换成工具调用的稳定身份，
-否则声明幂等依赖的是文件位置而不是调用身份。
-
-journal 只加可选字段，不升 `JournalSchemaVersion`（理由见 §6.1）。
-
----
-
-## 11. 测试矩阵
-
-每条都要能复现失败原因，注释写清边界（`AGENTS.md` §3）。
-
-| 测试 | 断言 | 失败原因 | 边界 |
-| --- | --- | --- | --- |
-| `TestForkChildrenVisibleOnRuntimeBus` | 三条 fork 的 `session_started`/`turn_ended` 出现在同一 `Observe`，归到父 run | 订阅按 session 过滤时会只看到父会话 | 子会话 `state=open` 期间也要可见 |
-| `TestChildUsageAccountedPerSession` | 三个 `run_sessions` 行各有用量，和不超过 Provider 账单 | 只在父 `turn_ended` 记账会漏 | 缺报计 `usage_missing`，不补零 |
-| `TestFactSourceAttribution` | 三个分支各写一条事实，来源字段不同 | 并发 append 同一 JSONL 时无法区分 | 同一分支重复写，`call_id` 不变 |
-| `TestToolPanicBecomesResult` | 工具 panic → `is_error` 结果，进程存活 | 无 recover 时整进程死 | panic 在工具 goroutine 内 |
-| `TestRestartReconcilesChildSessions` | 杀进程重启后，子会话 `state=closed` + 父 run `canceled/restart` | 只收敛父 run 会留孤儿 | 重启发生在子会话运行中 |
-| `TestCancelParentStopsChildren` | 取消父 run 后子会话停止并落终态 | 子会话逃出取消范围 | fork/async 两种 |
-| `TestDeliverInjectsIntoRunningTurn` | 插话在下一次模型调用前到达，不打断当前轮 | 直投绕过 mailbox 时会丢消息 | 队列满时的背压 |
-| `TestSessionResumeFromTranscript` | 重启后按 `Messages`/`HistorySnapshot` 重建，历史条数与摘要一致 | 不保真就退化为新会话 + 交接快照 | 压缩过的会话 |
-| `TestSystemPromptByteStable` | 同进程两次构造的 system prompt 逐字节相等（工具/技能顺序、`Session Started`） | 顺序来自未排序的注册表或换时间戳时，fork 共享前缀失效 | 不同会话、不同分支 WorkDir |
-| `TestEmbeddedToolSurface` | 关键工具名齐全（bash/read/edit/subagent/扫描命令） | 上游改名会静默少能力 | 只断言存在，不断言行为 |
-
----
-
-## 12. 不做
-
-机制层面的「不采用」见 §7.4。这里只列产品级约束：
-
-- 不设 token 上限闸；不因成本截断运行。
-- 不改账本语义（只加 §10 的来源字段与会话表）。
-- 阶段 A/B 不改 `docs/01-architecture.md`（补正清单见 §15）。
-- 不为了嵌入顺手改 harness；能落在扩展点/会话配置/自有工具的，不进副本（§14.4）。
-
----
-
-## 13. 开工前要逐条验证
-
-1. `agent.ToolAgentConfig(ctx)` 是否带 `SessionID`/`ParentSessionID`（决定 §6.3 的取法）。
-2. 子会话 `session_started` 是否带齐 `parent_session_id`/`parent_tool_call_id`/`DelegationDetail`。
-3. `Runtime.Observe` 是否也收到子会话的 `message_delta`（决定 journal 是否要折叠子会话 delta）。
-4. `harness.New` 与 `Session` 扩展在「先装 base、后加扩展」顺序下的加载错误是否可定位。
-5. fork 子会话的 `WorkDir` 是否随具名定义的 `Prepare` 覆盖生效（三条分支不互相踩文件）。
-6. `usage.detail.cache_read` 在三条同前缀分支上是否真的非零（缓存复用是推断，不是承诺）。
-7. 同一进程内构造两次 system prompt，字节是否相同：工具/技能列表顺序（`ToolDefinitions()`/
-   `Skills.All()` 未排序）与 `Session Started`（取 Runtime 创建时间，`agent/session/runtime.go:36,278`）。
-   这是 fork 前缀缓存的前提，不成立就不要在文档里写「缓存可复用」。
-8. `UPSTREAM.commit` 与 submodule gitlink 不一致时，构建门禁是否真的失败（先写门禁，再造一个不一致验它）。
-9. 冷构建时间与 `go test ./...` 时长（嵌入后 1756 包）：从分钟级变十分钟级就先解决测试组织，不接受。
-10. 带 exe 的 tag 集（`forceposix emptytemplates noembed osusergo sqlite`）能否编过、`go test` 能否跑；
-    再比一次 `ListCommands`（节点上报）与进程内 `CommandRegistry` 的 diff 是否为空（§4.3）。
-
----
-
-## 14. 维护自持副本 `[未实现]`
-
-嵌入不消灭 fork，只改变它的形态与门禁方式。这一节定的是：副本怎么放、pin 怎么验、补丁怎么退、
-升级怎么走。
-
-### 14.1 形态：git submodule
-
-| 项 | 取值 |
+| 记录 | 所需身份与状态 |
 | --- | --- |
-| 位置 | `third_party/cyber/`（saker 仓库内的 submodule） |
-| remote / branch | `kksty/cyber-harness` 的 `saker/fixes` |
-| 自带的嵌套模块 | `third_party/cyber/aop/`（`github.com/chainreactors/cyber/aop`） |
-| saker 的 `go.mod` | `require github.com/chainreactors/cyber v0.0.0` + `replace github.com/chainreactors/cyber => ./third_party/cyber` + `replace github.com/chainreactors/cyber/aop => ./third_party/cyber/aop` |
-| 克隆 | `git submodule update --init --recursive`（构建脚本先跑这一句） |
+| 会话 | 运行来源、会话 ID、父会话、父工具调用、模式、观测到的开启与关闭。标签用于展示。 |
+| 回合 | 运行来源、会话 ID、回合 ID，以及同一回合 ID 可以复用时的执行代次。回合关联实际 Saker run。 |
+| 用量 | 已报告的 input/output/total、缓存细分、请求数、缺报和终态覆盖。裁判与辅助运行维持各自的统计口径。 |
+| 补读 | Hub 时间线身份、已持久化的消费游标。无法确认的终态和缺失数据保持未知。 |
 
-`replace` 到本地目录时，`require` 里的版本号不参与解析，**pin 由 submodule 的 gitlink 决定**；
-`UPSTREAM` 只是给人读的副本，门禁以 gitlink 为准。
+按已上报的逻辑模型调用暂计，普通调用的 `Usage` 可能已合并重试。同一回合有最终汇总时按实际提供的字段结算，缺报保留已观测小计和覆盖状态。
+项目总用量从各回合汇总一次，缓存分项用于解释用量。已含在最终汇总中的评估器用量可按独立上报做归因，仍只计一次。历史运行继续显示已有的父回合计量与已知覆盖范围。
+兼容旧 journal 与旧账本；可选来源字段沿用现有记录格式，存储变更随相应回归验证。
 
-为什么不是另外两种形态：
+验收覆盖三种模式、一个长会话连续服务多个 Saker run、迟到终态、断线重放、部分与全部缺报。
+假模型给出已知用量，断言父、子及项目小计精确一致。同一批事件重放不改结果。看门狗改读实际会话状态，
+并核对看门狗、控制台和运行 journal 对已结束、仍活动与观测未知使用同一口径。
 
-| 形态 | pin 是不是 git 事实 | 漂移是否可见 |
-| --- | --- | --- |
-| submodule | 是（gitlink） | 是（`git status` 直接显示子模块变化） |
-| 普通目录提交进仓库 | 不是（靠文件里写的字符串） | 本地顺手改副本看不出来 |
-| module cache + `replace ../cyber` | 不是（依赖旁边有没有 checkout） | 换机器/CI 直接编不过 |
+上述验收通过后，停用根据 `subagent` 工具调用与返回推算活跃数的逻辑，以及看门狗依赖该计数的两小时静默宽限。工具调用次数继续作为独立的观测数据。用量读取逐步归并到持久投影，保留旧 journal 与旧账本的回读口径。
 
-### 14.2 `UPSTREAM`（仓库根，saker 所有；不放进 submodule）
+### 第三步 · 结构化声明、恢复与投递
 
-放在 submodule 里就等于改副本，所以这份文件由 saker 维护，门禁读它：
+先验证现有跨进程入口能否携带可核对的执行身份。声明由 Saker 在账本事务中提交，记录当前 run、session、turn、call；
+幂等键来自经过验证的执行身份并保留同次调用内的声明身份。现行文件导入用于读取既有材料，
+兼容测试保留旧 `DeclarationID` 和断言版本。来源元数据独立于断言指纹。会话输出或子代理回执本身只记录为运行观测。
 
-```
-fork      kksty/cyber-harness
-branch    saker/fixes
-commit    <sha>            # 与 gitlink 一致；门禁比对这一行
-upstream  chainreactors/cyber-harness
-base      <sha>            # 最近一次真正合并进来的上游 master
-synced    2026-11-27
-compose   <blob>           # cmd/cyber-scan/profile.go 在该 commit 的 blob hash（§14.6）
-patches   见 FORK.md（条数即债务规模）
-```
+对话恢复优先验证锁定版本的历史快照能否重建模型上下文，沿用 harness 的取消语义。会话事件补读与对话重建各自验证，外部动作结果未知时由账本记录并交接。
+声明与历史验收覆盖取消后迟到事件、压缩历史重建和已入账声明的幂等提交。
 
-`base` 必须是 HEAD 的祖先——门禁用 `git merge-base --is-ancestor` 验，防止「记了 base 但没真的 merge」。
+结构化入口承接实时入账、声明幂等、原件保全、部分失败和中断恢复后，新运行停止追加 `.saker/facts.jsonl`，退出相应的定时扫描与结算补读。旧声明仍可导入、回读和修复。运行产出自动收集沿用独立的入口。
 
-### 14.3 构建前三项门禁
+`.saker/aop-session.json` 当前还用于定位 Hub、节点连接、会话与补读游标，在线定向消息和续接都依赖它。替换该文件前，验证新的持久会话记录能在轮换与重启后定位同一来源、恢复补读位置，并兼容旧运行的定位信息。历史快照负责重建对话。
 
-1. **pin**：`go run ./cmd/saker-gate -check-fork-pin`
-   - submodule 未初始化 → 失败，打印 `git submodule update --init --recursive`；
-   - `git -C third_party/cyber rev-parse HEAD` ≠ `UPSTREAM.commit` → 失败并打印两个值；
-   - `git -C third_party/cyber status --porcelain` 非空 → 失败（「本地临时改一下」正是漂移来源）；
-   - `UPSTREAM.base` 不是 HEAD 的祖先 → 失败。
-2. **fork 自身回归**：`go run ./cmd/saker-gate -check-fork-tests`
-   - 在 submodule 里跑补丁清单里的包（包名常量放在 saker 侧，每条注明对应 FORK.md 的补丁号），
-     不解析 Markdown；这是「fork 的测试不会自动被 `go test ./...` 带到」的补救。
-   - 只跑受影响包，单次控制在三分钟内。
-3. **工具面**：`TestEmbeddedToolSurface`（§11）+ `-check-embedded-surface`
-   - 断言 `bash`/`read`/`edit`/`subagent`/关键扫描命令存在；上游改名会在这里失败，而不是静默少能力。
+#### 定向消息与会话 mailbox
 
-`cmd/saker-gate -check-aop-protos` 继续保留到阶段 C：那时 `internal/aop/*/*.pb.go` 改为 import 副本模块，
-两个协议来源合一，这个 gate 与那批生成文件一起删除。
+Harness 的 mailbox 是每个 Session 自带的内存队列。模型循环在执行边界取出追加输入，后台完成通知也走这个队列。
+当前跨进程的在线消息已经经由 Saker 的 IOA 发送、Harness 协作扩展和目标会话的投递回调进入 mailbox。
+离线消息由 Saker 账本保存，随下一次由 Saker 登记的运行交付。进程内试点可省去 IOA 中转，沿用同一套回合归属与消费确认条件。
 
-### 14.4 补丁纪律与退休清单
+Saker 保留按稳定收件人保存消息、暂停与唤醒、已读回执和重启对账。发送端受理、会话入队、追加到模型上下文、
+收件人确认已读是不同阶段。Harness 的 `Session.Deliver` 面向实际会话，普通长会话空闲时可能自动开新一轮；
+仅在能把入队原子绑定到目标执行与回合、并确认消息消费的情况下替换现有路径。对空闲会话继续由 Saker 登记后启动。
+队列拒绝、消息被替换、回合结束或取消时，未确认的持久消息仍可续交。
 
-规则两条：**能用扩展点/会话配置/自有工具解决的，不改 harness**；每个补丁必须有 FORK.md 条目
-（原因、回归测试、回滚）并在升级时逐条核对。
+先把指挥官、执行者在线投递重复的认领、结果回写和 journal 接线收敛为一个流程，保留各自的唤醒规则。
+显式启动先验证 `RunInput.TurnID` 和 `RunInput.Message` 能保留 Saker 登记的回合与消息身份，并能确认实际消费。指挥官和执行者当前共用 `inboxSection` 准备未读内容。统一投递接过认领、消费确认和未读续交后，撤掉两处启动提示词拼接，复用公共收件逻辑。
+验收覆盖消息 ID、回复关系和事实引用，分别验证并发定向投递、末尾到达、项目暂停、会话轮换、队列满、断线重投和迟到回执。
 
-| 类别 | 补丁（FORK.md 编号） | 嵌入后的处理 |
-| --- | --- | --- |
-| 直接退役（理由消失） | #5 `CYBER_EXCLUDE_TOOLS`、#8 `SingleTask` 的 AOP 扩展、#16 关 recap、#13 配置元数据 | 改为「装哪些扩展 + 会话 `Tools`」「`SessionOptions.SingleTask`」「不装 `recapext`」「程序化构造配置」 |
-| 核心保留、只是不再需要跨进程载体 | #1 Continue inbox、#3 每会话 `WorkDir`、#15 `EvalGoal` | 字段与语义留着，AOP 扩展的解析删掉（上游仍无这些字段，别误以为能整条删） |
-| 与嵌入无关，原样保留 | #2 `context_window`、#4、#6、#7、#9、#10、#12、#17、#18、#19、#20 | 与进程边界无关，照旧同步上游 |
+#### 发现与证据的自动通知（候选方案）
 
-衡量口径不是文件数，而是**补丁条数 + 每条有退役条件**。今天 121 文件 / 7034 插入 / 422 删除是现状，
-不是目标；「为嵌入新增的补丁 ≤20 文件、核心 ≤300 行」才是可以承诺的那条线（理想 0–5）。
+现有定向聊天消息已保存在项目账本中。事实提交后，Saker 也会依据已登记的事实引用、置顶或关注对象，为关联意图生成持久的事实变化通知。通知只带事实 ID、记录版本和变更类型，可在线送达，收件人空闲时留待下一次运行。指挥官通过现有账本变化机制了解进展。跨意图的语义关联尚需执行者或指挥官主动查询图谱与账本，或由知情同伴定向告知。
 
-### 14.5 升级流程
+- **提交即入账。** 共享入口接收事实声明或线索、原始证据及其来源引用，记录提交者、来源运行和已知意图。原件可以是文本、截图、PDF 或二进制文件。执行者可直接关联已有记录，也可显式声明有原始证据支撑的事实。缺少原始证据的观察作为线索记录。原件保全并登记后即可查，归类和通知随后处理。
+- **按相关性自动通知。** 信使结合账本、当前意图和验收标准，判断谁可能用得上哪些材料，可建议补证、归类或合并查看疑似重复项。保留每份独立来源的原件，收件人自行判断是否调整下一步。收件人明确时可直接发消息。事实更正沿用断言版本和独立复核流程。
+- **自动送达与未读补读。** 通知尽量随当前运行送达，未读在后续运行接续时补读。通知携带关联理由、来源和版本引用，事实、证据及复核状态从账本读取。按 ID 查看事实沿用详情 API，主动查证复用 `changes`、`focus` 和 `facts`，按关系追踪时读图谱。
 
-```sh
-# 1) 进入副本并同步上游（副本平时是 detached HEAD，升级前先切到维护分支）
-git submodule update --init --recursive
-cd third_party/cyber
-git fetch origin && git fetch upstream
-git checkout saker/fixes
-git merge upstream/master            # 按 FORK.md 的流程解冲突、逐条核对回归测试
-go test ./agent/... ./exts/... ./tools/...   # 受影响包，三分钟内
-git push origin saker/fixes
-cd ../..
+两种复核模式共用提交和投递链路。开启复核时，未核验材料可发送来源、引用和状态提示，实际进入复核流程才显示待复核。当前断言通过核验后，按相关性发送更新。关闭复核时，入账即可提示「未核验（复核关闭）」，符合类别要求的断言沿用现有前提规则。自动带入模型上下文的通知遵循可见面规则，未核验断言留占位。`note` 始终是线索。送达、查看或采用为前提时按各自的边界读取当前版本和适用状态，分别验证排队期间切换复核模式、版本更正、撤回和否决。
 
-# 2) 在 saker 里提交新的 gitlink、更新 UPSTREAM（commit/base/synced/compose）
-git add third_party/cyber UPSTREAM
+#### 通信页的收件箱与证据展示（候选方案）
 
-# 3) 门禁与受影响包测试
-go run ./cmd/saker-gate -check-fork-pin
-go run ./cmd/saker-gate -check-fork-tests
-go run ./cmd/saker-gate -check-embedded-surface
-go test ./internal/... ./cmd/saker/...
-```
+在现有「通信」页增加「收件箱」标签，和聊天记录共用消息与回执。默认显示未读，支持按收件人和来源意图筛选。同一收件人收到同一事实的多次变化时聚合显示，保留各版本引用。通知卡片显示关联理由、来源、当前复核状态和实际合并次数，投递与已读状态各自呈现。
 
-然后跑五条冒烟（**断言**，不是「点一遍」）：
+首版把现有 `fact_notice` 纳入统一通知卡片，撤掉独立的「机械通知」样式和展示分支。入队、回执及历史记录继续沿用现有契约。
 
-1. 一条意图（含 `fact_submit` → 账本）；
-2. 一次 fork（三条分支：子会话可见、逐会话用量、事实来源）；
-3. 一次取消 + kill 进程后的重启对账（`canceled/restart`，无 `state=open` 残留）；
-4. Windows：bash 外部命令与路径（FORK.md #20 就是被这个咬过的）；
-5. 工具面 gate 通过（同 §14.3 第 3 项）。
+卡片提供「查看事实」，通过现有详情 API 读取记录，复用事实详情和原件预览。详情标明通知所指版本与当前版本，允许沿引用查看证据。需要追踪依赖时可从详情打开图谱。收件箱查询限于通知列表，历史事实与证据沿用账本查询和证据页。
 
-完整断言见 §11 测试矩阵；这里只列升级时必须人工确认的那几条。
+当前证据保全以 SHA-256 标识原件，读取时校验摘要。摘要说明原件字节是否一致，证据是否支持断言由独立复核判断。详情按已有数据呈现待保全、已保全、缺失和摘要不符等状态，分开显示断言的核验结果。当前每轮自动收集有数量预算，证据页只限制前端首屏渲染，列表 API 仍返回全部项目证据元数据。优先给现有证据列表 API 增加分页与按来源意图、运行、是否被事实引用的筛选，原件按需读取。
 
-### 14.6 装配清单的漂移（新的维护面）
+分页能遍历完整列表且按 ID 预览和下载通过后，撤掉证据页全量拉取、前端排序再截取首屏的路径。
 
-`cmd/cyber-scan/profile.go` 是 `package main`，只能复制到 `internal/hostapp/compose.go`。它**不在** fork 的
-补丁 diff 里：上游新增一个扩展、改一个构造参数，saker 不会编译失败，只会少能力。对策：
+#### 试点与采用条件
 
-- `UPSTREAM.compose` 记该文件在我们 pin 的 commit 上的 blob hash；
-  `git -C third_party/cyber rev-parse HEAD:cmd/cyber-scan/profile.go` 必须与它相等；
-- 复制体文件头写同一个 hash；两者不等 → 门禁失败 → 人读 `profile.go` 的 diff → 更新复制体与 hash。
-- 每次升级都要读一遍 `profile.go` 的变更，这是唯一无法自动化的部分。
-- 另外两处漂移点不在这个 hash 里：`tools/*` 的 import 集合与 build tags（§4.2 第 1、3 项）。
-  它们靠 §4.3 的命令面 / 工具面检查兜住，不靠人读。
+以现有按账本关联通知为基线，评估信使能否补上未登记的相关性，并量化有用通知、漏发、误投、重复打扰、提交到通知送达的耗时与额外模型用量。先复用 Saker 已有的持久通知和投递能力。若仍有持续到达、归属不明、需要跨重启处理的输入，再评估 Harness 持久 Inbox Router。Router 提供可恢复分发，信使通过账本判断项目内相关性。入账、投递、已读和复核各按自己的回执推进。
 
-### 14.7 许可与声明
+统一生产路径继续按账本已有引用、置顶和关注关系通知确定的收件人，信使补充尚未登记的关联。同一收件人对同一事实变化只生成一次通知。验证新路径能续交旧未读、保留历史与回执、队列满时保留补读位置、重启后接续，并在继续操作的判断中将事实变化通知排除出已收口项目的聊天待办，再停用独立的 `fact_notice` 生产路径。
 
-`NOTICE` 增加：嵌入来源（`kksty/cyber-harness`）、commit、AGPL-3.0、本地补丁清单位置（FORK.md）、
-以及「本仓库内 `third_party/cyber` 是上述项目的副本，不是本仓库重新授权」。01 的 §9 兼容边界在阶段 C
-一起改，阶段 A/B 不改 01。
+### 第四步 · 按收益选择部署
 
----
+进程内试点优先选使用冻结资料的一次性报告生成。用现有路径对照输入快照、取消、用量、输出持久化及原始引用，
+记录可删除的接线与新增依赖。若直接入账、定向投递或本地运行生命周期确实能减少维护，再决定扩大范围。
 
-## 15. `docs/01-architecture.md` 的补正清单 `[未实现]`
+Hub 内嵌有明确打包收益时复用 `pkg/web/host.Serve` 与单独的 Hub 数据库，保留独立 Hub 作为回退入口。
+分别检查监听就绪、节点重新连接、关闭排空、重启后回放和目标平台构建。Hub 与 Saker 的生命周期按各自的状态验证。
+执行节点和工具组合继续独立发布。协议复用与版本 pin 独立推进，沿用[现有构建和协议同步入口](../CONTRIBUTING.md)。
+通用修复在 fork 登记回归与退役条件，再评估回馈上游；Saker 业务留在 Saker。
 
-阶段 A/B 不改 01（它仍是现状的唯一事实来源）。这一节存的是「01 现在写错或写漏、且不依赖新代码」的条目，
-以及「必须等代码落地才能写」的条目。阶段 C 按本文重写 01 时，B 组一并处理。
+## 4. harness 能力取舍
 
-### 15.1 现在就能改（事实修正，不依赖新代码）
+| 能力 | 价值与采用条件 |
+| --- | --- |
+| AOP typed 事件与共享协议类型 | **现在做。** 以实际构建组合验证结构化压缩事件和模型窗口上报。确认消费者能识别压缩边界，并能在控制台和预算读取端表达「窗口未知」后，撤掉压缩状态字符串匹配和 `128000` 兜底。用量汇总随第二步收敛。 |
+| 会话历史、调用身份、生命周期 | **优先验证并复用。** 它们能替换 Saker 对声明身份、续接进度和子会话活跃度的推断，是最容易改变内部架构的能力。 |
+| Guardrail Pending/Resolve | **沿用现有实现。** Saker 已通过 AOP 查询与处理审批。验证子会话归属变更后父会话仍能正确展示相关审批。 |
+| `skills.Bundle` | **有价值。** 把稳定的自有技能资源放在受版本控制的贡献里。验证角色可见性、版本和加载失败后，在采用 Bundle 的部署中撤掉内置技能的磁盘展开及相应路径接线。外部技能路径继续走现有入口。 |
+| `prompt.Contribution` / `Resolver` | **有价值。** 将稳定的角色契约与每轮变化的输入分开，减少字符串锚点和全局提示词碰撞。项目文档原文、定向消息和实际输入归档仍由当前职责提供。采用前核对目标角色的可见内容与原文保真。 |
+| `exts/otel` | **作为诊断复用。** 首选用会话、模型和工具跨度核对延迟、失败与缺报。项目和 run 用量由持久计量投影提供。验收关注采样、队列丢失与内容开关。 |
+| Goal Evaluation | **按需复用。** 仅在明确需要运行内自查时传验收标准。回合汇总已含评估请求，分项归因沿用第二步的计量口径。账本的交付结算、证据复核继续走当前契约。 |
+| `agent.RunTask` | **适合小试点。** 它可以做独立的同步执行并产生追踪事件。若需要长会话、实时定向投递或恢复，使用明确的 Session 入口。先用只有冻结输入的一次性报告验证快照、取消、回执和用量归属。 |
+| Harness Inbox Router | **候选采用。** 用于持续到达且需可恢复分发的输入。Router 为无明确地址的输入选择去向，提供持久准入、重发去重和恢复。项目内按相关性通知先复用 Saker 已有链路。 |
+| `BeforeRun` / `BeforeModel` | **先验证运行端供给输入。** 经 Saker 归档并定向的本轮输入可在运行端按边界注入。核对压缩、重试和会话轮换后的身份及可见性，投递切换沿用第三步的消费确认条件。意图交接使用账本快照。 |
+| Hub 历史与原件归档 | **复用已有历史来源。** `ListEvents` 按会话查询持久事件，`WatchEvents` 负责实时订阅和断线续传。`ArtifactService.SyncArtifacts` 单独读取原始归档。Saker 保存证据引用、版本关联和业务回执。确认 Hub 覆盖实际引用的原件，且重启后账本引用仍可打开，再减少重复留档。 |
 
-| 位置 | 现状 | 应改为 |
-| --- | --- | --- |
-| §10 工具审批 | 只写 provider/mode/scope 的判定规则 | 补三条：`scope` 只按工具名过滤、`allow_prefixes` 只是字面前缀，**都不是安全边界**；`safe` 的 review 今天只能由 harness 侧放行或按 `review_timeout` 过期；审批不跨重启恢复 |
-| §7 宿主与模型 | 「harness 负责模型上下文与工具」 | 补：模型名与上下文窗口只以 harness 上报为准（`session_started.model`、`usage.detail.context_window`），控制面不维护窗口表；128000 兜底要删或标注为仅展示 |
-| §4 运行与恢复 | 讲账本、对账、预算 | 补：每次 run 另有一份 `runs/<id>.jsonl`，带 schema 版本，读不了拒读；它是事件记录，不是账本 |
-| 全文 | 没有「工具面」这一层 | 新增一节：工具面由安装的扩展与会话配置决定；`CYBER_EXCLUDE_TOOLS` 与 `--allow-native-subagent` 是当前的两个开关；子代理属于一次 run 内部 |
-| 全文 | 没有「外部运行时与版本」 | 新增一节：harness 是外部依赖，协议来自它的 protobuf；自持副本必须记上游基线 commit 与本地改动清单 |
+## 5. 验证与文档收尾
 
-### 15.2 落地后再写（否则 01 会描述不存在的实现）
+使用临时目录、假模型和回环夹具。每个行为修复保留一条复现测试，注释记录失败原因及边界。
+单次测试只覆盖受影响包和用例，控制在三分钟内。harness 侧优先测 Hub 的归档、游标、轮换和关闭；
+Saker 侧优先测 AOP 消费、账本投影、journal、看门狗与重启对账。联合验收以锁定版本连接公开入口，
+验证三种子会话的终态和精确用量从原始事件到项目汇总。部署变更独立验证。
 
-- 会话内派生子会话（fork/async）的语义：不产生独立 run、事件归父 run、取消随父、用量按 session 归因。
-- 工具面从环境变量换成「装哪些扩展 + 会话 `Tools`」。
-- 审批闭环：控制台用 `Pending`/`Resolve` 放行。
-- 续跑载体：会话句柄 + 持久 transcript 替代 `.saker/aop-session.json`。
-- 上下文与交接：稳定契约进提示词贡献、易变材料进每轮输入。
-
----
-
-## 参考
-
-**saker（现状）**
-
-- 调度与门：`internal/decider/runner.go:1041-1130`；`internal/decider/decider.go:445-529`
-- 执行链路与事件翻译：`internal/aopexec/executor.go:48-336,338-345,543-622,653-795,800-811,821-823`
-- 工具面与动作面：`cmd/saker/auth.go:387-423,515-578`；`internal/skills/assets/commander/SKILL.md`
-- 账本存储形态：`internal/store/sqlite.go:69-76`；claim 指纹：`internal/store` 的 `claimHash`
-- 对账与生命周期：`internal/lifecycle/lifecycle.go:548-604,792-842`
-- 现行立场：`internal/api/journal.go` 的 `nativeSubagentInfo`
-- 协议副本 gate：`internal/buildinfo/aopproto.go`；`cmd/saker-gate -check-aop-protos`
-- 自持副本现状：fork 仓库的 `FORK.md`（`saker/fixes`，44 commits / 121 文件 / 7034 插入 / 422 删除 / 20 条补丁）
-
-**cyber-harness（嵌入侧）**
-
-- 宿主集成：`docs/developer/hosting.md:11-49,85-90`
-- 会话与子代理：`docs/architecture.md:44,60,76,92-111,197-222`；`docs/user/web.md:70-87`
-- 观察、取消、投递、恢复（源码核实）：`agent/session/session.go:525,846,906,994,1575,37,47`
-- 配置与工具：`agent/types.go`（`Config` 字段）、`agent/subagent/registry.go`（`Prepare` 签名）
-- 守卫：`exts/guardrail/runtime.go:441,460`；`proto/types/guardrail.proto:36-44`
-- 提示词：`exts/prompt/defaults.go`（`RenderEnvironment` 不含工作目录）；`agent/session/runtime.go:36,278`
-- 子会话订阅边界：`pkg/web/api/session.go:654`
+1. **实施期间维护 02。** 每项完成后在本文记录验收结果、仍待处理的兼容问题，以及旧路径是否已退役。中途的实现进度集中记录在本文。
+2. **整批验收后一次修订 01。** 根据最终实现更新对应章节。会话归档、用量和宿主分工写入第 4、5、7 节，已交付的结构化声明与证据行为写入第 3 节，收件箱与投递行为写入第 6 节。复核契约如有实际变更，再更新第 8 节。文档写实际生效的行为，并去掉已退役路径和重复内容。
+3. **确认 01 能独立使用后再处理 02。** 核对 01 与实际构建及验收结果一致，更新指向 02 的引用。若本文已完成实施用途，在同一收尾批次删除。仍需实施的内容继续集中留在 02，未采用的候选方案按收尾决定处理。

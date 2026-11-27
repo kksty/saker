@@ -276,7 +276,7 @@ func TestHarnessExpandsCommanderSkillBeforeCallingModel(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 75*time.Second)
 	defer cancel()
-	h, err := host.Start(ctx, host.Config{Bin: bin, NodeBin: scan, Dir: dir, Args: []string{"--config", config}, DropEnvPrefixes: []string{"CYBER_"}, ExcludeTools: "subagent", ReadyTimeout: 45 * time.Second, RequireProvider: true, Logf: t.Logf})
+	h, err := host.Start(ctx, host.Config{Bin: bin, NodeBin: scan, Dir: dir, Args: []string{"--config", config}, DropEnvPrefixes: []string{"CYBER_"}, Env: []string{"CYBER_EXCLUDE_TOOLS=subagent"}, ReadyTimeout: 45 * time.Second, RequireProvider: true, Logf: t.Logf})
 	if err != nil {
 		t.Fatal(err)
 	}

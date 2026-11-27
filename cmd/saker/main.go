@@ -69,7 +69,6 @@ func main() {
 	hostAddr := flag.String("host-addr", "127.0.0.1:18766", "本机 cyber-harness Hub的监听地址（被占用时自动换一个空闲端口）")
 	requireHostReady := flag.Bool("require-host-ready", false,
 		"本机宿主没就绪就退出；默认降级启动控制台（API/设置可用，不派发），在「设置 → 模型」修好后宿主自动重启")
-	allowNativeSubagent := flag.Bool("allow-native-subagent", true, "允许 harness 原生 subagent；临时助手由父会话管理")
 	timeout := flag.Duration("timeout", 0, "per-run timeout, 0 means none")
 	idleTimeout := flag.Duration("idle-timeout", 30*time.Minute, "cancel a run with no events for this long (0 disables)")
 	maxEvidence := flag.Int("max-evidence", 200, "每次 run 最多自动登记的证据文件数（交接口声明的证据不受此限）")
@@ -140,18 +139,6 @@ func main() {
 		nodeBin = absPath(executor.NormalizePath(nodeBin))
 	}
 	log.Printf("harness Hub: %s", bin)
-	// The native subagent tool is allowed by default (--allow-native-subagent,
-	// true): its temporary helpers are owned by the parent session and counted
-	// through the run's NativeSubagent* fields instead of being registered as
-	// ledger runs. Setting the flag false excludes the tool on hosts that
-	// support CYBER_EXCLUDE_TOOLS.
-	excludeTools := "subagent"
-	if *allowNativeSubagent {
-		excludeTools = ""
-		log.Printf("harness: --allow-native-subagent 已启用：原生 subagent 工具可见（助手归父会话管理，账本只统计次数/时长，不单独建 run）")
-	} else {
-		log.Printf("harness: 排除原生工具 CYBER_EXCLUDE_TOOLS=%s（--allow-native-subagent 可恢复）", excludeTools)
-	}
 
 	// Execution locations are the local Hub + its scan node plus every scan
 	// process that registered with that Hub (auto-discovered by the node
@@ -334,7 +321,6 @@ func main() {
 		DropEnvPrefixes: []string{"SAKER_CONSOLE_TOKEN"},
 		Args:            harnessArgs,
 		HubArgs:         hubHarnessArgs,
-		ExcludeTools:    excludeTools,
 		// The local host is the one endpoint recorded on disk: its PID is how
 		// the next start knows the previous process did not stop cleanly.
 		Persist: true,
@@ -434,12 +420,7 @@ func main() {
 	}
 	warnExposure(*addr, nodes)
 	// Audit runs are local processes: they take the instance's harness settings.
-	// They are harness processes too, so the same tool exclusion applies.
-	auditEnv := eff.Env()
-	if excludeTools != "" {
-		auditEnv = append(auditEnv, "CYBER_EXCLUDE_TOOLS="+excludeTools)
-	}
-	nodes.SetLLM(auditEnv, harnessArgs)
+	nodes.SetLLM(eff.Env(), harnessArgs)
 	var h *hub
 	nodes.SetLocalID("local")
 	discoveryCtx, discoveryCancel := context.WithTimeout(ctx, 3*time.Second)

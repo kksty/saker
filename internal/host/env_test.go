@@ -106,6 +106,20 @@ func TestChildEnvDropsInheritedPrefixes(t *testing.T) {
 	}
 }
 
+// Tool exclusions belong to the harness environment. Removing Saker's flag
+// must preserve both inherited deployment settings and explicit fixture values.
+func TestChildEnvKeepsHarnessToolExclusions(t *testing.T) {
+	t.Setenv("CYBER_EXCLUDE_TOOLS", "ioa")
+	h := &Host{cfg: Config{Logf: t.Logf}}
+	if got := envValue(h.childEnv(nil), "CYBER_EXCLUDE_TOOLS"); got != "ioa" {
+		t.Fatalf("inherited tool exclusion = %q, want ioa", got)
+	}
+	h.cfg.DropEnvPrefixes = []string{"CYBER_"}
+	if got := envValue(h.childEnv([]string{"CYBER_EXCLUDE_TOOLS=subagent"}), "CYBER_EXCLUDE_TOOLS"); got != "subagent" {
+		t.Fatalf("explicit tool exclusion = %q, want subagent", got)
+	}
+}
+
 func TestEnvValueIsCaseInsensitive(t *testing.T) {
 	env := []string{"Path=C:\\a", "PATH=C:\\b"}
 	// The last definition wins, as it does for a child process.
