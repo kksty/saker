@@ -3,6 +3,7 @@
 // field instead of only showing a payload-level error.
 import { after, afterEach, before, test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import React from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
@@ -361,4 +362,23 @@ test('the model protocol is a choice, not free text', async () => {
   assert.equal(inputs.some(node => node.props['aria-label'] === '模型接口协议'), false, 'protocol must not be a text input')
   const trigger = renderer!.root.findAllByType('button').find(node => node.props['aria-label'] === '模型接口协议')
   assert.ok(trigger, 'protocol select trigger is missing')
+})
+
+test('every select label is inside a select group', async () => {
+  // Radix throws "`SelectLabel` must be used within `SelectGroup`", and a
+  // closed SelectContent still renders its children into a hidden fragment —
+  // so an ungrouped label takes the whole settings page down on mount. The
+  // node renderer does not mount that fragment, which is why only the browser
+  // caught it; this guard covers the rule statically.
+  const source = await readFile(fileURLToPath(new URL('../src/views/Settings.tsx', import.meta.url)), 'utf8')
+  let at = 0
+  let labels = 0
+  while ((at = source.indexOf('<SelectLabel', at)) >= 0) {
+    labels += 1
+    const open = source.lastIndexOf('<SelectGroup>', at)
+    const close = source.lastIndexOf('</SelectGroup>', at)
+    assert.ok(open >= 0 && open > close, 'a SelectLabel sits outside its SelectGroup')
+    at += 1
+  }
+  assert.ok(labels > 0, 'no SelectLabel found to check')
 })

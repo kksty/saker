@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { Cable, Check, Eye, EyeOff, FolderCog, KeyRound, TriangleAlert } from 'lucide-react'
-import { Badge, Button, Callout, EmptyState, Input, Select, SelectContent, SelectItem, SelectLabel, SelectTrigger, SelectValue, Skeleton, Spinner, Switch, Textarea } from '@cyber/ui'
+import { Badge, Button, Callout, EmptyState, Input, Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue, Skeleton, Spinner, Switch, Textarea } from '@cyber/ui'
 import { Page, Panel } from '@/components/Page'
 import { GuardrailPolicyCard } from '@/components/GuardrailPolicyCard'
 import { ProjectSettingsCard } from '@/components/ProjectSettingsCard'
@@ -543,10 +543,14 @@ function ModelConnection({settings}:{settings:AsyncState<SettingsView>}) {
        <SelectItem value={MODEL_PROVIDER_AUTO}>自动（按接口地址推断）</SelectItem>
        <SelectItem value="openai">openai（Chat Completions）</SelectItem>
        <SelectItem value="anthropic">anthropic（Messages）</SelectItem>
-       <SelectLabel>厂商预设（OpenAI 兼容）</SelectLabel>
-       {MODEL_VENDOR_PRESETS.map((preset) => (
-        <SelectItem key={preset.value} value={preset.value}>{preset.value} · {preset.label}</SelectItem>
-       ))}
+       {/* Radix's SelectLabel throws outside SelectGroup, and a closed
+           SelectContent still renders its children into a hidden fragment. */}
+       <SelectGroup>
+        <SelectLabel>厂商预设（OpenAI 兼容）</SelectLabel>
+        {MODEL_VENDOR_PRESETS.map((preset) => (
+         <SelectItem key={preset.value} value={preset.value}>{preset.value} · {preset.label}</SelectItem>
+        ))}
+       </SelectGroup>
        {draft.provider && !MODEL_PROVIDER_VALUES.has(draft.provider) && (
         <SelectItem value={draft.provider}>{draft.provider}（已保存）</SelectItem>
        )}

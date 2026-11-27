@@ -53,7 +53,6 @@ import {
 } from '@cyber/ui'
 import { BoardCounters } from '@/components/BoardCounters'
 import { ConsoleRail } from '@/components/ConsoleRail'
-import { EgressChip } from '@/components/EgressChip'
 import { FreshnessPill } from '@/components/FreshnessPill'
 import { AppendGoalDialog } from '@/components/AppendGoalDialog'
 import { CreateIntentDialog } from '@/components/CreateIntentDialog'
@@ -913,7 +912,6 @@ export function GraphView({ current, projects, board, boardState, onRefresh, loa
         footer={
           <div className="space-y-1.5">
             <FreshnessPill state={boardState} intervalMs={5000} label="项目数据" />
-            <EgressChip />
             <Button
               size="sm"
               variant="ghost"
